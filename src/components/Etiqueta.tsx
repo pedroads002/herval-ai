@@ -1,22 +1,38 @@
-const estilos: Record<string, string> = {
-  neutro: "bg-slate-100 text-slate-700",
-  sucesso: "bg-emerald-100 text-emerald-700",
-  atencao: "bg-amber-100 text-amber-700",
-  erro: "bg-rose-100 text-rose-700",
-  info: "bg-blue-100 text-blue-700",
-};
+/**
+ * Badge em formato de pílula, inspirado no ícone da logo.
+ * Só usa a paleta da marca: verde, preto e branco.
+ */
+const estilos = {
+  // Estado positivo: verde da marca.
+  verde: "bg-herval-verde text-herval-preto",
+  // Estado neutro/aguardando: contorno preto sobre branco.
+  contorno: "border border-black/25 bg-herval-branco text-black/70",
+  // Estado encerrado/negado: preto sólido.
+  preto: "bg-herval-preto text-herval-branco",
+} as const;
+
+export type TomEtiqueta = keyof typeof estilos;
 
 export default function Etiqueta({
   texto,
-  tom = "neutro",
+  tom = "contorno",
 }: {
   texto: string;
-  tom?: keyof typeof estilos;
+  tom?: TomEtiqueta;
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${estilos[tom]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${estilos[tom]}`}
     >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          tom === "verde"
+            ? "bg-herval-preto"
+            : tom === "preto"
+              ? "bg-herval-branco"
+              : "bg-black/40"
+        }`}
+      />
       {texto}
     </span>
   );

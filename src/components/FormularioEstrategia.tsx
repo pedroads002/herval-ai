@@ -5,7 +5,9 @@ import { Check } from "lucide-react";
 import { estrategiaInicial, type Estrategia } from "@/data/estrategia";
 
 const campoBase =
-  "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20";
+  "w-full rounded-controle border border-black/15 bg-herval-branco px-4 py-3 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
+
+const rotuloBase = "mb-2 block text-sm font-bold text-herval-preto";
 
 export default function FormularioEstrategia() {
   const [estrategia, setEstrategia] = useState<Estrategia>(estrategiaInicial);
@@ -32,13 +34,11 @@ export default function FormularioEstrategia() {
 
   return (
     <form
-      className="max-w-3xl space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="max-w-3xl space-y-8 rounded-card border border-black/10 bg-herval-branco p-8 shadow-card"
       onSubmit={(e) => e.preventDefault()}
     >
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-slate-700">
-          História da clínica
-        </label>
+        <label className={rotuloBase}>História da clínica</label>
         <textarea
           rows={4}
           value={estrategia.historia}
@@ -48,9 +48,7 @@ export default function FormularioEstrategia() {
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-slate-700">
-          Diferenciais
-        </label>
+        <label className={rotuloBase}>Diferenciais</label>
         <textarea
           rows={4}
           value={estrategia.diferenciais}
@@ -59,11 +57,9 @@ export default function FormularioEstrategia() {
         />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-8 sm:grid-cols-2">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-            Ticket médio
-          </label>
+          <label className={rotuloBase}>Ticket médio</label>
           <input
             type="text"
             value={estrategia.ticketMedio}
@@ -72,9 +68,7 @@ export default function FormularioEstrategia() {
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-            Formas de pagamento
-          </label>
+          <label className={rotuloBase}>Formas de pagamento</label>
           <input
             type="text"
             value={estrategia.formasPagamento}
@@ -85,9 +79,7 @@ export default function FormularioEstrategia() {
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-slate-700">
-          Público-alvo
-        </label>
+        <label className={rotuloBase}>Público-alvo</label>
         <textarea
           rows={3}
           value={estrategia.publicoAlvo}
@@ -96,11 +88,11 @@ export default function FormularioEstrategia() {
         />
       </div>
 
-      <div className="flex items-center gap-3 border-t border-slate-100 pt-5">
+      <div className="flex items-center gap-4 border-t border-black/10 pt-6">
         <button
           type="button"
           onClick={salvar}
-          className="rounded-lg bg-marca px-4 py-2.5 text-sm font-medium text-white hover:bg-marca-escura"
+          className="rounded-full bg-herval-verde px-6 py-3 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
         >
           Salvar estratégia
         </button>
@@ -108,13 +100,13 @@ export default function FormularioEstrategia() {
         {salvo ? (
           <span
             role="status"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700"
+            className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde/15 px-3.5 py-2 text-xs font-bold text-herval-preto"
           >
             <Check className="h-4 w-4" />
             Salvo
           </span>
         ) : (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs font-medium text-black/45">
             Tela de demonstração: nada é salvo ainda.
           </span>
         )}

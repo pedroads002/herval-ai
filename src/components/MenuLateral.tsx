@@ -8,6 +8,7 @@ import {
   MessageSquareWarning,
   Plug,
 } from "lucide-react";
+import LogoHerval from "@/components/LogoHerval";
 
 const itens = [
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
@@ -20,40 +21,34 @@ export default function MenuLateral() {
   const caminho = usePathname();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-20 flex w-56 flex-col bg-menu text-slate-200 md:w-64">
-      <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-marca font-bold text-white">
-          H
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-white">Herval AI</p>
-          <p className="text-xs text-slate-400">Painel operacional</p>
-        </div>
-      </div>
-
-      <nav className="flex-1 space-y-1 px-3">
+    <aside className="fixed bottom-0 left-0 top-16 z-20 flex w-56 flex-col bg-herval-preto md:w-64">
+      <nav className="flex-1 space-y-1.5 px-3 py-6">
         {itens.map(({ href, rotulo, Icone }) => {
           const ativo = caminho === href;
           return (
             <Link
               key={href}
               href={href}
+              aria-current={ativo ? "page" : undefined}
               className={[
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                "flex items-center gap-3 rounded-controle px-3.5 py-3 text-sm transition-colors",
                 ativo
-                  ? "bg-marca text-white"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white",
+                  ? "bg-herval-verde font-bold text-herval-preto"
+                  : "font-medium text-white/70 hover:bg-white/10 hover:text-herval-branco",
               ].join(" ")}
             >
-              <Icone className="h-4 w-4" />
+              <Icone className="h-4 w-4 shrink-0" />
               {rotulo}
             </Link>
           );
         })}
       </nav>
 
-      <div className="px-6 py-6 text-xs text-slate-500">
-        Versão de demonstração
+      <div className="flex items-center gap-2.5 border-t border-white/10 px-5 py-5">
+        <LogoHerval variante="dark" className="h-7 w-7" />
+        <span className="text-xs font-medium text-white/50">
+          Versão de demonstração
+        </span>
       </div>
     </aside>
   );

@@ -4,6 +4,28 @@ Painel visual (front-end) do Herval AI. Nesta fase existe **apenas a interface**
 não há backend, banco de dados nem integração externa. Todos os dados são fixos,
 escritos direto no código.
 
+## Identidade visual
+
+Paleta oficial Herval, usada de forma exclusiva (não há outras cores no
+projeto):
+
+| Cor    | Código    | Uso                                            |
+| ------ | --------- | ---------------------------------------------- |
+| Verde  | `#01D800` | destaque, item ativo, ações principais, badges  |
+| Preto  | `#000000` | menu lateral, títulos, texto, estado encerrado  |
+| Branco | `#FFFFFF` | fundo da página e dos cards                     |
+
+Cinzas são obtidos por transparência do preto (`text-black/60`), para não
+introduzir nenhuma cor nova. As cores ficam em `tailwind.config.ts` sob
+`herval`.
+
+### Logos
+
+O cabeçalho superior usa `public/logo-light.png` e o rodapé do menu usa
+`public/logo-dark.png`. **Basta colocar os dois arquivos na pasta `public/`** —
+nada mais precisa ser alterado. Enquanto eles não existirem, aparece um
+monograma "H" no lugar, para a tela não ficar com imagem quebrada.
+
 ## Stack
 
 - Next.js (App Router) + React + TypeScript

@@ -2,17 +2,17 @@
 
 import { useState } from "react";
 import { Check, X } from "lucide-react";
-import Etiqueta from "@/components/Etiqueta";
+import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
 import {
   tarefasIniciais,
   type StatusTarefa,
   type Tarefa,
 } from "@/data/tarefas";
 
-const tomDoStatus: Record<StatusTarefa, "atencao" | "sucesso" | "erro"> = {
-  Pendente: "atencao",
-  Aprovado: "sucesso",
-  Rejeitado: "erro",
+const tomDoStatus: Record<StatusTarefa, TomEtiqueta> = {
+  Pendente: "contorno",
+  Aprovado: "verde",
+  Rejeitado: "preto",
 };
 
 export default function TabelaTarefas() {
@@ -30,54 +30,62 @@ export default function TabelaTarefas() {
   const pendentes = tarefas.filter((t) => t.status === "Pendente").length;
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-500">
-        {pendentes === 0
-          ? "Nenhuma tarefa pendente."
-          : `${pendentes} ${pendentes === 1 ? "tarefa pendente" : "tarefas pendentes"}.`}
+    <div className="space-y-5">
+      <p className="text-sm font-medium text-black/55">
+        {pendentes === 0 ? (
+          "Nenhuma tarefa pendente."
+        ) : (
+          <>
+            <span className="font-extrabold text-herval-preto">{pendentes}</span>{" "}
+            {pendentes === 1 ? "tarefa pendente" : "tarefas pendentes"}.
+          </>
+        )}
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-black/10 bg-black/[0.03] text-left text-xs uppercase tracking-wider text-black/50">
               <tr>
-                <th className="px-5 py-3 font-medium">Lead</th>
-                <th className="px-5 py-3 font-medium">Regra disparada</th>
-                <th className="px-5 py-3 font-medium">Ação sugerida</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium">Ações</th>
+                <th className="px-6 py-4 font-bold">Lead</th>
+                <th className="px-6 py-4 font-bold">Regra disparada</th>
+                <th className="px-6 py-4 font-bold">Ação sugerida</th>
+                <th className="px-6 py-4 font-bold">Status</th>
+                <th className="px-6 py-4 font-bold">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-black/[0.07]">
               {tarefas.map((tarefa) => {
                 const aprovada = tarefa.status === "Aprovado";
                 const rejeitada = tarefa.status === "Rejeitado";
 
                 return (
-                  <tr key={tarefa.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4 font-medium text-slate-900">
+                  <tr
+                    key={tarefa.id}
+                    className="transition-colors hover:bg-herval-verde/[0.06]"
+                  >
+                    <td className="px-6 py-5 font-bold text-herval-preto">
                       {tarefa.lead}
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{tarefa.regra}</td>
-                    <td className="px-5 py-4 text-slate-600">{tarefa.acao}</td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-5 text-black/65">{tarefa.regra}</td>
+                    <td className="px-6 py-5 text-black/65">{tarefa.acao}</td>
+                    <td className="px-6 py-5">
                       <Etiqueta
                         texto={tarefa.status}
                         tom={tomDoStatus[tarefa.status]}
                       />
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-5">
                       <div className="flex gap-2">
                         <button
                           type="button"
                           aria-pressed={aprovada}
                           onClick={() => definirStatus(tarefa.id, "Aprovado")}
                           className={[
-                            "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                            "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
                             aprovada
-                              ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                              : "border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700",
+                              ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                              : "border border-black/15 text-black/70 hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto",
                           ].join(" ")}
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -88,10 +96,10 @@ export default function TabelaTarefas() {
                           aria-pressed={rejeitada}
                           onClick={() => definirStatus(tarefa.id, "Rejeitado")}
                           className={[
-                            "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                            "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
                             rejeitada
-                              ? "bg-rose-600 text-white hover:bg-rose-700"
-                              : "border border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-700",
+                              ? "bg-herval-preto text-herval-branco hover:bg-black/85"
+                              : "border border-black/15 text-black/70 hover:border-herval-preto hover:bg-black/5 hover:text-herval-preto",
                           ].join(" ")}
                         >
                           <X className="h-3.5 w-3.5" />
