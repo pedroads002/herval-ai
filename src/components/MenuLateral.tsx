@@ -7,10 +7,12 @@ import {
   Building2,
   MessageSquareWarning,
   Plug,
+  LayoutDashboard,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 
 const itens = [
+  { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
   { href: "/estrategia", rotulo: "Estratégia da Clínica", Icone: Building2 },
   { href: "/objecoes", rotulo: "Quebra de Objeções", Icone: MessageSquareWarning },
