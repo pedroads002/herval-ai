@@ -13,8 +13,11 @@ import {
   ChevronRight,
   MessageSquare,
   PhoneCall,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
+import { descricaoPrazo, grupoDoPrazo, gruposPrazo } from "@/lib/prazo";
 import CartaoIndicador from "@/components/CartaoIndicador";
 import { indicadoresFila } from "@/data/indicadores";
 import {
@@ -100,7 +103,22 @@ export default function TabelaTarefas() {
     });
   }, [tarefas, busca, filtro]);
 
+  // Agrupa por urgência, mantendo a ordem: atrasadas primeiro.
+  const agrupadas = useMemo(
+    () =>
+      gruposPrazo
+        .map((grupo) => ({
+          grupo,
+          itens: visiveis.filter((t) => grupoDoPrazo(t.prazoEmHoras) === grupo),
+        }))
+        .filter((secao) => secao.itens.length > 0),
+    [visiveis],
+  );
+
   const pendentes = tarefas.filter((t) => t.status === "Pendente").length;
+  const atrasadas = visiveis.filter(
+    (t) => grupoDoPrazo(t.prazoEmHoras) === "Atrasada",
+  ).length;
 
   return (
     <div className="space-y-8">
@@ -143,7 +161,17 @@ export default function TabelaTarefas() {
         </span>{" "}
         {visiveis.length === 1 ? "tarefa exibida" : "tarefas exibidas"} ·{" "}
         <span className="font-extrabold text-herval-preto">{pendentes}</span>{" "}
-        {pendentes === 1 ? "pendente" : "pendentes"} no total.
+        {pendentes === 1 ? "pendente" : "pendentes"} no total
+        {atrasadas > 0 && (
+          <>
+            {" · "}
+            <span className="font-extrabold text-herval-preto">
+              {atrasadas}
+            </span>{" "}
+            {atrasadas === 1 ? "atrasada" : "atrasadas"}
+          </>
+        )}
+        .
       </p>
 
       {/* Tabela */}
@@ -173,7 +201,30 @@ export default function TabelaTarefas() {
                 </tr>
               )}
 
-              {visiveis.map((tarefa) => {
+              {agrupadas.map((secao) => (
+                <Fragment key={secao.grupo}>
+                  <tr>
+                    <td colSpan={7} className="bg-black/[0.04] px-6 py-3">
+                      <span
+                        className={[
+                          "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold",
+                          secao.grupo === "Atrasada"
+                            ? "bg-herval-preto text-herval-branco"
+                            : "border border-black/20 text-black/70",
+                        ].join(" ")}
+                      >
+                        {secao.grupo === "Atrasada" && (
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                        )}
+                        {secao.grupo}
+                        <span className="font-bold opacity-70">
+                          {secao.itens.length}
+                        </span>
+                      </span>
+                    </td>
+                  </tr>
+
+                  {secao.itens.map((tarefa) => {
                 const alerta = tarefa.tipo === "alerta-humano";
                 const aberta = expandida === tarefa.id;
                 const IconeResp = iconeResponsavel[tarefa.responsavel];
@@ -212,7 +263,22 @@ export default function TabelaTarefas() {
                         </button>
                       </td>
 
-                      <td className="px-6 py-5 text-black/65">{tarefa.regra}</td>
+                      <td className="px-6 py-5">
+                        <span className="block text-black/65">
+                          {tarefa.regra}
+                        </span>
+                        <span
+                          className={[
+                            "mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold",
+                            tarefa.prazoEmHoras < 0
+                              ? "text-herval-preto"
+                              : "text-black/45",
+                          ].join(" ")}
+                        >
+                          <Clock className="h-3 w-3" />
+                          {descricaoPrazo(tarefa.prazoEmHoras)}
+                        </span>
+                      </td>
 
                       <td className="px-6 py-5">
                         {alerta ? (
@@ -363,7 +429,9 @@ export default function TabelaTarefas() {
                     )}
                   </Fragment>
                 );
-              })}
+                  })}
+                </Fragment>
+              ))}
             </tbody>
           </table>
         </div>

@@ -41,6 +41,11 @@ export type Tarefa = {
   status: StatusTarefa;
   /** Há quantos minutos a tarefa está sem nenhuma ação. */
   minutosSemAcao: number;
+  /**
+   * Horas até o prazo da tarefa. Negativo significa prazo vencido.
+   * É relativo (e não uma data fixa) para o exemplo não envelhecer.
+   */
+  prazoEmHoras: number;
   score: {
     percentual: number;
     nivel: NivelScore;
@@ -63,6 +68,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Aguardando Resposta",
     status: "Pendente",
     minutosSemAcao: 95,
+    prazoEmHoras: -3,
     score: {
       percentual: 62,
       nivel: "Média",
@@ -101,6 +107,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Em Atendimento",
     status: "Pendente",
     minutosSemAcao: 38,
+    prazoEmHoras: 5,
     score: {
       percentual: 74,
       nivel: "Alta",
@@ -134,6 +141,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Pendente",
     status: "Pendente",
     minutosSemAcao: 4,
+    prazoEmHoras: 0.2,
     score: {
       percentual: 20,
       nivel: "Baixa",
@@ -153,6 +161,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Em Atendimento",
     status: "Pendente",
     minutosSemAcao: 12,
+    prazoEmHoras: 2,
     score: {
       percentual: 55,
       nivel: "Média",
@@ -185,6 +194,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Agendado",
     status: "Pendente",
     minutosSemAcao: 140,
+    prazoEmHoras: 20,
     score: {
       percentual: 88,
       nivel: "Alta",
@@ -217,6 +227,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Aguardando Resposta",
     status: "Pendente",
     minutosSemAcao: 260,
+    prazoEmHoras: -26,
     score: {
       percentual: 41,
       nivel: "Baixa",
@@ -243,6 +254,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Pendente",
     status: "Pendente",
     minutosSemAcao: 2,
+    prazoEmHoras: 0.1,
     score: {
       percentual: 20,
       nivel: "Baixa",
@@ -262,6 +274,7 @@ export const tarefasIniciais: Tarefa[] = [
     situacao: "Desqualificado",
     status: "Rejeitado",
     minutosSemAcao: 420,
+    prazoEmHoras: 72,
     score: {
       percentual: 8,
       nivel: "Baixa",
