@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2, Check, X } from "lucide-react";
+import { Pencil, Plus, Trash2, Check, X, AlertCircle } from "lucide-react";
 import { objecoesIniciais, type Objecao } from "@/data/objecoes";
 
 const campoBase =
-  "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20";
+  "w-full rounded-controle border border-black/15 bg-herval-branco px-4 py-3 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
+
+const botaoLinha =
+  "inline-flex items-center gap-1.5 rounded-full border border-black/15 px-3.5 py-2 text-xs font-bold text-black/70 transition-colors";
 
 export default function GerenciadorObjecoes() {
   const [objecoes, setObjecoes] = useState<Objecao[]>(objecoesIniciais);
@@ -74,14 +77,17 @@ export default function GerenciadorObjecoes() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Formulário de nova objeção */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Nova objeção</h2>
+      <div className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+        <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
+          <span className="h-4 w-1 rounded-full bg-herval-verde" />
+          Nova objeção
+        </h2>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="mt-6 grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-black/50">
               Objeção
             </label>
             <input
@@ -93,7 +99,7 @@ export default function GerenciadorObjecoes() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-black/50">
               Resposta padrão
             </label>
             <input
@@ -106,19 +112,22 @@ export default function GerenciadorObjecoes() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-6 flex items-center gap-4">
           <button
             type="button"
             onClick={adicionar}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-marca px-4 py-2.5 text-sm font-medium text-white hover:bg-marca-escura"
+            className="inline-flex items-center gap-2 rounded-full bg-herval-verde px-5 py-3 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
           >
             <Plus className="h-4 w-4" />
             Adicionar
           </button>
           {erro ? (
-            <span className="text-xs text-rose-600">{erro}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-black/20 px-3.5 py-2 text-xs font-bold text-herval-preto">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {erro}
+            </span>
           ) : (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs font-medium text-black/45">
               Tela de demonstração: nada é salvo ainda.
             </span>
           )}
@@ -126,23 +135,23 @@ export default function GerenciadorObjecoes() {
       </div>
 
       {/* Tabela */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-black/10 bg-black/[0.03] text-left text-xs uppercase tracking-wider text-black/50">
               <tr>
-                <th className="w-64 px-5 py-3 font-medium">Objeção</th>
-                <th className="px-5 py-3 font-medium">Resposta padrão</th>
-                <th className="w-20 px-5 py-3 text-right font-medium">Usos</th>
-                <th className="w-40 px-5 py-3 font-medium">Ações</th>
+                <th className="w-64 px-6 py-4 font-bold">Objeção</th>
+                <th className="px-6 py-4 font-bold">Resposta padrão</th>
+                <th className="w-20 px-6 py-4 text-right font-bold">Usos</th>
+                <th className="w-44 px-6 py-4 font-bold">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-black/[0.07]">
               {objecoes.length === 0 && (
                 <tr>
                   <td
                     colSpan={4}
-                    className="px-5 py-10 text-center text-slate-500"
+                    className="px-6 py-14 text-center font-medium text-black/50"
                   >
                     Nenhuma objeção cadastrada. Use o formulário acima para
                     adicionar.
@@ -152,8 +161,8 @@ export default function GerenciadorObjecoes() {
 
               {objecoes.map((item) =>
                 emEdicao === item.id ? (
-                  <tr key={item.id} className="bg-marca-clara/60">
-                    <td className="px-5 py-4 align-top">
+                  <tr key={item.id} className="bg-herval-verde/[0.07]">
+                    <td className="px-6 py-5 align-top">
                       <input
                         type="text"
                         value={edicaoObjecao}
@@ -161,7 +170,7 @@ export default function GerenciadorObjecoes() {
                         className={campoBase}
                       />
                     </td>
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-6 py-5 align-top">
                       <textarea
                         rows={2}
                         value={edicaoResposta}
@@ -169,15 +178,15 @@ export default function GerenciadorObjecoes() {
                         className={campoBase}
                       />
                     </td>
-                    <td className="px-5 py-4 text-right align-top tabular-nums text-slate-700">
+                    <td className="px-6 py-5 text-right align-top font-bold tabular-nums text-herval-preto">
                       {item.usos}
                     </td>
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-6 py-5 align-top">
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => salvarEdicao(item.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-3.5 py-2 text-xs font-bold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
                         >
                           <Check className="h-3.5 w-3.5" />
                           Salvar
@@ -185,7 +194,7 @@ export default function GerenciadorObjecoes() {
                         <button
                           type="button"
                           onClick={cancelarEdicao}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          className={`${botaoLinha} hover:border-herval-preto hover:bg-black/5 hover:text-herval-preto`}
                         >
                           <X className="h-3.5 w-3.5" />
                           Cancelar
@@ -194,20 +203,23 @@ export default function GerenciadorObjecoes() {
                     </td>
                   </tr>
                 ) : (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4 font-medium text-slate-900">
+                  <tr
+                    key={item.id}
+                    className="transition-colors hover:bg-herval-verde/[0.06]"
+                  >
+                    <td className="px-6 py-5 font-bold text-herval-preto">
                       {item.objecao}
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{item.resposta}</td>
-                    <td className="px-5 py-4 text-right tabular-nums text-slate-700">
+                    <td className="px-6 py-5 text-black/65">{item.resposta}</td>
+                    <td className="px-6 py-5 text-right font-bold tabular-nums text-herval-preto">
                       {item.usos}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-5">
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => iniciarEdicao(item)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          className={`${botaoLinha} hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto`}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Editar
@@ -215,7 +227,7 @@ export default function GerenciadorObjecoes() {
                         <button
                           type="button"
                           onClick={() => excluir(item.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-rose-50 hover:text-rose-700"
+                          className={`${botaoLinha} hover:border-herval-preto hover:bg-herval-preto hover:text-herval-branco`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Excluir
