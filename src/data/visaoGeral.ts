@@ -32,7 +32,13 @@ export const dadosVisaoGeral: Record<Periodo, DadosPeriodo> = {
   Diário: {
     kpis: [
       { id: "marketing", rotulo: "Leads de marketing", valor: "184", variacao: 12 },
-      { id: "agendamentos", rotulo: "Agendamentos", valor: "47", variacao: 8 },
+      {
+        id: "agendamentos",
+        rotulo: "Agendamentos",
+        valor: "47",
+        variacao: 8,
+        detalhe: "no período selecionado",
+      },
       {
         id: "reagendamento",
         rotulo: "Taxa de reagendamento",
@@ -70,7 +76,13 @@ export const dadosVisaoGeral: Record<Periodo, DadosPeriodo> = {
   Semanal: {
     kpis: [
       { id: "marketing", rotulo: "Leads de marketing", valor: "1.146", variacao: 6 },
-      { id: "agendamentos", rotulo: "Agendamentos", valor: "292", variacao: 11 },
+      {
+        id: "agendamentos",
+        rotulo: "Agendamentos",
+        valor: "292",
+        variacao: 11,
+        detalhe: "no período selecionado",
+      },
       {
         id: "reagendamento",
         rotulo: "Taxa de reagendamento",
@@ -108,7 +120,13 @@ export const dadosVisaoGeral: Record<Periodo, DadosPeriodo> = {
   Mensal: {
     kpis: [
       { id: "marketing", rotulo: "Leads de marketing", valor: "4.938", variacao: 9 },
-      { id: "agendamentos", rotulo: "Agendamentos", valor: "1.204", variacao: -4 },
+      {
+        id: "agendamentos",
+        rotulo: "Agendamentos",
+        valor: "1.204",
+        variacao: -4,
+        detalhe: "no período selecionado",
+      },
       {
         id: "reagendamento",
         rotulo: "Taxa de reagendamento",

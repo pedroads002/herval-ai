@@ -34,9 +34,6 @@ export function calcularIndicadoresFila(tarefas: Tarefa[]): Indicador[] {
     (t) => t.situacao === "Pendente" && t.minutosSemAcao > LIMITE_SEM_ACAO,
   ).length;
 
-  const percentualAgendados =
-    recebidos === 0 ? 0 : Math.round((agendados / recebidos) * 1000) / 10;
-
   return [
     {
       id: "recebidos",
@@ -48,7 +45,9 @@ export function calcularIndicadoresFila(tarefas: Tarefa[]): Indicador[] {
       id: "agendados",
       rotulo: "Leads agendados",
       valor: String(agendados),
-      detalhe: `${percentualAgendados.toLocaleString("pt-BR")}% do total`,
+      // Deixa explícito que é a fila de agora, e não o total do período
+      // mostrado no card "Agendamentos" da Visão Geral.
+      detalhe: `${agendados} de ${recebidos} na base atual da fila`,
     },
     {
       id: "ativos",
