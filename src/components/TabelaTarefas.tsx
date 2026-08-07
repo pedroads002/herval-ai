@@ -19,7 +19,7 @@ import {
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
 import { descricaoPrazo, grupoDoPrazo, gruposPrazo } from "@/lib/prazo";
 import CartaoIndicador from "@/components/CartaoIndicador";
-import { indicadoresFila } from "@/data/indicadores";
+import { calcularIndicadoresFila } from "@/data/indicadores";
 import {
   situacoesAtivas,
   tarefasIniciais,
@@ -115,7 +115,15 @@ export default function TabelaTarefas() {
     [visiveis],
   );
 
-  const pendentes = tarefas.filter((t) => t.status === "Pendente").length;
+  // Os cards saem das mesmas tarefas da tabela, então nunca divergem dela.
+  const indicadores = useMemo(() => calcularIndicadoresFila(tarefas), [tarefas]);
+
+  // Mesma contagem do card "Pendentes": leads aguardando a primeira ação.
+  const pendentes = tarefas.filter((t) => t.situacao === "Pendente").length;
+  // Métrica diferente e com nome próprio: tarefas sem decisão tomada.
+  const aguardandoDecisao = tarefas.filter(
+    (t) => t.status === "Pendente",
+  ).length;
   const atrasadas = visiveis.filter(
     (t) => grupoDoPrazo(t.prazoEmHoras) === "Atrasada",
   ).length;
@@ -124,7 +132,7 @@ export default function TabelaTarefas() {
     <div className="space-y-8">
       {/* Indicadores */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {indicadoresFila.map((indicador) => (
+        {indicadores.map((indicador) => (
           <CartaoIndicador key={indicador.id} {...indicador} />
         ))}
       </div>
@@ -161,7 +169,11 @@ export default function TabelaTarefas() {
         </span>{" "}
         {visiveis.length === 1 ? "tarefa exibida" : "tarefas exibidas"} ·{" "}
         <span className="font-extrabold text-herval-preto">{pendentes}</span>{" "}
-        {pendentes === 1 ? "pendente" : "pendentes"} no total
+        {pendentes === 1 ? "pendente" : "pendentes"} na fila ·{" "}
+        <span className="font-extrabold text-herval-preto">
+          {aguardandoDecisao}
+        </span>{" "}
+        aguardando decisão
         {atrasadas > 0 && (
           <>
             {" · "}

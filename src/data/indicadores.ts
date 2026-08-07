@@ -1,3 +1,5 @@
+import type { Tarefa } from "@/data/tarefas";
+
 /** Indicadores mostrados acima da tabela da Fila de Tarefas. */
 export type Indicador = {
   id: string;
@@ -9,45 +11,85 @@ export type Indicador = {
   alerta?: boolean;
 };
 
-// Números de exemplo. Ainda não vêm de banco nem de API.
-export const indicadoresFila: Indicador[] = [
-  { id: "recebidos", rotulo: "Leads recebidos", valor: "184", detalhe: "hoje" },
-  {
-    id: "agendados",
-    rotulo: "Leads agendados",
-    valor: "47",
-    detalhe: "25,5% do total",
-  },
-  { id: "ativos", rotulo: "Ativos na fila", valor: "38", detalhe: "em aberto" },
-  {
-    id: "pendentes",
-    rotulo: "Pendentes",
-    valor: "12",
-    detalhe: "3 sem ação há mais de 1h",
-    alerta: true,
-  },
-  {
-    id: "atendimento",
-    rotulo: "Em atendimento",
-    valor: "19",
-    detalhe: "com a equipe",
-  },
-  {
-    id: "aguardando",
-    rotulo: "Aguardando resposta",
-    valor: "23",
-    detalhe: "do lead",
-  },
-  {
-    id: "recuperacao",
-    rotulo: "Taxa de recuperação",
-    valor: "31%",
-    detalhe: "leads frios reativados",
-  },
-  {
-    id: "retorno-ia",
-    rotulo: "Retorno para IA",
-    valor: "68%",
-    detalhe: "voltam ao fluxo automático",
-  },
-];
+/** Minutos sem ação a partir dos quais a tarefa entra no alerta do card. */
+const LIMITE_SEM_ACAO = 60;
+
+/**
+ * Os cards são calculados a partir das próprias tarefas, e não de números
+ * soltos, para nunca divergirem do que a tabela mostra. "Ativos na fila" é
+ * exatamente Pendentes + Em atendimento + Aguardando resposta.
+ */
+export function calcularIndicadoresFila(tarefas: Tarefa[]): Indicador[] {
+  const porSituacao = (situacao: Tarefa["situacao"]) =>
+    tarefas.filter((t) => t.situacao === situacao).length;
+
+  const recebidos = tarefas.length;
+  const pendentes = porSituacao("Pendente");
+  const emAtendimento = porSituacao("Em Atendimento");
+  const aguardando = porSituacao("Aguardando Resposta");
+  const agendados = porSituacao("Agendado");
+  const ativos = pendentes + emAtendimento + aguardando;
+
+  const semAcao = tarefas.filter(
+    (t) => t.situacao === "Pendente" && t.minutosSemAcao > LIMITE_SEM_ACAO,
+  ).length;
+
+  const percentualAgendados =
+    recebidos === 0 ? 0 : Math.round((agendados / recebidos) * 1000) / 10;
+
+  return [
+    {
+      id: "recebidos",
+      rotulo: "Leads recebidos",
+      valor: String(recebidos),
+      detalhe: "na base de hoje",
+    },
+    {
+      id: "agendados",
+      rotulo: "Leads agendados",
+      valor: String(agendados),
+      detalhe: `${percentualAgendados.toLocaleString("pt-BR")}% do total`,
+    },
+    {
+      id: "ativos",
+      rotulo: "Ativos na fila",
+      valor: String(ativos),
+      detalhe: `${pendentes} + ${emAtendimento} + ${aguardando}`,
+    },
+    {
+      id: "pendentes",
+      rotulo: "Pendentes",
+      valor: String(pendentes),
+      detalhe:
+        semAcao > 0
+          ? `${semAcao} sem ação há mais de 1h`
+          : "nenhuma sem ação há mais de 1h",
+      alerta: semAcao > 0,
+    },
+    {
+      id: "atendimento",
+      rotulo: "Em atendimento",
+      valor: String(emAtendimento),
+      detalhe: "com a equipe",
+    },
+    {
+      id: "aguardando",
+      rotulo: "Aguardando resposta",
+      valor: String(aguardando),
+      detalhe: "do lead",
+    },
+    // Métricas históricas: não saem da fila de hoje, seguem como exemplo fixo.
+    {
+      id: "recuperacao",
+      rotulo: "Taxa de recuperação",
+      valor: "31%",
+      detalhe: "leads frios reativados",
+    },
+    {
+      id: "retorno-ia",
+      rotulo: "Retorno para IA",
+      valor: "68%",
+      detalhe: "voltam ao fluxo automático",
+    },
+  ];
+}
