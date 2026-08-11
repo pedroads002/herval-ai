@@ -9,12 +9,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Paleta oficial Herval: verde, preto e branco. Nada além disso.
+        // Paleta oficial Herval: verde, preto e branco.
         herval: {
           verde: "#01D800",
           verdeEscuro: "#01B300",
           preto: "#000000",
           branco: "#FFFFFF",
+          // Único tom fora da paleta, reservado para ações destrutivas e
+          // mensagens de erro (sair da conta, login recusado).
+          vermelho: "#D93025",
         },
       },
       borderRadius: {

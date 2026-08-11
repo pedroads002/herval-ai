@@ -80,3 +80,21 @@ As telas interativas guardam tudo em `useState` (memória do navegador).
 **Ao recarregar a página, tudo volta ao estado inicial** — não há backend, API
 nem `localStorage`. Quando existir backend, os arquivos de `src/data/` serão
 substituídos pela busca real de dados.
+
+## Acesso (login)
+
+O login é real, feito pelo Supabase. Os dados de leads, tarefas e régua
+continuam sendo exemplos fixos em `src/data/`.
+
+1. Copie `.env.example` para `.env.local` e preencha as duas chaves do seu
+   projeto Supabase (`Project Settings > Data API` e `API Keys`).
+2. No Supabase, abra o **SQL Editor** e rode o arquivo `supabase/perfis.sql`.
+   Ele cria a tabela `profiles` ligada aos usuários de autenticação.
+3. Crie o usuário em **Authentication > Users > Add user**. A linha em
+   `profiles` nasce junto; depois preencha `nome` e `sobrenome` em
+   **Table Editor > profiles**.
+4. Reinicie `npm run dev`.
+
+Quem não estiver autenticado é mandado para `/login` pelo arquivo
+`src/proxy.ts` (o antigo `middleware.ts` do Next). Como ele vale para toda a
+aplicação, qualquer tela nova já nasce protegida.
