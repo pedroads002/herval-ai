@@ -9,13 +9,19 @@ import {
   Plug,
   LayoutDashboard,
   Workflow,
+  Bot,
+  Stethoscope,
+  ClipboardList,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 
 const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
+  { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
   { href: "/regua-automacao", rotulo: "Régua de Automação", Icone: Workflow },
+  { href: "/profissionais", rotulo: "Profissionais", Icone: Stethoscope },
+  { href: "/especialidades", rotulo: "Especialidades", Icone: ClipboardList },
   { href: "/estrategia", rotulo: "Estratégia da Clínica", Icone: Building2 },
   { href: "/objecoes", rotulo: "Quebra de Objeções", Icone: MessageSquareWarning },
   { href: "/integracoes", rotulo: "Integrações", Icone: Plug },
@@ -26,7 +32,8 @@ export default function MenuLateral() {
 
   return (
     <aside className="fixed bottom-0 left-0 top-16 z-20 flex w-56 flex-col bg-herval-preto md:w-64">
-      <nav className="flex-1 space-y-1.5 px-3 py-6">
+      {/* Com o menu maior, a lista rola sozinha em telas baixas. */}
+      <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-6">
         {itens.map(({ href, rotulo, Icone }) => {
           const ativo = caminho === href;
           return (
