@@ -15,7 +15,7 @@ export default function PaginaLogin() {
     <main className="flex min-h-screen items-center justify-center bg-[#F7F7F7] px-6 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
-          <LogoHerval variante="light" className="h-12 w-12" />
+          <LogoHerval className="h-24 w-24 rounded-card p-2.5" />
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-herval-preto">
               Herval AI

@@ -66,7 +66,7 @@ export default function MenuLateral() {
       </nav>
 
       <div className="flex items-center gap-2.5 border-t border-white/10 px-5 py-5">
-        <LogoHerval variante="dark" className="h-7 w-7" />
+        <LogoHerval className="h-8 w-8 rounded-controle" />
         <span className="text-xs font-medium text-white/50">
           Versão de demonstração
         </span>

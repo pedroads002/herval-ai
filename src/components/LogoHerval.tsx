@@ -3,17 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Mostra a logo da Herval a partir de public/logo-light.png e
- * public/logo-dark.png. Enquanto esses arquivos não existirem, cai em um
- * monograma "H" para a tela não ficar com imagem quebrada.
+ * Logo da Herval AI (public/logo.png). O arquivo já vem com fundo preto
+ * próprio, então a imagem nunca é usada solta sobre fundo claro: ela mora
+ * dentro de um selo preto arredondado, no formato de ícone de aplicativo.
+ *
+ * O tamanho e o arredondamento vêm de quem usa, pelo className; o padding
+ * define a margem preta visível em volta do robô.
  */
-export default function LogoHerval({
-  variante,
-  className = "",
-}: {
-  variante: "light" | "dark";
-  className?: string;
-}) {
+export default function LogoHerval({ className = "" }: { className?: string }) {
   const [falhou, setFalhou] = useState(false);
   const imagem = useRef<HTMLImageElement>(null);
 
@@ -24,30 +21,28 @@ export default function LogoHerval({
     if (el && el.complete && el.naturalWidth === 0) setFalhou(true);
   }, []);
 
-  if (falhou) {
-    const cores =
-      variante === "dark"
-        ? "bg-herval-verde text-herval-preto"
-        : "bg-herval-preto text-herval-verde";
-
-    return (
-      <span
-        aria-hidden
-        className={`flex shrink-0 items-center justify-center rounded-controle text-base font-extrabold ${cores} ${className}`}
-      >
-        H
-      </span>
-    );
-  }
-
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      ref={imagem}
-      src={`/logo-${variante}.png`}
-      alt="Herval AI"
-      onError={() => setFalhou(true)}
-      className={`shrink-0 object-contain ${className}`}
-    />
+    <span
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden bg-herval-preto ${className}`}
+    >
+      {falhou ? (
+        // Sem o arquivo, um monograma "H" no lugar da imagem quebrada.
+        <span
+          aria-hidden
+          className="text-base font-extrabold text-herval-verde"
+        >
+          H
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={imagem}
+          src="/logo.png"
+          alt="Herval AI"
+          onError={() => setFalhou(true)}
+          className="h-full w-full object-contain"
+        />
+      )}
+    </span>
   );
 }

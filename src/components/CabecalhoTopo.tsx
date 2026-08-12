@@ -8,7 +8,7 @@ export default async function CabecalhoTopo() {
   return (
     <header className="fixed inset-x-0 top-0 z-30 h-16 border-b border-black/10 bg-herval-branco shadow-topo">
       <div className="flex h-full items-center gap-3 px-6">
-        <LogoHerval variante="light" className="h-9 w-9" />
+        <LogoHerval className="h-10 w-10 rounded-controle p-1" />
 
         <div className="flex items-baseline gap-2">
           <span className="text-lg font-extrabold tracking-tight text-herval-preto">
