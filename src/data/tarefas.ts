@@ -17,7 +17,102 @@ export type SituacaoLead =
   | "Em Atendimento"
   | "Aguardando Resposta"
   | "Agendado"
+  | "Ganho"
   | "Desqualificado";
+
+/** Colunas do Funil, na ordem em que a agência trabalha com os clientes. */
+export type EtapaFunil =
+  | "Leads Recebidos"
+  | "Em Contato"
+  | "Outros Contatos"
+  | "F1"
+  | "F2"
+  | "F3"
+  | "F4"
+  | "F5"
+  | "F6"
+  | "F7"
+  | "Nutrição"
+  | "Agendamento"
+  | "Reagendamento"
+  | "Comparecimento"
+  | "Venda Ganha"
+  | "Venda Perdida";
+
+export const etapasFunil: EtapaFunil[] = [
+  "Leads Recebidos",
+  "Em Contato",
+  "Outros Contatos",
+  "F1",
+  "F2",
+  "F3",
+  "F4",
+  "F5",
+  "F6",
+  "F7",
+  "Nutrição",
+  "Agendamento",
+  "Reagendamento",
+  "Comparecimento",
+  "Venda Ganha",
+  "Venda Perdida",
+];
+
+/** Por onde o lead chegou. */
+export type OrigemContato =
+  | "Meta Ads"
+  | "Instagram"
+  | "Google Ads"
+  | "Indicação"
+  | "Site"
+  | "WhatsApp";
+
+/** As mesmas categorias mostradas em "Motivos de perda" na Visão Geral. */
+export type MotivoPerda =
+  | "Achou caro"
+  | "Não respondeu mais"
+  | "Fora da área de atendimento"
+  | "Só pesquisando preço"
+  | "Vai pensar / adiou";
+
+export const motivosDePerda: MotivoPerda[] = [
+  "Achou caro",
+  "Não respondeu mais",
+  "Fora da área de atendimento",
+  "Só pesquisando preço",
+  "Vai pensar / adiou",
+];
+
+/**
+ * A situação do lead sai da etapa do Funil, e não de um campo próprio: assim a
+ * Fila de Tarefas e o Funil não têm como discordar sobre o mesmo lead.
+ */
+export function situacaoDaEtapa(etapa: EtapaFunil): SituacaoLead {
+  switch (etapa) {
+    case "Leads Recebidos":
+      return "Pendente";
+    case "Em Contato":
+    case "Outros Contatos":
+    case "F1":
+    case "F2":
+      return "Em Atendimento";
+    case "F3":
+    case "F4":
+    case "F5":
+    case "F6":
+    case "F7":
+    case "Nutrição":
+      return "Aguardando Resposta";
+    case "Agendamento":
+    case "Reagendamento":
+    case "Comparecimento":
+      return "Agendado";
+    case "Venda Ganha":
+      return "Ganho";
+    case "Venda Perdida":
+      return "Desqualificado";
+  }
+}
 
 export type NivelScore = "Alta" | "Média" | "Baixa";
 
@@ -37,7 +132,13 @@ export type Tarefa = {
   acao: string;
   tipo: TipoTarefa;
   responsavel: Responsavel;
-  situacao: SituacaoLead;
+  /** Coluna do Funil. A situação do lead é derivada daqui. */
+  etapa: EtapaFunil;
+  origem: OrigemContato;
+  /** Há quantos dias o lead chegou. Alimenta o filtro de período do Funil. */
+  diasAtras: number;
+  /** Só preenchido enquanto o lead está em "Venda Perdida". */
+  motivoPerda?: MotivoPerda;
   status: StatusTarefa;
   /** Há quantos minutos a tarefa está sem nenhuma ação. */
   minutosSemAcao: number;
@@ -65,7 +166,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Em Contato",
+    origem: "Meta Ads",
+    diasAtras: 2,
     status: "Pendente",
     minutosSemAcao: 300,
     prazoEmHoras: 40,
@@ -104,7 +207,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Agendamento",
+    origem: "Instagram",
+    diasAtras: 4,
     status: "Pendente",
     minutosSemAcao: 90,
     prazoEmHoras: 26,
@@ -137,7 +242,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F3",
+    origem: "Google Ads",
+    diasAtras: 5,
     status: "Pendente",
     minutosSemAcao: 45,
     prazoEmHoras: 8,
@@ -170,7 +277,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Em Contato",
+    origem: "Indicação",
+    diasAtras: 2,
     status: "Pendente",
     minutosSemAcao: 160,
     prazoEmHoras: 30,
@@ -197,7 +306,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Agendamento",
+    origem: "Site",
+    diasAtras: 3,
     status: "Pendente",
     minutosSemAcao: 140,
     prazoEmHoras: 20,
@@ -230,7 +341,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar explicação do protocolo",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Em Contato",
+    origem: "WhatsApp",
+    diasAtras: 1,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 2,
@@ -269,7 +382,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
     responsavel: "Humano",
-    situacao: "Pendente",
+    etapa: "Leads Recebidos",
+    origem: "Meta Ads",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 2,
     prazoEmHoras: 0.1,
@@ -289,7 +404,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Em Contato",
+    origem: "Instagram",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 70,
     prazoEmHoras: 11,
@@ -316,7 +433,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Em Contato",
+    origem: "Google Ads",
+    diasAtras: 1,
     status: "Pendente",
     minutosSemAcao: 130,
     prazoEmHoras: 24,
@@ -355,7 +474,10 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Desqualificado",
+    etapa: "Venda Perdida",
+    origem: "Indicação",
+    diasAtras: 27,
+    motivoPerda: "Achou caro",
     status: "Rejeitado",
     minutosSemAcao: 380,
     prazoEmHoras: 60,
@@ -382,7 +504,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Outros Contatos",
+    origem: "Site",
+    diasAtras: 1,
     status: "Pendente",
     minutosSemAcao: 130,
     prazoEmHoras: 24,
@@ -409,7 +533,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Outros Contatos",
+    origem: "WhatsApp",
+    diasAtras: 1,
     status: "Pendente",
     minutosSemAcao: 260,
     prazoEmHoras: -6,
@@ -436,7 +562,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Confirmar consulta e orientar chegada",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Agendamento",
+    origem: "Meta Ads",
+    diasAtras: 4,
     status: "Pendente",
     minutosSemAcao: 200,
     prazoEmHoras: 30,
@@ -469,7 +597,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Agendamento",
+    origem: "Instagram",
+    diasAtras: 7,
     status: "Pendente",
     minutosSemAcao: 140,
     prazoEmHoras: 20,
@@ -502,7 +632,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F3",
+    origem: "Google Ads",
+    diasAtras: 6,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 2,
@@ -529,7 +661,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Agendamento",
+    origem: "Indicação",
+    diasAtras: 9,
     status: "Pendente",
     minutosSemAcao: 90,
     prazoEmHoras: 26,
@@ -562,7 +696,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F3",
+    origem: "Site",
+    diasAtras: 6,
     status: "Pendente",
     minutosSemAcao: 190,
     prazoEmHoras: -3,
@@ -601,7 +737,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F4",
+    origem: "WhatsApp",
+    diasAtras: 5,
     status: "Pendente",
     minutosSemAcao: 38,
     prazoEmHoras: 5,
@@ -640,7 +778,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F4",
+    origem: "Meta Ads",
+    diasAtras: 5,
     status: "Pendente",
     minutosSemAcao: 350,
     prazoEmHoras: 55,
@@ -667,7 +807,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "Outros Contatos",
+    origem: "Instagram",
+    diasAtras: 3,
     status: "Pendente",
     minutosSemAcao: 100,
     prazoEmHoras: 18,
@@ -694,7 +836,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar prova social (antes e depois)",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F4",
+    origem: "Google Ads",
+    diasAtras: 9,
     status: "Pendente",
     minutosSemAcao: 300,
     prazoEmHoras: 40,
@@ -721,7 +865,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Confirmar consulta e orientar chegada",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Reagendamento",
+    origem: "Indicação",
+    diasAtras: 15,
     status: "Pendente",
     minutosSemAcao: 60,
     prazoEmHoras: 5,
@@ -754,7 +900,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F5",
+    origem: "Site",
+    diasAtras: 8,
     status: "Pendente",
     minutosSemAcao: 45,
     prazoEmHoras: 8,
@@ -793,7 +941,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F5",
+    origem: "WhatsApp",
+    diasAtras: 8,
     status: "Pendente",
     minutosSemAcao: 130,
     prazoEmHoras: 24,
@@ -832,7 +982,10 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Encerrar e manter em base de nutrição",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Desqualificado",
+    etapa: "Venda Perdida",
+    origem: "Meta Ads",
+    diasAtras: 28,
+    motivoPerda: "Não respondeu mais",
     status: "Rejeitado",
     minutosSemAcao: 420,
     prazoEmHoras: 48,
@@ -859,7 +1012,10 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Desqualificado",
+    etapa: "Venda Perdida",
+    origem: "Instagram",
+    diasAtras: 6,
+    motivoPerda: "Fora da área de atendimento",
     status: "Rejeitado",
     minutosSemAcao: 420,
     prazoEmHoras: 48,
@@ -886,7 +1042,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "F1",
+    origem: "Google Ads",
+    diasAtras: 3,
     status: "Pendente",
     minutosSemAcao: 160,
     prazoEmHoras: 30,
@@ -919,7 +1077,10 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Desqualificado",
+    etapa: "Venda Perdida",
+    origem: "Indicação",
+    diasAtras: 34,
+    motivoPerda: "Só pesquisando preço",
     status: "Rejeitado",
     minutosSemAcao: 500,
     prazoEmHoras: 72,
@@ -946,7 +1107,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "F1",
+    origem: "Site",
+    diasAtras: 2,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 2,
@@ -985,7 +1148,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F6",
+    origem: "WhatsApp",
+    diasAtras: 14,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 2,
@@ -1012,7 +1177,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
     responsavel: "Humano",
-    situacao: "Pendente",
+    etapa: "Leads Recebidos",
+    origem: "Meta Ads",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 0.5,
@@ -1032,7 +1199,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "F6",
+    origem: "Instagram",
+    diasAtras: 11,
     status: "Pendente",
     minutosSemAcao: 260,
     prazoEmHoras: -6,
@@ -1065,7 +1234,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Reagendamento",
+    origem: "Google Ads",
+    diasAtras: 14,
     status: "Pendente",
     minutosSemAcao: 60,
     prazoEmHoras: 5,
@@ -1098,7 +1269,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "F1",
+    origem: "Indicação",
+    diasAtras: 1,
     status: "Pendente",
     minutosSemAcao: 260,
     prazoEmHoras: -6,
@@ -1125,7 +1298,10 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Encerrar e manter em base de nutrição",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Desqualificado",
+    etapa: "Venda Perdida",
+    origem: "Site",
+    diasAtras: 3,
+    motivoPerda: "Vai pensar / adiou",
     status: "Rejeitado",
     minutosSemAcao: 420,
     prazoEmHoras: 48,
@@ -1152,7 +1328,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "WhatsApp",
+    diasAtras: 18,
     status: "Pendente",
     minutosSemAcao: 190,
     prazoEmHoras: -3,
@@ -1185,7 +1363,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "Meta Ads",
+    diasAtras: 15,
     status: "Pendente",
     minutosSemAcao: 70,
     prazoEmHoras: 11,
@@ -1224,7 +1404,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
     responsavel: "Humano",
-    situacao: "Pendente",
+    etapa: "Leads Recebidos",
+    origem: "Instagram",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 95,
     prazoEmHoras: -2.0,
@@ -1244,7 +1426,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
     responsavel: "Humano",
-    situacao: "Pendente",
+    etapa: "Leads Recebidos",
+    origem: "Google Ads",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 0.5,
@@ -1264,7 +1448,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "F2",
+    origem: "Indicação",
+    diasAtras: 4,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 2,
@@ -1303,7 +1489,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "Site",
+    diasAtras: 34,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 2,
@@ -1342,7 +1530,10 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Desqualificado",
+    etapa: "Venda Perdida",
+    origem: "WhatsApp",
+    diasAtras: 19,
+    motivoPerda: "Achou caro",
     status: "Rejeitado",
     minutosSemAcao: 500,
     prazoEmHoras: 72,
@@ -1369,7 +1560,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Confirmar consulta e orientar chegada",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Comparecimento",
+    origem: "Meta Ads",
+    diasAtras: 10,
     status: "Pendente",
     minutosSemAcao: 90,
     prazoEmHoras: 26,
@@ -1402,7 +1595,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "Instagram",
+    diasAtras: 34,
     status: "Pendente",
     minutosSemAcao: 190,
     prazoEmHoras: -3,
@@ -1441,7 +1636,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar explicação do protocolo",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "F2",
+    origem: "Google Ads",
+    diasAtras: 4,
     status: "Pendente",
     minutosSemAcao: 130,
     prazoEmHoras: 24,
@@ -1480,7 +1677,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "Indicação",
+    diasAtras: 17,
     status: "Pendente",
     minutosSemAcao: 350,
     prazoEmHoras: 55,
@@ -1513,7 +1712,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
     responsavel: "Humano",
-    situacao: "Pendente",
+    etapa: "Leads Recebidos",
+    origem: "Site",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 0.5,
@@ -1533,7 +1734,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
     responsavel: "Humano",
-    situacao: "Pendente",
+    etapa: "Leads Recebidos",
+    origem: "WhatsApp",
+    diasAtras: 0,
     status: "Pendente",
     minutosSemAcao: 12,
     prazoEmHoras: 0.5,
@@ -1553,7 +1756,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
     responsavel: "Automática",
-    situacao: "Agendado",
+    etapa: "Comparecimento",
+    origem: "Meta Ads",
+    diasAtras: 10,
     status: "Pendente",
     minutosSemAcao: 60,
     prazoEmHoras: 5,
@@ -1586,7 +1791,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "Instagram",
+    diasAtras: 34,
     status: "Pendente",
     minutosSemAcao: 45,
     prazoEmHoras: 8,
@@ -1625,7 +1832,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Em Atendimento",
+    etapa: "F2",
+    origem: "Google Ads",
+    diasAtras: 3,
     status: "Pendente",
     minutosSemAcao: 45,
     prazoEmHoras: 8,
@@ -1664,7 +1873,9 @@ export const tarefasIniciais: Tarefa[] = [
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
     responsavel: "IA",
-    situacao: "Aguardando Resposta",
+    etapa: "Nutrição",
+    origem: "Indicação",
+    diasAtras: 39,
     status: "Pendente",
     minutosSemAcao: 130,
     prazoEmHoras: 24,
@@ -1684,6 +1895,790 @@ export const tarefasIniciais: Tarefa[] = [
         quando: "11/03 16:20",
         mensagem:
           "Júlio, separei alguns resultados de pacientes com perfil parecido com o seu.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 53,
+    lead: "Aline Barreto",
+    telefone: "(51) 94892-1917",
+    clinica: "Unidade Centro",
+    regra: "Venda fechada",
+    acao: "Registrar procedimento na agenda",
+    tipo: "acao-ia",
+    responsavel: "Automática",
+    etapa: "Venda Ganha",
+    origem: "Site",
+    diasAtras: 34,
+    status: "Aprovado",
+    minutosSemAcao: 173,
+    prazoEmHoras: 106,
+    score: {
+      percentual: 91,
+      nivel: "Alta",
+      motivo: "Fechou o pacote na avaliação",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Aline! Confirmei sua avaliação de harmonização facial.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 54,
+    lead: "Débora Nunes",
+    telefone: "(51) 95577-3242",
+    clinica: "Unidade Zona Sul",
+    regra: "Venda fechada",
+    acao: "Enviar orientações de pré-procedimento",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Ganha",
+    origem: "WhatsApp",
+    diasAtras: 27,
+    status: "Aprovado",
+    minutosSemAcao: 1495,
+    prazoEmHoras: 100,
+    score: {
+      percentual: 92,
+      nivel: "Alta",
+      motivo: "Assinou o termo no mesmo dia",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Débora! Confirmei sua avaliação de preenchimento labial.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 55,
+    lead: "Felipe Aragão",
+    telefone: "(51) 93506-5485",
+    clinica: "Unidade Moinhos",
+    regra: "Venda fechada",
+    acao: "Registrar procedimento na agenda",
+    tipo: "acao-ia",
+    responsavel: "Automática",
+    etapa: "Venda Ganha",
+    origem: "Meta Ads",
+    diasAtras: 31,
+    status: "Aprovado",
+    minutosSemAcao: 2396,
+    prazoEmHoras: 79,
+    score: {
+      percentual: 95,
+      nivel: "Alta",
+      motivo: "Fechou o pacote na avaliação",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Felipe! Confirmei sua avaliação de toxina botulínica.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 56,
+    lead: "Tatiane Correia",
+    telefone: "(51) 97648-2983",
+    clinica: "Unidade Centro",
+    regra: "Venda fechada",
+    acao: "Enviar orientações de pré-procedimento",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Ganha",
+    origem: "Instagram",
+    diasAtras: 13,
+    status: "Aprovado",
+    minutosSemAcao: 632,
+    prazoEmHoras: 98,
+    score: {
+      percentual: 90,
+      nivel: "Alta",
+      motivo: "Assinou o termo no mesmo dia",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Tatiane! Confirmei sua avaliação de bioestimulador de colágeno.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 57,
+    lead: "Rodrigo Vasques",
+    telefone: "(51) 94670-2906",
+    clinica: "Unidade Zona Sul",
+    regra: "Venda fechada",
+    acao: "Registrar procedimento na agenda",
+    tipo: "acao-ia",
+    responsavel: "Automática",
+    etapa: "Venda Ganha",
+    origem: "Google Ads",
+    diasAtras: 21,
+    status: "Aprovado",
+    minutosSemAcao: 332,
+    prazoEmHoras: 90,
+    score: {
+      percentual: 93,
+      nivel: "Alta",
+      motivo: "Fechou o pacote na avaliação",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Rodrigo! Confirmei sua avaliação de limpeza de pele.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 58,
+    lead: "Priscila Amado",
+    telefone: "(51) 93823-3823",
+    clinica: "Unidade Moinhos",
+    regra: "Venda fechada",
+    acao: "Enviar orientações de pré-procedimento",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Ganha",
+    origem: "Indicação",
+    diasAtras: 14,
+    status: "Aprovado",
+    minutosSemAcao: 451,
+    prazoEmHoras: 38,
+    score: {
+      percentual: 94,
+      nivel: "Alta",
+      motivo: "Assinou o termo no mesmo dia",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Priscila! Confirmei sua avaliação de harmonização facial.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 59,
+    lead: "Márcio Bettega",
+    telefone: "(51) 91032-6166",
+    clinica: "Unidade Centro",
+    regra: "Venda fechada",
+    acao: "Registrar procedimento na agenda",
+    tipo: "acao-ia",
+    responsavel: "Automática",
+    etapa: "Venda Ganha",
+    origem: "Site",
+    diasAtras: 33,
+    status: "Aprovado",
+    minutosSemAcao: 1766,
+    prazoEmHoras: 82,
+    score: {
+      percentual: 92,
+      nivel: "Alta",
+      motivo: "Fechou o pacote na avaliação",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Márcio! Confirmei sua avaliação de preenchimento labial.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 60,
+    lead: "Simone Falcão",
+    telefone: "(51) 93688-2925",
+    clinica: "Unidade Zona Sul",
+    regra: "Venda fechada",
+    acao: "Enviar orientações de pré-procedimento",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Ganha",
+    origem: "WhatsApp",
+    diasAtras: 24,
+    status: "Aprovado",
+    minutosSemAcao: 1984,
+    prazoEmHoras: 95,
+    score: {
+      percentual: 88,
+      nivel: "Alta",
+      motivo: "Assinou o termo no mesmo dia",
+    },
+    historico: [
+      {
+        quando: "10/03 09:12",
+        mensagem:
+          "Oi Simone! Confirmei sua avaliação de toxina botulínica.",
+        regra: "Agendamento criado",
+      },
+      {
+        quando: "12/03 15:40",
+        mensagem:
+          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
+        regra: "Pós-procedimento",
+      },
+    ],
+  },
+  {
+    id: 61,
+    lead: "Cristina Bueno",
+    telefone: "(51) 92197-2779",
+    clinica: "Unidade Moinhos",
+    regra: "Objeção de preço sem retorno",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Meta Ads",
+    diasAtras: 22,
+    motivoPerda: "Achou caro",
+    status: "Aprovado",
+    minutosSemAcao: 502,
+    prazoEmHoras: 66,
+    score: {
+      percentual: 9,
+      nivel: "Baixa",
+      motivo: "Parou de responder após o orçamento",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Cristina, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 62,
+    lead: "Anderson Prates",
+    telefone: "(51) 92407-5931",
+    clinica: "Unidade Centro",
+    regra: "Objeção de preço sem retorno",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Instagram",
+    diasAtras: 17,
+    motivoPerda: "Achou caro",
+    status: "Aprovado",
+    minutosSemAcao: 301,
+    prazoEmHoras: 27,
+    score: {
+      percentual: 29,
+      nivel: "Baixa",
+      motivo: "Parou de responder após o orçamento",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Anderson, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 63,
+    lead: "Elaine Ristow",
+    telefone: "(51) 99407-9300",
+    clinica: "Unidade Zona Sul",
+    regra: "Objeção de preço sem retorno",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Google Ads",
+    diasAtras: 13,
+    motivoPerda: "Achou caro",
+    status: "Aprovado",
+    minutosSemAcao: 169,
+    prazoEmHoras: 44,
+    score: {
+      percentual: 16,
+      nivel: "Baixa",
+      motivo: "Parou de responder após o orçamento",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Elaine, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 64,
+    lead: "Gustavo Peixoto",
+    telefone: "(51) 99639-3213",
+    clinica: "Unidade Moinhos",
+    regra: "Objeção de preço sem retorno",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Indicação",
+    diasAtras: 2,
+    motivoPerda: "Achou caro",
+    status: "Aprovado",
+    minutosSemAcao: 1398,
+    prazoEmHoras: 40,
+    score: {
+      percentual: 30,
+      nivel: "Baixa",
+      motivo: "Parou de responder após o orçamento",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Gustavo, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 65,
+    lead: "Larissa Kunz",
+    telefone: "(51) 92789-7357",
+    clinica: "Unidade Centro",
+    regra: "Follow-up D+7 sem resposta",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Site",
+    diasAtras: 27,
+    motivoPerda: "Não respondeu mais",
+    status: "Aprovado",
+    minutosSemAcao: 524,
+    prazoEmHoras: 51,
+    score: {
+      percentual: 17,
+      nivel: "Baixa",
+      motivo: "Sete tentativas sem retorno",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Larissa, tudo bem? Vi seu interesse em toxina botulínica. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 66,
+    lead: "Otávio Brizola",
+    telefone: "(51) 94709-2592",
+    clinica: "Unidade Zona Sul",
+    regra: "Follow-up D+7 sem resposta",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "WhatsApp",
+    diasAtras: 16,
+    motivoPerda: "Não respondeu mais",
+    status: "Aprovado",
+    minutosSemAcao: 1354,
+    prazoEmHoras: 40,
+    score: {
+      percentual: 15,
+      nivel: "Baixa",
+      motivo: "Sete tentativas sem retorno",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Otávio, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 67,
+    lead: "Michele Sarturi",
+    telefone: "(51) 93285-2355",
+    clinica: "Unidade Moinhos",
+    regra: "Follow-up D+7 sem resposta",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Meta Ads",
+    diasAtras: 36,
+    motivoPerda: "Não respondeu mais",
+    status: "Aprovado",
+    minutosSemAcao: 1957,
+    prazoEmHoras: 86,
+    score: {
+      percentual: 21,
+      nivel: "Baixa",
+      motivo: "Sete tentativas sem retorno",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Michele, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 68,
+    lead: "Paulo Sperb",
+    telefone: "(51) 94089-6100",
+    clinica: "Unidade Centro",
+    regra: "Follow-up D+7 sem resposta",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Instagram",
+    diasAtras: 1,
+    motivoPerda: "Não respondeu mais",
+    status: "Aprovado",
+    minutosSemAcao: 1779,
+    prazoEmHoras: 36,
+    score: {
+      percentual: 14,
+      nivel: "Baixa",
+      motivo: "Sete tentativas sem retorno",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Paulo, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 69,
+    lead: "Renata Grazziotin",
+    telefone: "(51) 96971-5886",
+    clinica: "Unidade Zona Sul",
+    regra: "Lead de outra cidade",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Google Ads",
+    diasAtras: 19,
+    motivoPerda: "Fora da área de atendimento",
+    status: "Aprovado",
+    minutosSemAcao: 709,
+    prazoEmHoras: 110,
+    score: {
+      percentual: 15,
+      nivel: "Baixa",
+      motivo: "Mora fora da região atendida",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Renata, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 70,
+    lead: "Diego Lamb",
+    telefone: "(51) 95525-2012",
+    clinica: "Unidade Moinhos",
+    regra: "Lead de outra cidade",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Indicação",
+    diasAtras: 7,
+    motivoPerda: "Fora da área de atendimento",
+    status: "Aprovado",
+    minutosSemAcao: 1707,
+    prazoEmHoras: 71,
+    score: {
+      percentual: 9,
+      nivel: "Baixa",
+      motivo: "Mora fora da região atendida",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Diego, tudo bem? Vi seu interesse em toxina botulínica. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 71,
+    lead: "Fabiana Roso",
+    telefone: "(51) 98577-2628",
+    clinica: "Unidade Centro",
+    regra: "Pesquisa de preço",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Site",
+    diasAtras: 19,
+    motivoPerda: "Só pesquisando preço",
+    status: "Aprovado",
+    minutosSemAcao: 392,
+    prazoEmHoras: 97,
+    score: {
+      percentual: 21,
+      nivel: "Baixa",
+      motivo: "Disse que só queria saber o valor",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Fabiana, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 72,
+    lead: "Sérgio Doneda",
+    telefone: "(51) 91164-9671",
+    clinica: "Unidade Zona Sul",
+    regra: "Pesquisa de preço",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "WhatsApp",
+    diasAtras: 31,
+    motivoPerda: "Só pesquisando preço",
+    status: "Aprovado",
+    minutosSemAcao: 406,
+    prazoEmHoras: 120,
+    score: {
+      percentual: 15,
+      nivel: "Baixa",
+      motivo: "Disse que só queria saber o valor",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Sérgio, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 73,
+    lead: "Karine Bonatto",
+    telefone: "(51) 96583-1254",
+    clinica: "Unidade Moinhos",
+    regra: "Adiamento sem data",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Meta Ads",
+    diasAtras: 36,
+    motivoPerda: "Vai pensar / adiou",
+    status: "Aprovado",
+    minutosSemAcao: 853,
+    prazoEmHoras: 59,
+    score: {
+      percentual: 28,
+      nivel: "Baixa",
+      motivo: "Pediu para retomar no ano que vem",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Karine, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
+        regra: "Follow-up D+2",
+      },
+    ],
+  },
+  {
+    id: 74,
+    lead: "Thiago Marchi",
+    telefone: "(51) 92636-1039",
+    clinica: "Unidade Centro",
+    regra: "Adiamento sem data",
+    acao: "Encerrar fluxo e arquivar lead",
+    tipo: "acao-ia",
+    responsavel: "IA",
+    etapa: "Venda Perdida",
+    origem: "Instagram",
+    diasAtras: 19,
+    motivoPerda: "Vai pensar / adiou",
+    status: "Aprovado",
+    minutosSemAcao: 288,
+    prazoEmHoras: 51,
+    score: {
+      percentual: 28,
+      nivel: "Baixa",
+      motivo: "Pediu para retomar no ano que vem",
+    },
+    historico: [
+      {
+        quando: "09/03 11:05",
+        mensagem:
+          "Oi Thiago, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
+        regra: "Lead novo do Meta Ads",
+      },
+      {
+        quando: "11/03 16:20",
+        mensagem:
+          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
       },
     ],

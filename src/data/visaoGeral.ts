@@ -16,15 +16,9 @@ export type EtapaFunil = {
   quantidade: number;
 };
 
-export type MotivoPerda = {
-  motivo: string;
-  quantidade: number;
-};
-
 export type DadosPeriodo = {
   kpis: Kpi[];
   funil: EtapaFunil[];
-  motivosPerda: MotivoPerda[];
 };
 
 // Números de exemplo. Ainda não vêm de banco nem de API.
@@ -65,13 +59,6 @@ export const dadosVisaoGeral: Record<Periodo, DadosPeriodo> = {
       { etapa: "Comparecimento", quantidade: 39 },
       { etapa: "Venda ganha", quantidade: 21 },
     ],
-    motivosPerda: [
-      { motivo: "Achou caro", quantidade: 18 },
-      { motivo: "Não respondeu mais", quantidade: 14 },
-      { motivo: "Fora da área de atendimento", quantidade: 9 },
-      { motivo: "Só pesquisando preço", quantidade: 7 },
-      { motivo: "Vai pensar / adiou", quantidade: 5 },
-    ],
   },
   Semanal: {
     kpis: [
@@ -109,13 +96,6 @@ export const dadosVisaoGeral: Record<Periodo, DadosPeriodo> = {
       { etapa: "Comparecimento", quantidade: 243 },
       { etapa: "Venda ganha", quantidade: 131 },
     ],
-    motivosPerda: [
-      { motivo: "Achou caro", quantidade: 112 },
-      { motivo: "Não respondeu mais", quantidade: 96 },
-      { motivo: "Fora da área de atendimento", quantidade: 54 },
-      { motivo: "Só pesquisando preço", quantidade: 41 },
-      { motivo: "Vai pensar / adiou", quantidade: 33 },
-    ],
   },
   Mensal: {
     kpis: [
@@ -152,13 +132,6 @@ export const dadosVisaoGeral: Record<Periodo, DadosPeriodo> = {
       { etapa: "Agendamento", quantidade: 1204 },
       { etapa: "Comparecimento", quantidade: 1017 },
       { etapa: "Venda ganha", quantidade: 548 },
-    ],
-    motivosPerda: [
-      { motivo: "Achou caro", quantidade: 486 },
-      { motivo: "Não respondeu mais", quantidade: 402 },
-      { motivo: "Fora da área de atendimento", quantidade: 228 },
-      { motivo: "Só pesquisando preço", quantidade: 176 },
-      { motivo: "Vai pensar / adiou", quantidade: 145 },
     ],
   },
 };

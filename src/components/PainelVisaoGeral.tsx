@@ -1,20 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import {
   dadosVisaoGeral,
   periodos,
   type Periodo,
 } from "@/data/visaoGeral";
+import { useLeads } from "@/components/ProvedorLeads";
+import { motivosDePerda } from "@/data/tarefas";
 import { formatarNumero, percentual } from "@/lib/formato";
 
 export default function PainelVisaoGeral() {
   const [periodo, setPeriodo] = useState<Periodo>("Diário");
   const dados = dadosVisaoGeral[periodo];
+  const { tarefas } = useLeads();
+
+  // Os motivos saem dos próprios cards em "Venda Perdida" no Funil, e não de
+  // uma lista fixa: mover um lead para lá muda esta contagem na hora.
+  const perdidos = useMemo(
+    () => tarefas.filter((t) => t.etapa === "Venda Perdida"),
+    [tarefas],
+  );
+
+  const contagemMotivos = useMemo(
+    () =>
+      motivosDePerda
+        .map((motivo) => ({
+          motivo,
+          quantidade: perdidos.filter((t) => t.motivoPerda === motivo).length,
+        }))
+        .sort((a, b) => b.quantidade - a.quantidade),
+    [perdidos],
+  );
 
   const totalFunil = dados.funil[0]?.quantidade ?? 0;
-  const maiorMotivo = Math.max(...dados.motivosPerda.map((m) => m.quantidade));
+  const maiorMotivo = Math.max(
+    1,
+    ...contagemMotivos.map((m) => m.quantidade),
+  );
 
   return (
     <div className="space-y-10">
@@ -142,8 +166,22 @@ export default function PainelVisaoGeral() {
             Motivos de perda
           </h2>
 
+          {/* Deixa claro que esta contagem não é do período selecionado, para
+              não ser comparada com o funil de conversão. */}
+          <p className="mt-2 text-xs font-medium text-black/50">
+            Com base nos{" "}
+            <span className="font-extrabold text-herval-preto">
+              {perdidos.length}
+            </span>{" "}
+            {perdidos.length === 1
+              ? "lead atualmente em"
+              : "leads atualmente em"}{" "}
+            &quot;Venda Perdida&quot; no Funil. Não muda com o filtro de
+            período, diferente do funil de conversão.
+          </p>
+
           <ul className="mt-7 space-y-4">
-            {dados.motivosPerda.map((motivo) => (
+            {contagemMotivos.map((motivo) => (
               <li key={motivo.motivo}>
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="text-sm font-medium text-black/70">

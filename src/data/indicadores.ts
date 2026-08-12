@@ -1,4 +1,4 @@
-import type { Tarefa } from "@/data/tarefas";
+import { situacaoDaEtapa, type SituacaoLead, type Tarefa } from "@/data/tarefas";
 
 /** Indicadores mostrados acima da tabela da Fila de Tarefas. */
 export type Indicador = {
@@ -20,8 +20,8 @@ const LIMITE_SEM_ACAO = 60;
  * exatamente Pendentes + Em atendimento + Aguardando resposta.
  */
 export function calcularIndicadoresFila(tarefas: Tarefa[]): Indicador[] {
-  const porSituacao = (situacao: Tarefa["situacao"]) =>
-    tarefas.filter((t) => t.situacao === situacao).length;
+  const porSituacao = (situacao: SituacaoLead) =>
+    tarefas.filter((t) => situacaoDaEtapa(t.etapa) === situacao).length;
 
   const recebidos = tarefas.length;
   const pendentes = porSituacao("Pendente");
@@ -31,7 +31,9 @@ export function calcularIndicadoresFila(tarefas: Tarefa[]): Indicador[] {
   const ativos = pendentes + emAtendimento + aguardando;
 
   const semAcao = tarefas.filter(
-    (t) => t.situacao === "Pendente" && t.minutosSemAcao > LIMITE_SEM_ACAO,
+    (t) =>
+      situacaoDaEtapa(t.etapa) === "Pendente" &&
+      t.minutosSemAcao > LIMITE_SEM_ACAO,
   ).length;
 
   return [
