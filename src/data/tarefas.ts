@@ -114,6 +114,29 @@ export function situacaoDaEtapa(etapa: EtapaFunil): SituacaoLead {
   }
 }
 
+/**
+ * Consulta marcada para o lead. Só faz sentido para quem está em Agendamento,
+ * Reagendamento ou Comparecimento no Funil — é o que a tela de Agenda mostra.
+ *
+ * O dia é guardado como dia da semana + quantas semanas a partir da atual, e
+ * não como data fixa, para o exemplo não envelhecer (mesma escolha já feita em
+ * `prazoEmHoras` e `diasAtras`).
+ */
+export type ConsultaMarcada = {
+  /** Id da tela de Profissionais. */
+  profissionalId: number;
+  /** Id da tela de Especialidades. O profissional precisa atender essa. */
+  especialidadeId: number;
+  /** 0 = domingo, 1 = segunda ... 6 = sábado. */
+  diaSemana: number;
+  /** -1 = semana passada, 0 = semana atual, 1 = próxima. */
+  semanasAFrente: number;
+  /** Hora de início, no formato "HH:MM". */
+  hora: string;
+  /** O paciente respondeu confirmando presença. */
+  confirmada: boolean;
+};
+
 export type NivelScore = "Alta" | "Média" | "Baixa";
 
 /** Uma mensagem que a IA enviou ao lead, para rastreabilidade. */
@@ -139,6 +162,8 @@ export type Tarefa = {
   diasAtras: number;
   /** Só preenchido enquanto o lead está em "Venda Perdida". */
   motivoPerda?: MotivoPerda;
+  /** Consulta na Agenda. Nem todo lead agendado já tem horário definido. */
+  consulta?: ConsultaMarcada;
   status: StatusTarefa;
   /** Há quantos minutos a tarefa está sem nenhuma ação. */
   minutosSemAcao: number;
@@ -210,6 +235,14 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Instagram",
     diasAtras: 4,
+    consulta: {
+      profissionalId: 3,
+      especialidadeId: 3,
+      diaSemana: 1,
+      semanasAFrente: 0,
+      hora: "09:00",
+      confirmada: true,
+    },
     status: "Pendente",
     minutosSemAcao: 90,
     prazoEmHoras: 26,
@@ -309,6 +342,14 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Site",
     diasAtras: 3,
+    consulta: {
+      profissionalId: 2,
+      especialidadeId: 1,
+      diaSemana: 2,
+      semanasAFrente: 0,
+      hora: "10:00",
+      confirmada: true,
+    },
     status: "Pendente",
     minutosSemAcao: 140,
     prazoEmHoras: 20,
@@ -565,6 +606,14 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Meta Ads",
     diasAtras: 4,
+    consulta: {
+      profissionalId: 4,
+      especialidadeId: 2,
+      diaSemana: 3,
+      semanasAFrente: 0,
+      hora: "14:00",
+      confirmada: false,
+    },
     status: "Pendente",
     minutosSemAcao: 200,
     prazoEmHoras: 30,
@@ -600,6 +649,14 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Instagram",
     diasAtras: 7,
+    consulta: {
+      profissionalId: 3,
+      especialidadeId: 4,
+      diaSemana: 4,
+      semanasAFrente: 0,
+      hora: "16:00",
+      confirmada: false,
+    },
     status: "Pendente",
     minutosSemAcao: 140,
     prazoEmHoras: 20,
@@ -868,6 +925,14 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Reagendamento",
     origem: "Indicação",
     diasAtras: 15,
+    consulta: {
+      profissionalId: 1,
+      especialidadeId: 1,
+      diaSemana: 5,
+      semanasAFrente: 0,
+      hora: "11:00",
+      confirmada: true,
+    },
     status: "Pendente",
     minutosSemAcao: 60,
     prazoEmHoras: 5,
@@ -1554,6 +1619,14 @@ export const tarefasIniciais: Tarefa[] = [
   {
     id: 43,
     lead: "Fernanda Antunes",
+    consulta: {
+      profissionalId: 5,
+      especialidadeId: 5,
+      diaSemana: 4,
+      semanasAFrente: -1,
+      hora: "15:00",
+      confirmada: true,
+    },
     telefone: "(51) 93357-7545",
     clinica: "Unidade Zona Sul",
     regra: "Agendamento não confirmado",
@@ -1750,6 +1823,14 @@ export const tarefasIniciais: Tarefa[] = [
   {
     id: 49,
     lead: "Michele Dornelles",
+    consulta: {
+      profissionalId: 6,
+      especialidadeId: 5,
+      diaSemana: 5,
+      semanasAFrente: -1,
+      hora: "09:00",
+      confirmada: true,
+    },
     telefone: "(51) 94248-2269",
     clinica: "Unidade Zona Sul",
     regra: "Confirmação de consulta · D-1",

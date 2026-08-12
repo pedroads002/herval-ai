@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   ListChecks,
   KanbanSquare,
+  CalendarDays,
   Building2,
   MessageSquareWarning,
   MessageSquareText,
@@ -21,6 +22,7 @@ const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
   { href: "/funil", rotulo: "Funil", Icone: KanbanSquare },
+  { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
   { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
   { href: "/regua-automacao", rotulo: "Régua de Automação", Icone: Workflow },
   { href: "/profissionais", rotulo: "Profissionais", Icone: Stethoscope },

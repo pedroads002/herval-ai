@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
   tarefasIniciais,
+  type ConsultaMarcada,
   type EtapaFunil,
   type MotivoPerda,
   type StatusTarefa,
@@ -13,6 +14,7 @@ type ValorContexto = {
   tarefas: Tarefa[];
   definirStatus: (id: number, status: StatusTarefa) => void;
   moverEtapa: (id: number, etapa: EtapaFunil, motivo?: MotivoPerda) => void;
+  definirConsulta: (id: number, consulta: ConsultaMarcada) => void;
 };
 
 const ContextoLeads = createContext<ValorContexto | null>(null);
@@ -57,9 +59,22 @@ export default function ProvedorLeads({
     [],
   );
 
+  // Marcar um horário na Agenda grava no próprio lead, e não numa lista
+  // separada de consultas: é o mesmo cuidado de não duplicar dado.
+  const definirConsulta = useCallback(
+    (id: number, consulta: ConsultaMarcada) => {
+      setTarefas((atuais) =>
+        atuais.map((tarefa) =>
+          tarefa.id === id ? { ...tarefa, consulta } : tarefa,
+        ),
+      );
+    },
+    [],
+  );
+
   const valor = useMemo(
-    () => ({ tarefas, definirStatus, moverEtapa }),
-    [tarefas, definirStatus, moverEtapa],
+    () => ({ tarefas, definirStatus, moverEtapa, definirConsulta }),
+    [tarefas, definirStatus, moverEtapa, definirConsulta],
   );
 
   return (
