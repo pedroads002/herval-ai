@@ -1,5 +1,6 @@
 import MenuLateral from "@/components/MenuLateral";
 import CabecalhoTopo from "@/components/CabecalhoTopo";
+import ProvedorLeads from "@/components/ProvedorLeads";
 
 /**
  * Moldura das telas internas: cabeçalho fixo e menu lateral. A tela de login
@@ -13,7 +14,7 @@ export default function LayoutPainel({
       <CabecalhoTopo />
       <MenuLateral />
       <main className="ml-56 px-6 pb-16 pt-24 md:ml-64 md:px-10">
-        {children}
+        <ProvedorLeads>{children}</ProvedorLeads>
       </main>
     </>
   );

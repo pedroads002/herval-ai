@@ -6,9 +6,6 @@ import {
   X,
   Search,
   Bell,
-  Bot,
-  User,
-  Zap,
   ChevronDown,
   ChevronRight,
   MessageSquare,
@@ -17,16 +14,16 @@ import {
   Clock,
 } from "lucide-react";
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
+import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
 import { descricaoPrazo, grupoDoPrazo, gruposPrazo } from "@/lib/prazo";
 import CartaoIndicador from "@/components/CartaoIndicador";
 import { calcularIndicadoresFila } from "@/data/indicadores";
+import { useLeads } from "@/components/ProvedorLeads";
 import {
+  situacaoDaEtapa,
   situacoesAtivas,
-  tarefasIniciais,
   type NivelScore,
-  type Responsavel,
   type StatusTarefa,
-  type Tarefa,
 } from "@/data/tarefas";
 
 const filtros = [
@@ -36,6 +33,7 @@ const filtros = [
   "Em Atendimento",
   "Aguardando Resposta",
   "Agendados",
+  "Ganhos",
   "Desqualificados",
 ] as const;
 
@@ -48,12 +46,6 @@ const tomDoStatus: Record<StatusTarefa, TomEtiqueta> = {
   Avisado: "verde",
 };
 
-const iconeResponsavel: Record<Responsavel, typeof Bot> = {
-  IA: Bot,
-  Humano: User,
-  Automática: Zap,
-};
-
 /** O verde marca a chance alta; os demais níveis usam contorno preto. */
 function estiloScore(nivel: NivelScore) {
   return nivel === "Alta"
@@ -62,24 +54,17 @@ function estiloScore(nivel: NivelScore) {
 }
 
 export default function TabelaTarefas() {
-  const [tarefas, setTarefas] = useState<Tarefa[]>(tarefasIniciais);
+  // A base é a mesma do Funil: mover um card lá muda esta tabela na hora.
+  const { tarefas, definirStatus } = useLeads();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
-
-  // Só muda o estado desta tela. Nada é enviado nem salvo.
-  function definirStatus(id: number, status: StatusTarefa) {
-    setTarefas((atuais) =>
-      atuais.map((tarefa) =>
-        tarefa.id === id ? { ...tarefa, status } : tarefa,
-      ),
-    );
-  }
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
     return tarefas.filter((t) => {
+      const situacao = situacaoDaEtapa(t.etapa);
       const combinaBusca =
         termo === "" ||
         t.lead.toLowerCase().includes(termo) ||
@@ -90,14 +75,16 @@ export default function TabelaTarefas() {
         filtro === "Todos"
           ? true
           : filtro === "Ativos"
-            ? situacoesAtivas.includes(t.situacao)
+            ? situacoesAtivas.includes(situacao)
             : filtro === "Pendentes"
-              ? t.situacao === "Pendente"
+              ? situacao === "Pendente"
               : filtro === "Agendados"
-                ? t.situacao === "Agendado"
-                : filtro === "Desqualificados"
-                  ? t.situacao === "Desqualificado"
-                  : t.situacao === filtro;
+                ? situacao === "Agendado"
+                : filtro === "Ganhos"
+                  ? situacao === "Ganho"
+                  : filtro === "Desqualificados"
+                    ? situacao === "Desqualificado"
+                    : situacao === filtro;
 
       return combinaBusca && combinaFiltro;
     });
@@ -119,7 +106,9 @@ export default function TabelaTarefas() {
   const indicadores = useMemo(() => calcularIndicadoresFila(tarefas), [tarefas]);
 
   // Mesma contagem do card "Pendentes": leads aguardando a primeira ação.
-  const pendentes = tarefas.filter((t) => t.situacao === "Pendente").length;
+  const pendentes = tarefas.filter(
+    (t) => situacaoDaEtapa(t.etapa) === "Pendente",
+  ).length;
   // Métrica diferente e com nome próprio: tarefas sem decisão tomada.
   const aguardandoDecisao = tarefas.filter(
     (t) => t.status === "Pendente",
@@ -239,7 +228,6 @@ export default function TabelaTarefas() {
                   {secao.itens.map((tarefa) => {
                 const alerta = tarefa.tipo === "alerta-humano";
                 const aberta = expandida === tarefa.id;
-                const IconeResp = iconeResponsavel[tarefa.responsavel];
 
                 return (
                   <Fragment key={tarefa.id}>
@@ -304,17 +292,10 @@ export default function TabelaTarefas() {
                       </td>
 
                       <td className="px-6 py-5">
-                        <span
-                          className={[
-                            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold",
-                            alerta
-                              ? "bg-herval-preto text-herval-branco"
-                              : "border border-black/20 text-black/70",
-                          ].join(" ")}
-                        >
-                          <IconeResp className="h-3.5 w-3.5" />
-                          {tarefa.responsavel}
-                        </span>
+                        <EtiquetaResponsavel
+                          responsavel={tarefa.responsavel}
+                          destacado={alerta}
+                        />
                       </td>
 
                       <td className="px-6 py-5">

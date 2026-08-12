@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ListChecks,
+  KanbanSquare,
   Building2,
   MessageSquareWarning,
   MessageSquareText,
@@ -19,6 +20,7 @@ import LogoHerval from "@/components/LogoHerval";
 const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
+  { href: "/funil", rotulo: "Funil", Icone: KanbanSquare },
   { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
   { href: "/regua-automacao", rotulo: "Régua de Automação", Icone: Workflow },
   { href: "/profissionais", rotulo: "Profissionais", Icone: Stethoscope },
