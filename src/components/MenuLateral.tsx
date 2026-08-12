@@ -6,6 +6,7 @@ import {
   ListChecks,
   Building2,
   MessageSquareWarning,
+  MessageSquareText,
   Plug,
   LayoutDashboard,
   Workflow,
@@ -24,6 +25,11 @@ const itens = [
   { href: "/especialidades", rotulo: "Especialidades", Icone: ClipboardList },
   { href: "/estrategia", rotulo: "Estratégia da Clínica", Icone: Building2 },
   { href: "/objecoes", rotulo: "Quebra de Objeções", Icone: MessageSquareWarning },
+  {
+    href: "/templates-whatsapp",
+    rotulo: "Templates de WhatsApp",
+    Icone: MessageSquareText,
+  },
   { href: "/integracoes", rotulo: "Integrações", Icone: Plug },
 ];
 
