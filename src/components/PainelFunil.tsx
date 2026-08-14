@@ -1,16 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, ExternalLink, Move, Search, X } from "lucide-react";
-import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
-import { useLeads } from "@/components/ProvedorLeads";
 import {
+  ArrowRight,
+  ExternalLink,
+  Move,
+  RotateCcw,
+  Search,
+  Trophy,
+  X,
+} from "lucide-react";
+import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
+import {
+  useLeads,
+  type DadosDaMovimentacao,
+} from "@/components/ProvedorLeads";
+import {
+  ETAPA_GANHA,
+  ETAPA_PERDIDA,
   etapasFunil,
   motivosDePerda,
   type EtapaFunil,
   type MotivoPerda,
-  type Tarefa,
-} from "@/data/tarefas";
+} from "@/data/leads";
+import type { Tarefa } from "@/data/tarefas";
+import { formatarMoeda } from "@/lib/formato";
 
 const periodos = ["Todos", "Este mês", "Chegaram hoje"] as const;
 type Periodo = (typeof periodos)[number];
@@ -27,8 +41,11 @@ export default function PainelFunil() {
   const [periodo, setPeriodo] = useState<Periodo>("Todos");
   // Card com o menu "Mover para" aberto.
   const [movendo, setMovendo] = useState<number | null>(null);
-  // Segundo passo: escolher o motivo antes de cair em Venda Perdida.
-  const [escolhendoMotivo, setEscolhendoMotivo] = useState(false);
+  /**
+   * Mover é livre, mas duas etapas cobram informação antes de aceitar: Venda
+   * Ganha pede o valor e Venda Perdida pede o motivo. Daí o menu ter passos.
+   */
+  const [passo, setPasso] = useState<PassoDoMenu>("etapas");
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -53,13 +70,13 @@ export default function PainelFunil() {
 
   function abrirMenu(id: number) {
     setMovendo((atual) => (atual === id ? null : id));
-    setEscolhendoMotivo(false);
+    setPasso("etapas");
   }
 
-  function mover(id: number, etapa: EtapaFunil, motivo?: MotivoPerda) {
-    moverEtapa(id, etapa, motivo);
+  function mover(id: number, etapa: EtapaFunil, dados?: DadosDaMovimentacao) {
+    moverEtapa(id, etapa, dados);
     setMovendo(null);
-    setEscolhendoMotivo(false);
+    setPasso("etapas");
   }
 
   return (
@@ -147,11 +164,11 @@ export default function PainelFunil() {
                     key={tarefa.id}
                     tarefa={tarefa}
                     menuAberto={movendo === tarefa.id}
-                    escolhendoMotivo={escolhendoMotivo}
+                    passo={passo}
                     aoAbrirMenu={() => abrirMenu(tarefa.id)}
-                    aoPedirMotivo={() => setEscolhendoMotivo(true)}
-                    aoMover={(destino, motivo) =>
-                      mover(tarefa.id, destino, motivo)
+                    aoPedirPasso={setPasso}
+                    aoMover={(destino, dados) =>
+                      mover(tarefa.id, destino, dados)
                     }
                   />
                 ))}
@@ -164,20 +181,23 @@ export default function PainelFunil() {
   );
 }
 
+/** Passos do menu de mover: a lista, ou o campo que a etapa de destino exige. */
+type PassoDoMenu = "etapas" | "motivo" | "valor";
+
 function Cartao({
   tarefa,
   menuAberto,
-  escolhendoMotivo,
+  passo,
   aoAbrirMenu,
-  aoPedirMotivo,
+  aoPedirPasso,
   aoMover,
 }: {
   tarefa: Tarefa;
   menuAberto: boolean;
-  escolhendoMotivo: boolean;
+  passo: PassoDoMenu;
   aoAbrirMenu: () => void;
-  aoPedirMotivo: () => void;
-  aoMover: (etapa: EtapaFunil, motivo?: MotivoPerda) => void;
+  aoPedirPasso: (passo: PassoDoMenu) => void;
+  aoMover: (etapa: EtapaFunil, dados?: DadosDaMovimentacao) => void;
 }) {
   return (
     <article className="rounded-controle border border-black/10 bg-herval-branco p-3.5 shadow-card">
@@ -194,12 +214,29 @@ function Cartao({
         <span className="rounded-full bg-herval-verde/15 px-2.5 py-1 text-[11px] font-bold text-herval-preto">
           {tarefa.origem}
         </span>
+        {(tarefa.remarcacoes ?? 0) > 0 && (
+          <span
+            title="Consulta remarcada depois de uma falta"
+            className="inline-flex items-center gap-1 rounded-full border border-black/20 px-2.5 py-1 text-[11px] font-bold text-black/70"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {tarefa.remarcacoes}
+            {tarefa.remarcacoes === 1 ? " remarcação" : " remarcações"}
+          </span>
+        )}
       </div>
 
       {tarefa.motivoPerda && (
         <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-herval-preto px-2.5 py-1 text-[11px] font-bold text-herval-branco">
           <X className="h-3 w-3" />
           {tarefa.motivoPerda}
+        </p>
+      )}
+
+      {tarefa.valorVenda !== undefined && (
+        <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-2.5 py-1 text-[11px] font-extrabold text-herval-preto">
+          <Trophy className="h-3 w-3" />
+          {formatarMoeda(tarefa.valorVenda)}
         </p>
       )}
 
@@ -231,55 +268,122 @@ function Cartao({
 
       {menuAberto && (
         <div className="mt-3 rounded-controle bg-black/[0.04] p-2.5">
-          {escolhendoMotivo ? (
-            <>
-              <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
-                Motivo da perda
-              </p>
-              <ul className="space-y-1">
-                {motivosDePerda.map((motivo) => (
-                  <li key={motivo}>
-                    <button
-                      type="button"
-                      onClick={() => aoMover("Venda Perdida", motivo)}
-                      className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs font-medium text-black/70 transition-colors hover:bg-herval-verde/20 hover:font-bold hover:text-herval-preto"
-                    >
-                      <ArrowRight className="h-3 w-3 shrink-0" />
-                      {motivo}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
+          {passo === "motivo" ? (
+            <ListaDeOpcoes
+              titulo="Motivo da perda"
+              opcoes={motivosDePerda}
+              apoios={apoioDoMotivo}
+              aoEscolher={(motivo) =>
+                aoMover(ETAPA_PERDIDA, { motivoPerda: motivo as MotivoPerda })
+              }
+            />
+          ) : passo === "valor" ? (
+            <CampoDeValor aoConfirmar={(valorVenda) => aoMover(ETAPA_GANHA, { valorVenda })} />
           ) : (
-            <>
-              <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
-                Mover para
-              </p>
-              <ul className="max-h-56 space-y-1 overflow-y-auto">
-                {etapasFunil
-                  .filter((destino) => destino !== tarefa.etapa)
-                  .map((destino) => (
-                    <li key={destino}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          destino === "Venda Perdida"
-                            ? aoPedirMotivo()
-                            : aoMover(destino)
-                        }
-                        className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-xs font-medium text-black/70 transition-colors hover:bg-herval-verde/20 hover:font-bold hover:text-herval-preto"
-                      >
-                        <ArrowRight className="h-3 w-3 shrink-0" />
-                        {destino}
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </>
+            <ListaDeOpcoes
+              titulo="Mover para"
+              opcoes={etapasFunil.filter((destino) => destino !== tarefa.etapa)}
+              aoEscolher={(destino) => {
+                // Estas duas cobram informação antes de aceitar o movimento.
+                if (destino === ETAPA_PERDIDA) return aoPedirPasso("motivo");
+                if (destino === ETAPA_GANHA) return aoPedirPasso("valor");
+                aoMover(destino as EtapaFunil);
+              }}
+            />
           )}
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * Explicação curta em opções que o CRC costuma usar fora do lugar. Só "Spam"
+ * precisa hoje: sem isso ele vira gaveta de lead que apenas esfriou, e esse
+ * lead sairia da conta de qualificados sem ter deixado de ser lead de verdade.
+ */
+const apoioDoMotivo: Record<string, string> = {
+  Spam: "mensagens sem sentido, sem interação real — não usar para quem só parou de responder",
+};
+
+function ListaDeOpcoes({
+  titulo,
+  opcoes,
+  apoios,
+  aoEscolher,
+}: {
+  titulo: string;
+  opcoes: readonly string[];
+  apoios?: Record<string, string>;
+  aoEscolher: (opcao: string) => void;
+}) {
+  return (
+    <>
+      <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
+        {titulo}
+      </p>
+      <ul className="max-h-56 space-y-1 overflow-y-auto">
+        {opcoes.map((opcao) => (
+          <li key={opcao}>
+            <button
+              type="button"
+              onClick={() => aoEscolher(opcao)}
+              className="flex w-full items-start gap-1.5 rounded px-2 py-1.5 text-left text-xs font-medium text-black/70 transition-colors hover:bg-herval-verde/20 hover:font-bold hover:text-herval-preto"
+            >
+              <ArrowRight className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>
+                {opcao}
+                {apoios?.[opcao] && (
+                  <span className="mt-0.5 block text-[11px] font-normal leading-snug text-black/45">
+                    {apoios[opcao]}
+                  </span>
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** Valor da venda: obrigatório para marcar Venda Ganha, e só o valor. */
+function CampoDeValor({
+  aoConfirmar,
+}: {
+  aoConfirmar: (valor: number) => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const valor = Number(texto.replace(",", "."));
+  const valido = texto.trim() !== "" && Number.isFinite(valor) && valor > 0;
+
+  return (
+    <>
+      <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
+        Valor da venda (R$)
+      </p>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        inputMode="decimal"
+        autoFocus
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && valido) aoConfirmar(valor);
+        }}
+        placeholder="0,00"
+        className="w-full rounded border border-black/15 bg-herval-branco px-2.5 py-1.5 text-xs font-bold text-herval-preto outline-none focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/30"
+      />
+      <button
+        type="button"
+        disabled={!valido}
+        onClick={() => aoConfirmar(valor)}
+        className="mt-2 w-full rounded bg-herval-verde px-2 py-1.5 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
+      >
+        Confirmar venda
+      </button>
+    </>
   );
 }

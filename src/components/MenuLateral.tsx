@@ -6,6 +6,7 @@ import {
   ListChecks,
   KanbanSquare,
   CalendarDays,
+  BarChart3,
   Building2,
   MessageSquareWarning,
   MessageSquareText,
@@ -20,6 +21,7 @@ import LogoHerval from "@/components/LogoHerval";
 
 const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
+  { href: "/relatorios", rotulo: "Relatórios", Icone: BarChart3 },
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
   { href: "/funil", rotulo: "Funil", Icone: KanbanSquare },
   { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },

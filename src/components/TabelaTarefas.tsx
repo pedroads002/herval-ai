@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import { nomeDaClinica } from "@/data/clinicas";
 import {
   Check,
   X,
@@ -69,7 +70,7 @@ export default function TabelaTarefas() {
         termo === "" ||
         t.lead.toLowerCase().includes(termo) ||
         t.telefone.toLowerCase().includes(termo) ||
-        t.clinica.toLowerCase().includes(termo);
+        nomeDaClinica(t.clinicaId).toLowerCase().includes(termo);
 
       const combinaFiltro =
         filtro === "Todos"
@@ -257,7 +258,7 @@ export default function TabelaTarefas() {
                               {tarefa.lead}
                             </span>
                             <span className="mt-0.5 block text-xs font-medium text-black/45">
-                              {tarefa.telefone} · {tarefa.clinica}
+                              {tarefa.telefone} · {nomeDaClinica(tarefa.clinicaId)}
                             </span>
                           </span>
                         </button>

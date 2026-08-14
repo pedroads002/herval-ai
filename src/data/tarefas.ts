@@ -11,131 +11,29 @@ export type TipoTarefa = "acao-ia" | "alerta-humano";
 /** Quem executa a ação depois de decidida. */
 export type Responsavel = "IA" | "Humano" | "Automática";
 
-/** Situação do lead no atendimento (não confundir com a decisão da tarefa). */
-export type SituacaoLead =
-  | "Pendente"
-  | "Em Atendimento"
-  | "Aguardando Resposta"
-  | "Agendado"
-  | "Ganho"
-  | "Desqualificado";
 
-/** Colunas do Funil, na ordem em que a agência trabalha com os clientes. */
-export type EtapaFunil =
-  | "Leads Recebidos"
-  | "Em Contato"
-  | "Outros Contatos"
-  | "F1"
-  | "F2"
-  | "F3"
-  | "F4"
-  | "F5"
-  | "F6"
-  | "F7"
-  | "Nutrição"
-  | "Agendamento"
-  | "Reagendamento"
-  | "Comparecimento"
-  | "Venda Ganha"
-  | "Venda Perdida";
+import {
+  type EtapaFunil,
+  type Lead,
+  type MotivoPerda,
+  type SituacaoLead,
+} from "@/data/leads";
 
-export const etapasFunil: EtapaFunil[] = [
-  "Leads Recebidos",
-  "Em Contato",
-  "Outros Contatos",
-  "F1",
-  "F2",
-  "F3",
-  "F4",
-  "F5",
-  "F6",
-  "F7",
-  "Nutrição",
-  "Agendamento",
-  "Reagendamento",
-  "Comparecimento",
-  "Venda Ganha",
-  "Venda Perdida",
-];
-
-/** Por onde o lead chegou. */
-export type OrigemContato =
-  | "Meta Ads"
-  | "Instagram"
-  | "Google Ads"
-  | "Indicação"
-  | "Site"
-  | "WhatsApp";
-
-/** As mesmas categorias mostradas em "Motivos de perda" na Visão Geral. */
-export type MotivoPerda =
-  | "Achou caro"
-  | "Não respondeu mais"
-  | "Fora da área de atendimento"
-  | "Só pesquisando preço"
-  | "Vai pensar / adiou";
-
-export const motivosDePerda: MotivoPerda[] = [
-  "Achou caro",
-  "Não respondeu mais",
-  "Fora da área de atendimento",
-  "Só pesquisando preço",
-  "Vai pensar / adiou",
-];
-
-/**
- * A situação do lead sai da etapa do Funil, e não de um campo próprio: assim a
- * Fila de Tarefas e o Funil não têm como discordar sobre o mesmo lead.
- */
-export function situacaoDaEtapa(etapa: EtapaFunil): SituacaoLead {
-  switch (etapa) {
-    case "Leads Recebidos":
-      return "Pendente";
-    case "Em Contato":
-    case "Outros Contatos":
-    case "F1":
-    case "F2":
-      return "Em Atendimento";
-    case "F3":
-    case "F4":
-    case "F5":
-    case "F6":
-    case "F7":
-    case "Nutrição":
-      return "Aguardando Resposta";
-    case "Agendamento":
-    case "Reagendamento":
-    case "Comparecimento":
-      return "Agendado";
-    case "Venda Ganha":
-      return "Ganho";
-    case "Venda Perdida":
-      return "Desqualificado";
-  }
-}
-
-/**
- * Consulta marcada para o lead. Só faz sentido para quem está em Agendamento,
- * Reagendamento ou Comparecimento no Funil — é o que a tela de Agenda mostra.
- *
- * O dia é guardado como dia da semana + quantas semanas a partir da atual, e
- * não como data fixa, para o exemplo não envelhecer (mesma escolha já feita em
- * `prazoEmHoras` e `diasAtras`).
- */
-export type ConsultaMarcada = {
-  /** Id da tela de Profissionais. */
-  profissionalId: number;
-  /** Id da tela de Especialidades. O profissional precisa atender essa. */
-  especialidadeId: number;
-  /** 0 = domingo, 1 = segunda ... 6 = sábado. */
-  diaSemana: number;
-  /** -1 = semana passada, 0 = semana atual, 1 = próxima. */
-  semanasAFrente: number;
-  /** Hora de início, no formato "HH:MM". */
-  hora: string;
-  /** O paciente respondeu confirmando presença. */
-  confirmada: boolean;
-};
+// Repassados para as telas que já importavam esses tipos daqui.
+export {
+  etapasFunil,
+  motivosDePerda,
+  situacaoDaEtapa,
+  origensPagas,
+  ehLeadDeMarketing,
+} from "@/data/leads";
+export type {
+  EtapaFunil,
+  Lead,
+  MotivoPerda,
+  OrigemContato,
+  SituacaoLead,
+} from "@/data/leads";
 
 export type NivelScore = "Alta" | "Média" | "Baixa";
 
@@ -146,24 +44,19 @@ export type EventoHistorico = {
   regra: string;
 };
 
-export type Tarefa = {
-  id: number;
+/**
+ * Uma tarefa é um lead da fila com os campos de operação em cima: qual regra
+ * disparou, o que a IA sugere, o histórico da conversa. Os campos do lead em
+ * si (clínica, origem, etapa, safra) vêm de `Lead`, que é o que os relatórios
+ * leem — assim a fila e o relatório nunca discordam sobre o mesmo lead.
+ */
+export type Tarefa = Lead & {
   lead: string;
   telefone: string;
-  clinica: string;
   regra: string;
   acao: string;
   tipo: TipoTarefa;
   responsavel: Responsavel;
-  /** Coluna do Funil. A situação do lead é derivada daqui. */
-  etapa: EtapaFunil;
-  origem: OrigemContato;
-  /** Há quantos dias o lead chegou. Alimenta o filtro de período do Funil. */
-  diasAtras: number;
-  /** Só preenchido enquanto o lead está em "Venda Perdida". */
-  motivoPerda?: MotivoPerda;
-  /** Consulta na Agenda. Nem todo lead agendado já tem horário definido. */
-  consulta?: ConsultaMarcada;
   status: StatusTarefa;
   /** Há quantos minutos a tarefa está sem nenhuma ação. */
   minutosSemAcao: number;
@@ -186,7 +79,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 1,
     lead: "Mariana Souza",
     telefone: "(51) 96146-8628",
-    clinica: "Unidade Centro",
+    clinicaId: 1,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -227,7 +120,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 2,
     lead: "Carlos Menezes",
     telefone: "(51) 95919-9604",
-    clinica: "Unidade Centro",
+    clinicaId: 2,
     regra: "Confirmação de consulta · D-1",
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
@@ -235,14 +128,6 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Instagram",
     diasAtras: 4,
-    consulta: {
-      profissionalId: 3,
-      especialidadeId: 3,
-      diaSemana: 1,
-      semanasAFrente: 0,
-      hora: "09:00",
-      confirmada: true,
-    },
     status: "Pendente",
     minutosSemAcao: 90,
     prazoEmHoras: 26,
@@ -270,7 +155,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 3,
     lead: "Juliana Prado",
     telefone: "(51) 96604-3490",
-    clinica: "Unidade Centro",
+    clinicaId: 3,
     regra: "Cliente antigo inativo",
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
@@ -305,7 +190,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 4,
     lead: "Rafael Lima",
     telefone: "(51) 99137-8474",
-    clinica: "Unidade Moinhos",
+    clinicaId: 4,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -334,7 +219,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 5,
     lead: "Ana Beatriz Rocha",
     telefone: "(51) 97320-6685",
-    clinica: "Unidade Moinhos",
+    clinicaId: 5,
     regra: "Confirmação de consulta · D-1",
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
@@ -342,14 +227,6 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Site",
     diasAtras: 3,
-    consulta: {
-      profissionalId: 2,
-      especialidadeId: 1,
-      diaSemana: 2,
-      semanasAFrente: 0,
-      hora: "10:00",
-      confirmada: true,
-    },
     status: "Pendente",
     minutosSemAcao: 140,
     prazoEmHoras: 20,
@@ -377,7 +254,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 6,
     lead: "Diego Ferraz",
     telefone: "(51) 95709-3119",
-    clinica: "Unidade Moinhos",
+    clinicaId: 1,
     regra: "Dúvida sobre o procedimento",
     acao: "Enviar explicação do protocolo",
     tipo: "acao-ia",
@@ -418,7 +295,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 7,
     lead: "Patrícia Nogueira",
     telefone: "(51) 95552-3243",
-    clinica: "Unidade Centro",
+    clinicaId: 6,
     regra: "Lead novo do site",
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
@@ -440,7 +317,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 8,
     lead: "Fernando Aquino",
     telefone: "(51) 93887-3478",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 7,
     regra: "Pedido de horário",
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
@@ -469,7 +346,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 9,
     lead: "Camila Bertoldo",
     telefone: "(51) 93386-7864",
-    clinica: "Unidade Centro",
+    clinicaId: 1,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -510,7 +387,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 10,
     lead: "Lucas Andrade",
     telefone: "(51) 97428-7521",
-    clinica: "Unidade Centro",
+    clinicaId: 8,
     regra: "Fora da área de atendimento",
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
@@ -518,7 +395,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Indicação",
     diasAtras: 27,
-    motivoPerda: "Achou caro",
+    motivoPerda: "Sem dinheiro",
     status: "Rejeitado",
     minutosSemAcao: 380,
     prazoEmHoras: 60,
@@ -540,7 +417,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 11,
     lead: "Renata Vasques",
     telefone: "(51) 94420-8219",
-    clinica: "Unidade Moinhos",
+    clinicaId: 9,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -569,7 +446,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 12,
     lead: "Bruno Tavares",
     telefone: "(51) 91417-2152",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 2,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -598,7 +475,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 13,
     lead: "Letícia Camargo",
     telefone: "(51) 98996-8634",
-    clinica: "Unidade Centro",
+    clinicaId: 3,
     regra: "Agendamento não confirmado",
     acao: "Confirmar consulta e orientar chegada",
     tipo: "acao-ia",
@@ -606,14 +483,6 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Meta Ads",
     diasAtras: 4,
-    consulta: {
-      profissionalId: 4,
-      especialidadeId: 2,
-      diaSemana: 3,
-      semanasAFrente: 0,
-      hora: "14:00",
-      confirmada: false,
-    },
     status: "Pendente",
     minutosSemAcao: 200,
     prazoEmHoras: 30,
@@ -641,7 +510,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 14,
     lead: "Gustavo Pinheiro",
     telefone: "(51) 93645-9459",
-    clinica: "Unidade Moinhos",
+    clinicaId: 10,
     regra: "Confirmação de consulta · D-1",
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
@@ -649,14 +518,6 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Agendamento",
     origem: "Instagram",
     diasAtras: 7,
-    consulta: {
-      profissionalId: 3,
-      especialidadeId: 4,
-      diaSemana: 4,
-      semanasAFrente: 0,
-      hora: "16:00",
-      confirmada: false,
-    },
     status: "Pendente",
     minutosSemAcao: 140,
     prazoEmHoras: 20,
@@ -684,7 +545,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 15,
     lead: "Aline Model",
     telefone: "(51) 99493-7008",
-    clinica: "Unidade Centro",
+    clinicaId: 5,
     regra: "Follow-up D+3",
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
@@ -713,7 +574,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 16,
     lead: "Marcelo Íris",
     telefone: "(51) 94275-9480",
-    clinica: "Unidade Centro",
+    clinicaId: 1,
     regra: "Confirmação de consulta · D-1",
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
@@ -748,7 +609,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 17,
     lead: "Vanessa Duarte",
     telefone: "(51) 96640-8327",
-    clinica: "Unidade Centro",
+    clinicaId: 4,
     regra: "Sem resposta há 48h",
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
@@ -789,7 +650,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 18,
     lead: "Rodrigo Sartori",
     telefone: "(51) 94348-8907",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 7,
     regra: "Sem resposta há 48h",
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
@@ -830,7 +691,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 19,
     lead: "Priscila Bastos",
     telefone: "(51) 94265-8832",
-    clinica: "Unidade Centro",
+    clinicaId: 2,
     regra: "Cliente antigo inativo",
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
@@ -859,7 +720,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 20,
     lead: "Thiago Nunes",
     telefone: "(51) 93081-1451",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 9,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -888,7 +749,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 21,
     lead: "Débora Marques",
     telefone: "(51) 93146-1350",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 3,
     regra: "Follow-up D+2",
     acao: "Enviar prova social (antes e depois)",
     tipo: "acao-ia",
@@ -917,7 +778,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 22,
     lead: "Eduardo Kraemer",
     telefone: "(51) 94486-5799",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 6,
     regra: "Agendamento não confirmado",
     acao: "Confirmar consulta e orientar chegada",
     tipo: "acao-ia",
@@ -925,14 +786,6 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Reagendamento",
     origem: "Indicação",
     diasAtras: 15,
-    consulta: {
-      profissionalId: 1,
-      especialidadeId: 1,
-      diaSemana: 5,
-      semanasAFrente: 0,
-      hora: "11:00",
-      confirmada: true,
-    },
     status: "Pendente",
     minutosSemAcao: 60,
     prazoEmHoras: 5,
@@ -960,7 +813,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 23,
     lead: "Sabrina Lopes",
     telefone: "(51) 99466-7891",
-    clinica: "Unidade Moinhos",
+    clinicaId: 8,
     regra: "Follow-up D+3",
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
@@ -1001,7 +854,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 24,
     lead: "Henrique Vieira",
     telefone: "(51) 98757-2971",
-    clinica: "Unidade Moinhos",
+    clinicaId: 1,
     regra: "Sem resposta há 48h",
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
@@ -1042,7 +895,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 25,
     lead: "Natália Brum",
     telefone: "(51) 91691-2601",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 10,
     regra: "Só pesquisando preço",
     acao: "Encerrar e manter em base de nutrição",
     tipo: "acao-ia",
@@ -1050,7 +903,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Meta Ads",
     diasAtras: 28,
-    motivoPerda: "Não respondeu mais",
+    motivoPerda: "Perdeu o interesse",
     status: "Rejeitado",
     minutosSemAcao: 420,
     prazoEmHoras: 48,
@@ -1072,7 +925,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 26,
     lead: "Felipe Cardoso",
     telefone: "(51) 99391-4267",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 5,
     regra: "Fora da área de atendimento",
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
@@ -1080,7 +933,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Instagram",
     diasAtras: 6,
-    motivoPerda: "Fora da área de atendimento",
+    motivoPerda: "Localização distante",
     status: "Rejeitado",
     minutosSemAcao: 420,
     prazoEmHoras: 48,
@@ -1102,7 +955,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 27,
     lead: "Larissa Peixoto",
     telefone: "(51) 95253-4319",
-    clinica: "Unidade Moinhos",
+    clinicaId: 2,
     regra: "Pedido de horário",
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
@@ -1137,7 +990,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 28,
     lead: "André Salgado",
     telefone: "(51) 92198-4484",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 4,
     regra: "Fora da área de atendimento",
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
@@ -1145,7 +998,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Indicação",
     diasAtras: 34,
-    motivoPerda: "Só pesquisando preço",
+    motivoPerda: "Outros",
     status: "Rejeitado",
     minutosSemAcao: 500,
     prazoEmHoras: 72,
@@ -1167,7 +1020,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 29,
     lead: "Bianca Ferrari",
     telefone: "(51) 98663-4597",
-    clinica: "Unidade Moinhos",
+    clinicaId: 9,
     regra: "Objeção de preço detectada",
     acao: "Responder com quebra de objeção padrão",
     tipo: "acao-ia",
@@ -1208,7 +1061,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 30,
     lead: "Otávio Barcellos",
     telefone: "(51) 96556-7902",
-    clinica: "Unidade Centro",
+    clinicaId: 1,
     regra: "Cliente antigo inativo",
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
@@ -1237,7 +1090,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 31,
     lead: "Cristiane Rosa",
     telefone: "(51) 91296-7297",
-    clinica: "Unidade Centro",
+    clinicaId: 7,
     regra: "Lead novo do Meta Ads",
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
@@ -1259,7 +1112,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 32,
     lead: "Vinícius Portela",
     telefone: "(51) 91648-3974",
-    clinica: "Unidade Moinhos",
+    clinicaId: 3,
     regra: "Sem resposta há 48h",
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
@@ -1294,7 +1147,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 33,
     lead: "Manuela Schmitt",
     telefone: "(51) 92465-5572",
-    clinica: "Unidade Moinhos",
+    clinicaId: 8,
     regra: "Confirmação de consulta · D-1",
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
@@ -1329,7 +1182,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 34,
     lead: "Leandro Fagundes",
     telefone: "(51) 92372-4643",
-    clinica: "Unidade Centro",
+    clinicaId: 5,
     regra: "Pedido de horário",
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
@@ -1358,7 +1211,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 35,
     lead: "Tatiane Moura",
     telefone: "(51) 99632-4906",
-    clinica: "Unidade Moinhos",
+    clinicaId: 2,
     regra: "Só pesquisando preço",
     acao: "Encerrar e manter em base de nutrição",
     tipo: "acao-ia",
@@ -1366,7 +1219,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Site",
     diasAtras: 3,
-    motivoPerda: "Vai pensar / adiou",
+    motivoPerda: "Perdeu o interesse",
     status: "Rejeitado",
     minutosSemAcao: 420,
     prazoEmHoras: 48,
@@ -1388,7 +1241,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 36,
     lead: "Ricardo Zanella",
     telefone: "(51) 94372-5750",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 10,
     regra: "Follow-up D+3",
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
@@ -1423,7 +1276,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 37,
     lead: "Isabela Trindade",
     telefone: "(51) 99284-4104",
-    clinica: "Unidade Centro",
+    clinicaId: 1,
     regra: "Follow-up D+3",
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
@@ -1464,7 +1317,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 38,
     lead: "Márcio Bulhões",
     telefone: "(51) 96042-4525",
-    clinica: "Unidade Moinhos",
+    clinicaId: 6,
     regra: "Lead novo do site",
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
@@ -1486,7 +1339,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 39,
     lead: "Carolina Xavier",
     telefone: "(51) 91233-2158",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 4,
     regra: "Lead novo do Meta Ads",
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
@@ -1508,7 +1361,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 40,
     lead: "Paulo Guedes",
     telefone: "(51) 95619-4968",
-    clinica: "Unidade Centro",
+    clinicaId: 9,
     regra: "Pedido de horário",
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
@@ -1549,7 +1402,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 41,
     lead: "Simone Wagner",
     telefone: "(51) 96966-6389",
-    clinica: "Unidade Centro",
+    clinicaId: 3,
     regra: "Cliente antigo inativo",
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
@@ -1590,7 +1443,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 42,
     lead: "Alexandre Reis",
     telefone: "(51) 97252-2374",
-    clinica: "Unidade Centro",
+    clinicaId: 7,
     regra: "Fora da área de atendimento",
     acao: "Encerrar conversa com mensagem cordial",
     tipo: "acao-ia",
@@ -1598,7 +1451,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "WhatsApp",
     diasAtras: 19,
-    motivoPerda: "Achou caro",
+    motivoPerda: "Sem dinheiro",
     status: "Rejeitado",
     minutosSemAcao: 500,
     prazoEmHoras: 72,
@@ -1619,16 +1472,8 @@ export const tarefasIniciais: Tarefa[] = [
   {
     id: 43,
     lead: "Fernanda Antunes",
-    consulta: {
-      profissionalId: 5,
-      especialidadeId: 5,
-      diaSemana: 4,
-      semanasAFrente: -1,
-      hora: "15:00",
-      confirmada: true,
-    },
     telefone: "(51) 93357-7545",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 2,
     regra: "Agendamento não confirmado",
     acao: "Confirmar consulta e orientar chegada",
     tipo: "acao-ia",
@@ -1663,7 +1508,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 44,
     lead: "Douglas Meireles",
     telefone: "(51) 99670-3543",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 8,
     regra: "Cliente antigo inativo",
     acao: "Convidar para avaliação de retorno",
     tipo: "acao-ia",
@@ -1704,7 +1549,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 45,
     lead: "Elisa Konrad",
     telefone: "(51) 99404-8032",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 5,
     regra: "Dúvida sobre o procedimento",
     acao: "Enviar explicação do protocolo",
     tipo: "acao-ia",
@@ -1745,7 +1590,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 46,
     lead: "Rogério Pacheco",
     telefone: "(51) 96909-2718",
-    clinica: "Unidade Centro",
+    clinicaId: 1,
     regra: "Sem resposta há 48h",
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
@@ -1780,7 +1625,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 47,
     lead: "Amanda Cerutti",
     telefone: "(51) 92148-9240",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 10,
     regra: "Lead novo do Meta Ads",
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
@@ -1802,7 +1647,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 48,
     lead: "Sérgio Balbinot",
     telefone: "(51) 94362-4780",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 4,
     regra: "Lead novo do Meta Ads",
     acao: "Notificar CRC: lead novo, ligar em até 5 min",
     tipo: "alerta-humano",
@@ -1823,16 +1668,8 @@ export const tarefasIniciais: Tarefa[] = [
   {
     id: 49,
     lead: "Michele Dornelles",
-    consulta: {
-      profissionalId: 6,
-      especialidadeId: 5,
-      diaSemana: 5,
-      semanasAFrente: -1,
-      hora: "09:00",
-      confirmada: true,
-    },
     telefone: "(51) 94248-2269",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 9,
     regra: "Confirmação de consulta · D-1",
     acao: "Pedir confirmação da consulta de amanhã",
     tipo: "acao-ia",
@@ -1867,7 +1704,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 50,
     lead: "Fábio Guerreiro",
     telefone: "(51) 98959-5403",
-    clinica: "Unidade Moinhos",
+    clinicaId: 6,
     regra: "Follow-up D+3",
     acao: "Perguntar se prefere atendimento por telefone",
     tipo: "acao-ia",
@@ -1908,7 +1745,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 51,
     lead: "Rafaela Ost",
     telefone: "(51) 98640-2941",
-    clinica: "Unidade Moinhos",
+    clinicaId: 3,
     regra: "Pedido de horário",
     acao: "Sugerir três horários disponíveis",
     tipo: "acao-ia",
@@ -1949,7 +1786,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 52,
     lead: "Júlio Menegat",
     telefone: "(51) 98363-5401",
-    clinica: "Unidade Moinhos",
+    clinicaId: 2,
     regra: "Sem resposta há 48h",
     acao: "Enviar mensagem de reativação no WhatsApp",
     tipo: "acao-ia",
@@ -1984,12 +1821,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 53,
     lead: "Aline Barreto",
     telefone: "(51) 94892-1917",
-    clinica: "Unidade Centro",
+    clinicaId: 7,
     regra: "Venda fechada",
     acao: "Registrar procedimento na agenda",
     tipo: "acao-ia",
     responsavel: "Automática",
     etapa: "Venda Ganha",
+    valorVenda: 5800,
     origem: "Site",
     diasAtras: 34,
     status: "Aprovado",
@@ -2019,12 +1857,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 54,
     lead: "Débora Nunes",
     telefone: "(51) 95577-3242",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 1,
     regra: "Venda fechada",
     acao: "Enviar orientações de pré-procedimento",
     tipo: "acao-ia",
     responsavel: "IA",
     etapa: "Venda Ganha",
+    valorVenda: 4500,
     origem: "WhatsApp",
     diasAtras: 27,
     status: "Aprovado",
@@ -2054,12 +1893,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 55,
     lead: "Felipe Aragão",
     telefone: "(51) 93506-5485",
-    clinica: "Unidade Moinhos",
+    clinicaId: 8,
     regra: "Venda fechada",
     acao: "Registrar procedimento na agenda",
     tipo: "acao-ia",
     responsavel: "Automática",
     etapa: "Venda Ganha",
+    valorVenda: 7200,
     origem: "Meta Ads",
     diasAtras: 31,
     status: "Aprovado",
@@ -2089,12 +1929,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 56,
     lead: "Tatiane Correia",
     telefone: "(51) 97648-2983",
-    clinica: "Unidade Centro",
+    clinicaId: 5,
     regra: "Venda fechada",
     acao: "Enviar orientações de pré-procedimento",
     tipo: "acao-ia",
     responsavel: "IA",
     etapa: "Venda Ganha",
+    valorVenda: 12400,
     origem: "Instagram",
     diasAtras: 13,
     status: "Aprovado",
@@ -2124,12 +1965,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 57,
     lead: "Rodrigo Vasques",
     telefone: "(51) 94670-2906",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 4,
     regra: "Venda fechada",
     acao: "Registrar procedimento na agenda",
     tipo: "acao-ia",
     responsavel: "Automática",
     etapa: "Venda Ganha",
+    valorVenda: 3200,
     origem: "Google Ads",
     diasAtras: 21,
     status: "Aprovado",
@@ -2159,12 +2001,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 58,
     lead: "Priscila Amado",
     telefone: "(51) 93823-3823",
-    clinica: "Unidade Moinhos",
+    clinicaId: 10,
     regra: "Venda fechada",
     acao: "Enviar orientações de pré-procedimento",
     tipo: "acao-ia",
     responsavel: "IA",
     etapa: "Venda Ganha",
+    valorVenda: 3200,
     origem: "Indicação",
     diasAtras: 14,
     status: "Aprovado",
@@ -2194,12 +2037,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 59,
     lead: "Márcio Bettega",
     telefone: "(51) 91032-6166",
-    clinica: "Unidade Centro",
+    clinicaId: 9,
     regra: "Venda fechada",
     acao: "Registrar procedimento na agenda",
     tipo: "acao-ia",
     responsavel: "Automática",
     etapa: "Venda Ganha",
+    valorVenda: 9600,
     origem: "Site",
     diasAtras: 33,
     status: "Aprovado",
@@ -2229,12 +2073,13 @@ export const tarefasIniciais: Tarefa[] = [
     id: 60,
     lead: "Simone Falcão",
     telefone: "(51) 93688-2925",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 2,
     regra: "Venda fechada",
     acao: "Enviar orientações de pré-procedimento",
     tipo: "acao-ia",
     responsavel: "IA",
     etapa: "Venda Ganha",
+    valorVenda: 3200,
     origem: "WhatsApp",
     diasAtras: 24,
     status: "Aprovado",
@@ -2264,7 +2109,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 61,
     lead: "Cristina Bueno",
     telefone: "(51) 92197-2779",
-    clinica: "Unidade Moinhos",
+    clinicaId: 3,
     regra: "Objeção de preço sem retorno",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2272,7 +2117,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Meta Ads",
     diasAtras: 22,
-    motivoPerda: "Achou caro",
+    motivoPerda: "Sem dinheiro",
     status: "Aprovado",
     minutosSemAcao: 502,
     prazoEmHoras: 66,
@@ -2300,7 +2145,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 62,
     lead: "Anderson Prates",
     telefone: "(51) 92407-5931",
-    clinica: "Unidade Centro",
+    clinicaId: 6,
     regra: "Objeção de preço sem retorno",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2308,7 +2153,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Instagram",
     diasAtras: 17,
-    motivoPerda: "Achou caro",
+    motivoPerda: "Sem dinheiro",
     status: "Aprovado",
     minutosSemAcao: 301,
     prazoEmHoras: 27,
@@ -2336,7 +2181,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 63,
     lead: "Elaine Ristow",
     telefone: "(51) 99407-9300",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 1,
     regra: "Objeção de preço sem retorno",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2344,7 +2189,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Google Ads",
     diasAtras: 13,
-    motivoPerda: "Achou caro",
+    motivoPerda: "Sem dinheiro",
     status: "Aprovado",
     minutosSemAcao: 169,
     prazoEmHoras: 44,
@@ -2372,7 +2217,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 64,
     lead: "Gustavo Peixoto",
     telefone: "(51) 99639-3213",
-    clinica: "Unidade Moinhos",
+    clinicaId: 7,
     regra: "Objeção de preço sem retorno",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2380,7 +2225,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Indicação",
     diasAtras: 2,
-    motivoPerda: "Achou caro",
+    motivoPerda: "Sem dinheiro",
     status: "Aprovado",
     minutosSemAcao: 1398,
     prazoEmHoras: 40,
@@ -2408,7 +2253,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 65,
     lead: "Larissa Kunz",
     telefone: "(51) 92789-7357",
-    clinica: "Unidade Centro",
+    clinicaId: 5,
     regra: "Follow-up D+7 sem resposta",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2416,7 +2261,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Site",
     diasAtras: 27,
-    motivoPerda: "Não respondeu mais",
+    motivoPerda: "Perdeu o interesse",
     status: "Aprovado",
     minutosSemAcao: 524,
     prazoEmHoras: 51,
@@ -2444,7 +2289,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 66,
     lead: "Otávio Brizola",
     telefone: "(51) 94709-2592",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 8,
     regra: "Follow-up D+7 sem resposta",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2452,7 +2297,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "WhatsApp",
     diasAtras: 16,
-    motivoPerda: "Não respondeu mais",
+    motivoPerda: "Perdeu o interesse",
     status: "Aprovado",
     minutosSemAcao: 1354,
     prazoEmHoras: 40,
@@ -2480,7 +2325,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 67,
     lead: "Michele Sarturi",
     telefone: "(51) 93285-2355",
-    clinica: "Unidade Moinhos",
+    clinicaId: 2,
     regra: "Follow-up D+7 sem resposta",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2488,7 +2333,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Meta Ads",
     diasAtras: 36,
-    motivoPerda: "Não respondeu mais",
+    motivoPerda: "Perdeu o interesse",
     status: "Aprovado",
     minutosSemAcao: 1957,
     prazoEmHoras: 86,
@@ -2516,7 +2361,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 68,
     lead: "Paulo Sperb",
     telefone: "(51) 94089-6100",
-    clinica: "Unidade Centro",
+    clinicaId: 4,
     regra: "Follow-up D+7 sem resposta",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2524,7 +2369,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Instagram",
     diasAtras: 1,
-    motivoPerda: "Não respondeu mais",
+    motivoPerda: "Perdeu o interesse",
     status: "Aprovado",
     minutosSemAcao: 1779,
     prazoEmHoras: 36,
@@ -2552,7 +2397,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 69,
     lead: "Renata Grazziotin",
     telefone: "(51) 96971-5886",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 10,
     regra: "Lead de outra cidade",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2560,7 +2405,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Google Ads",
     diasAtras: 19,
-    motivoPerda: "Fora da área de atendimento",
+    motivoPerda: "Localização distante",
     status: "Aprovado",
     minutosSemAcao: 709,
     prazoEmHoras: 110,
@@ -2588,7 +2433,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 70,
     lead: "Diego Lamb",
     telefone: "(51) 95525-2012",
-    clinica: "Unidade Moinhos",
+    clinicaId: 3,
     regra: "Lead de outra cidade",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2596,7 +2441,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Indicação",
     diasAtras: 7,
-    motivoPerda: "Fora da área de atendimento",
+    motivoPerda: "Localização distante",
     status: "Aprovado",
     minutosSemAcao: 1707,
     prazoEmHoras: 71,
@@ -2624,7 +2469,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 71,
     lead: "Fabiana Roso",
     telefone: "(51) 98577-2628",
-    clinica: "Unidade Centro",
+    clinicaId: 9,
     regra: "Pesquisa de preço",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2632,7 +2477,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Site",
     diasAtras: 19,
-    motivoPerda: "Só pesquisando preço",
+    motivoPerda: "Outros",
     status: "Aprovado",
     minutosSemAcao: 392,
     prazoEmHoras: 97,
@@ -2660,7 +2505,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 72,
     lead: "Sérgio Doneda",
     telefone: "(51) 91164-9671",
-    clinica: "Unidade Zona Sul",
+    clinicaId: 1,
     regra: "Pesquisa de preço",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2668,7 +2513,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "WhatsApp",
     diasAtras: 31,
-    motivoPerda: "Só pesquisando preço",
+    motivoPerda: "Outros",
     status: "Aprovado",
     minutosSemAcao: 406,
     prazoEmHoras: 120,
@@ -2696,7 +2541,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 73,
     lead: "Karine Bonatto",
     telefone: "(51) 96583-1254",
-    clinica: "Unidade Moinhos",
+    clinicaId: 6,
     regra: "Adiamento sem data",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2704,7 +2549,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Meta Ads",
     diasAtras: 36,
-    motivoPerda: "Vai pensar / adiou",
+    motivoPerda: "Perdeu o interesse",
     status: "Aprovado",
     minutosSemAcao: 853,
     prazoEmHoras: 59,
@@ -2732,7 +2577,7 @@ export const tarefasIniciais: Tarefa[] = [
     id: 74,
     lead: "Thiago Marchi",
     telefone: "(51) 92636-1039",
-    clinica: "Unidade Centro",
+    clinicaId: 5,
     regra: "Adiamento sem data",
     acao: "Encerrar fluxo e arquivar lead",
     tipo: "acao-ia",
@@ -2740,7 +2585,7 @@ export const tarefasIniciais: Tarefa[] = [
     etapa: "Venda Perdida",
     origem: "Instagram",
     diasAtras: 19,
-    motivoPerda: "Vai pensar / adiou",
+    motivoPerda: "Perdeu o interesse",
     status: "Aprovado",
     minutosSemAcao: 288,
     prazoEmHoras: 51,

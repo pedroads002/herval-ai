@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { nomeDaClinica } from "@/data/clinicas";
 import {
   CalendarPlus,
   ChevronLeft,
@@ -10,7 +11,7 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { useLeads } from "@/components/ProvedorLeads";
+import { useLeads, type DadosDaConsulta } from "@/components/ProvedorLeads";
 import {
   dataCompleta,
   dataDaConsulta,
@@ -25,22 +26,23 @@ import {
   mesmaData,
   nomesCurtosDosDias,
   nomesDosDias,
-  semanasDeDiferenca,
   somarDias,
   statusDaConsulta,
+  diasAteAData,
   type StatusConsulta,
 } from "@/data/agenda";
 import { especialidadesIniciais, especialidadePorId } from "@/data/especialidades";
 import { profissionaisIniciais } from "@/data/profissionais";
-import type { ConsultaMarcada, Tarefa } from "@/data/tarefas";
+import type { Agendamento } from "@/data/agendamentos";
+import type { Tarefa } from "@/data/tarefas";
 import { formatarDuracao } from "@/lib/formato";
 
 type Modo = "Dia" | "Semana";
 
-/** Consulta pronta para a grade: o lead junto do horário já resolvido. */
+/** Consulta pronta para a grade: o lead junto do agendamento dele. */
 type ItemAgenda = {
   tarefa: Tarefa;
-  consulta: ConsultaMarcada;
+  agendamento: Agendamento;
   data: Date;
   status: StatusConsulta;
 };
@@ -48,11 +50,14 @@ type ItemAgenda = {
 const estiloStatus: Record<StatusConsulta, string> = {
   Agendado: "border border-black/25 text-black/70",
   Confirmado: "bg-herval-verde text-herval-preto",
-  Finalizado: "bg-herval-preto text-herval-branco",
+  Compareceu: "bg-herval-preto text-herval-branco",
+  Faltou: "bg-herval-vermelho text-herval-branco",
+  Cancelada: "border border-black/25 text-black/40 line-through",
 };
 
 export default function PainelAgenda() {
-  const { tarefas, definirConsulta } = useLeads();
+  const { tarefas, agendamentos, definirConsulta, definirStatusDoAgendamento } =
+    useLeads();
 
   // A data só é lida depois que a tela monta, para o servidor e o navegador
   // nunca renderizarem dias diferentes.
@@ -78,32 +83,52 @@ export default function PainelAgenda() {
     [tarefas],
   );
 
-  const semHorario = useMemo(
-    () => leadsDaAgenda.filter((t) => !t.consulta),
-    [leadsDaAgenda],
+  /**
+   * A grade só desenha agendamento com horário montado. O resto do histórico
+   * tem só o dia, e aparece em "Aguardando horário" em vez de ganhar um
+   * horário inventado.
+   */
+  const comHorario = useMemo(
+    () => agendamentos.filter((a) => a.hora !== null && a.status !== "Cancelada"),
+    [agendamentos],
   );
+
+  /**
+   * Quem está sem data marcada. Inclui quem faltou: o agendamento dele existe,
+   * mas está encerrado, então ele precisa de horário novo. Quem já compareceu
+   * não entra — a consulta dele acabou.
+   */
+  const semHorario = useMemo(() => {
+    const comDataAberta = new Set(
+      agendamentos.filter((a) => a.status === "Agendada").map((a) => a.leadId),
+    );
+    return leadsDaAgenda.filter(
+      (t) => t.etapa !== "Comparecimento" && !comDataAberta.has(t.id),
+    );
+  }, [leadsDaAgenda, agendamentos]);
 
   const itens = useMemo<ItemAgenda[]>(() => {
     if (!hoje) return [];
+    const porId = new Map(tarefas.map((t) => [t.id, t]));
 
-    return leadsDaAgenda
-      .map((tarefa) => {
-        const consulta = tarefa.consulta;
-        if (!consulta) return null;
+    return comHorario
+      .map((agendamento) => {
+        const tarefa = porId.get(agendamento.leadId);
+        if (!tarefa) return null;
         return {
           tarefa,
-          consulta,
-          data: dataDaConsulta(consulta, hoje),
-          status: statusDaConsulta(tarefa.etapa, consulta.confirmada),
+          agendamento,
+          data: dataDaConsulta(agendamento, hoje),
+          status: statusDaConsulta(agendamento),
         };
       })
       .filter((item): item is ItemAgenda => item !== null)
       .filter(
         (item) =>
           filtroProfissional === "todos" ||
-          item.consulta.profissionalId === filtroProfissional,
+          item.agendamento.profissionalId === filtroProfissional,
       );
-  }, [leadsDaAgenda, hoje, filtroProfissional]);
+  }, [comHorario, tarefas, hoje, filtroProfissional]);
 
   const profissionaisVisiveis = useMemo(
     () =>
@@ -266,8 +291,8 @@ export default function PainelAgenda() {
           semHorario={semHorario}
           diasDaSemana={Array.from({ length: 7 }, (_, i) => somarDias(domingo, i))}
           hoje={hoje}
-          aoMarcar={(leadId, consulta) => {
-            definirConsulta(leadId, consulta);
+          aoMarcar={(leadId, dados) => {
+            definirConsulta(leadId, dados);
             setFormAberto(false);
           }}
           aoFechar={() => setFormAberto(false)}
@@ -298,8 +323,9 @@ export default function PainelAgenda() {
             Aguardando horário
           </h3>
           <p className="mt-1 text-xs font-medium text-black/50">
-            Já estão em etapa de agenda no Funil, mas ainda não têm dia e
-            profissional definidos. Use &quot;Nova Consulta&quot; para marcar.
+            Estão em etapa de agenda no Funil e não têm consulta marcada em
+            aberto — inclui quem faltou e precisa remarcar. Use &quot;Nova
+            Consulta&quot; para dar uma data.
           </p>
           <ul className="mt-4 flex flex-wrap gap-2.5">
             {semHorario.map((tarefa) => (
@@ -388,7 +414,7 @@ function GradeSemana({
             {dias.map((dia) => {
               const doDia = itens.filter(
                 (item) =>
-                  mesmaData(item.data, dia) && item.consulta.hora === hora,
+                  mesmaData(item.data, dia) && item.agendamento.hora === hora,
               );
 
               // Intervalos valem de segunda a sexta.
@@ -483,8 +509,8 @@ function GradeDia({
                 diaUtil && intervalo && horaEmIntervalo(hora, intervalo);
               const consultas = doDia.filter(
                 (item) =>
-                  item.consulta.profissionalId === p.id &&
-                  item.consulta.hora === hora,
+                  item.agendamento.profissionalId === p.id &&
+                  item.agendamento.hora === hora,
               );
 
               return (
@@ -519,16 +545,22 @@ function CartaoConsulta({
   item: ItemAgenda;
   compacto?: boolean;
 }) {
-  const especialidade = especialidadePorId(item.consulta.especialidadeId);
+  // Pega a ação direto do contexto: passar por duas grades só para repassar
+  // uma função deixaria as duas com um parâmetro que elas não usam.
+  const { definirStatusDoAgendamento } = useLeads();
+  const especialidade = especialidadePorId(item.agendamento.especialidadeId ?? 0);
+  // Consulta que já passou da data e ainda está sem desfecho.
+  const aguardaDesfecho =
+    item.agendamento.status === "Agendada" && item.agendamento.consultaEmDias >= 0;
   const profissional = profissionaisIniciais.find(
-    (p) => p.id === item.consulta.profissionalId,
+    (p) => p.id === item.agendamento.profissionalId,
   );
 
   return (
     <article className="rounded-controle border border-black/10 bg-herval-branco p-2.5 shadow-card">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-extrabold tabular-nums text-herval-preto">
-          {item.consulta.hora}
+          {item.agendamento.hora}
         </p>
         <span
           className={[
@@ -558,8 +590,33 @@ function CartaoConsulta({
 
       {!compacto && (
         <p className="mt-0.5 text-[11px] font-medium leading-tight text-black/45">
-          {item.tarefa.telefone} · {item.tarefa.clinica}
+          {item.tarefa.telefone} · {nomeDaClinica(item.tarefa.clinicaId)}
         </p>
+      )}
+
+      {aguardaDesfecho && (
+        // Marcar o desfecho move o lead de etapa sozinho: quem comparece vai
+        // para "Comparecimento", quem falta cai em "Reagendamento".
+        <div className="mt-2 flex gap-1.5 border-t border-black/10 pt-2">
+          <button
+            type="button"
+            onClick={() =>
+              definirStatusDoAgendamento(item.agendamento.id, "Compareceu")
+            }
+            className="flex-1 rounded bg-herval-verde px-2 py-1 text-[10px] font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
+          >
+            Compareceu
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              definirStatusDoAgendamento(item.agendamento.id, "Faltou")
+            }
+            className="flex-1 rounded border border-black/20 px-2 py-1 text-[10px] font-extrabold text-black/65 transition-colors hover:border-herval-vermelho hover:text-herval-vermelho"
+          >
+            Faltou
+          </button>
+        </div>
       )}
     </article>
   );
@@ -581,7 +638,7 @@ function FormularioNovaConsulta({
   semHorario: Tarefa[];
   diasDaSemana: Date[];
   hoje: Date;
-  aoMarcar: (leadId: number, consulta: ConsultaMarcada) => void;
+  aoMarcar: (leadId: number, dados: DadosDaConsulta) => void;
   aoFechar: () => void;
 }) {
   const ativas = especialidadesIniciais.filter((e) => e.ativa);
@@ -624,10 +681,8 @@ function FormularioNovaConsulta({
     aoMarcar(Number(leadId), {
       profissionalId: profissionalValido,
       especialidadeId,
-      diaSemana: data.getDay(),
-      semanasAFrente: semanasDeDiferenca(data, hoje),
+      consultaEmDias: diasAteAData(data, hoje),
       hora,
-      confirmada: false,
     });
   }
 
