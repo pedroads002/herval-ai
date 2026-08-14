@@ -1,4 +1,5 @@
-import type { ConsultaMarcada, EtapaFunil } from "@/data/tarefas";
+import type { Agendamento } from "@/data/agendamentos";
+import type { EtapaFunil } from "@/data/leads";
 
 /**
  * Etapas do Funil que aparecem na Agenda. A Agenda não tem base própria: ela
@@ -64,19 +65,22 @@ export function horaEmIntervalo(hora: string, intervalo: Intervalo) {
   return hora >= intervalo.inicio && hora < intervalo.fim;
 }
 
-export type StatusConsulta = "Agendado" | "Confirmado" | "Finalizado";
+export type StatusConsulta =
+  | "Agendado"
+  | "Confirmado"
+  | "Compareceu"
+  | "Faltou"
+  | "Cancelada";
 
 /**
- * O status também é derivado, e não guardado duas vezes: quem está em
- * Comparecimento já passou pela consulta; nas outras etapas depende de o
- * paciente ter respondido confirmando.
+ * O rótulo na grade sai do status do próprio agendamento, que agora é a fonte
+ * única. "Confirmado" é o agendamento ainda aberto que o paciente respondeu.
  */
-export function statusDaConsulta(
-  etapa: EtapaFunil,
-  confirmada: boolean,
-): StatusConsulta {
-  if (etapa === "Comparecimento") return "Finalizado";
-  return confirmada ? "Confirmado" : "Agendado";
+export function statusDaConsulta(agendamento: Agendamento): StatusConsulta {
+  if (agendamento.status === "Compareceu") return "Compareceu";
+  if (agendamento.status === "Faltou") return "Faltou";
+  if (agendamento.status === "Cancelada") return "Cancelada";
+  return agendamento.confirmada ? "Confirmado" : "Agendado";
 }
 
 // --- Datas -----------------------------------------------------------------
@@ -108,11 +112,19 @@ export function mesmaData(a: Date, b: Date) {
   );
 }
 
-/** Data real da consulta, contada a partir da semana de hoje. */
-export function dataDaConsulta(consulta: ConsultaMarcada, hoje: Date) {
-  return somarDias(
-    inicioDaSemana(hoje),
-    consulta.semanasAFrente * 7 + consulta.diaSemana,
+/**
+ * Data real da consulta. `consultaEmDias` conta para trás: 3 é anteontem mais
+ * um, -2 é depois de amanhã.
+ */
+export function dataDaConsulta(agendamento: Agendamento, hoje: Date) {
+  return somarDias(hoje, -agendamento.consultaEmDias);
+}
+
+/** Quantos dias separam a data de hoje, no formato guardado no agendamento. */
+export function diasAteAData(data: Date, hoje: Date) {
+  const umDia = 24 * 60 * 60 * 1000;
+  return Math.round(
+    (inicioDoDia(hoje).getTime() - inicioDoDia(data).getTime()) / umDia,
   );
 }
 

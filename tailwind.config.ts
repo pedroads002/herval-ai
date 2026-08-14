@@ -15,9 +15,11 @@ const config: Config = {
           verdeEscuro: "#01B300",
           preto: "#000000",
           branco: "#FFFFFF",
-          // Único tom fora da paleta, reservado para ações destrutivas e
-          // mensagens de erro (sair da conta, login recusado).
+          // Tons fora da paleta, reservados para sinalização: vermelho para
+          // ação destrutiva, erro e alerta crítico; âmbar para alerta de
+          // atenção nos relatórios.
           vermelho: "#D93025",
+          atencao: "#C77700",
         },
       },
       borderRadius: {
