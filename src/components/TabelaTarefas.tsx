@@ -22,6 +22,11 @@ import CartaoIndicador from "@/components/CartaoIndicador";
 import { calcularIndicadoresFila } from "@/data/indicadores";
 import { useLeads } from "@/components/ProvedorLeads";
 import {
+  conversaDoLead,
+  indexarMensagens,
+  mensagensIniciais,
+} from "@/data/mensagens";
+import {
   situacaoDaEtapa,
   situacoesAtivas,
   type NivelScore,
@@ -106,6 +111,9 @@ export default function TabelaTarefas() {
 
   // Os cards saem das mesmas tarefas da tabela, então nunca divergem dela.
   const indicadores = useMemo(() => calcularIndicadoresFila(tarefas), [tarefas]);
+
+  // A conversa não vem mais junto da tarefa: é buscada por lead, uma vez só.
+  const conversas = useMemo(() => indexarMensagens(mensagensIniciais), []);
 
   // Mesma contagem do card "Pendentes": leads aguardando a primeira ação.
   const pendentes = tarefas.filter(
@@ -230,6 +238,7 @@ export default function TabelaTarefas() {
                   {secao.itens.map((tarefa) => {
                 const alerta = tarefa.tipo === "alerta-humano";
                 const aberta = expandida === tarefa.id;
+                const conversa = aberta ? conversaDoLead(conversas, tarefa.id) : [];
 
                 return (
                   <Fragment key={tarefa.id}>
@@ -395,25 +404,27 @@ export default function TabelaTarefas() {
                             Histórico da IA com {tarefa.lead}
                           </h3>
 
-                          {tarefa.historico.length === 0 ? (
+                          {conversa.length === 0 ? (
                             <p className="mt-4 text-sm font-medium text-black/55">
                               A IA ainda não enviou nenhuma mensagem para este
                               lead. O primeiro contato é feito pelo CRC.
                             </p>
                           ) : (
                             <ol className="mt-4 space-y-4 border-l-2 border-herval-verde pl-5">
-                              {tarefa.historico.map((evento, indice) => (
-                                <li key={indice}>
+                              {conversa.map((mensagem) => (
+                                <li key={mensagem.id}>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-extrabold text-herval-preto">
-                                      {tempoRelativo(evento.minutosAtras)}
+                                      {tempoRelativo(mensagem.minutosAtras)}
                                     </span>
-                                    <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
-                                      {evento.regra}
-                                    </span>
+                                    {mensagem.regra && (
+                                      <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
+                                        {mensagem.regra}
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="mt-1.5 max-w-3xl text-sm text-black/70">
-                                    {evento.mensagem}
+                                    {mensagem.texto}
                                   </p>
                                 </li>
                               ))}
