@@ -2,7 +2,33 @@ import { Clock, MessageSquareQuote, Users, Wallet } from "lucide-react";
 import Etiqueta from "@/components/Etiqueta";
 import { especialidadesIniciais } from "@/data/especialidades";
 import { profissionaisDaEspecialidade } from "@/data/profissionais";
+import { clinicasQueOferecem, procedimentoDaClinica } from "@/data/clinicas";
 import { formatarDuracao, formatarMoeda } from "@/lib/formato";
+
+/**
+ * O que cada clínica cobra pela avaliação deste procedimento, resumido. O
+ * preço é de cada clínica, então aqui ele só pode aparecer como faixa — não
+ * existe "o valor" da harmonização facial, existe o valor em cada lugar.
+ */
+function resumoDaAvaliacao(especialidadeId: number) {
+  const clinicas = clinicasQueOferecem(especialidadeId);
+  if (clinicas.length === 0) return "Nenhuma clínica oferece";
+
+  const valores = clinicas.map(
+    (c) => procedimentoDaClinica(c, especialidadeId)?.valorConsulta ?? null,
+  );
+  const gratuitas = valores.filter((v) => v === null).length;
+  const cobrados = valores.filter((v): v is number => v !== null);
+
+  if (cobrados.length === 0) return `Gratuita nas ${gratuitas} clínicas`;
+
+  const menor = formatarMoeda(Math.min(...cobrados));
+  const maior = formatarMoeda(Math.max(...cobrados));
+  const faixa = menor === maior ? menor : `${menor} a ${maior}`;
+
+  if (gratuitas === 0) return faixa;
+  return `Gratuita em ${gratuitas} · ${faixa} nas demais`;
+}
 
 export default function ListaEspecialidades() {
   const ativas = especialidadesIniciais.filter((e) => e.ativa).length;
@@ -48,9 +74,7 @@ export default function ListaEspecialidades() {
                     Avaliação
                   </dt>
                   <dd className="mt-1 text-sm font-bold text-herval-preto">
-                    {especialidade.avaliacaoGratuita
-                      ? "Gratuita"
-                      : formatarMoeda(especialidade.valorAvaliacao ?? 0)}
+                    {resumoDaAvaliacao(especialidade.id)}
                   </dd>
                 </div>
 
@@ -98,7 +122,9 @@ export default function ListaEspecialidades() {
 
       <p className="text-xs font-medium text-black/45">
         A lista de quem atende vem da tela de Profissionais: para mudar aqui,
-        mude a especialidade lá no cadastro do profissional.
+        mude a especialidade lá no cadastro do profissional. O valor da
+        avaliação é de cada clínica e se edita na ficha dela, em Estratégia da
+        Clínica — por isso aqui ele aparece como faixa.
       </p>
     </div>
   );

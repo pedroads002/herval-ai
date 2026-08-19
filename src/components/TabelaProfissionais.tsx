@@ -1,6 +1,7 @@
 import { Stethoscope } from "lucide-react";
 import { profissionaisIniciais } from "@/data/profissionais";
 import { especialidadePorId } from "@/data/especialidades";
+import { nomeDaClinica } from "@/data/clinicas";
 
 /**
  * Lista fixa de profissionais. As especialidades vêm da tela de Especialidades
@@ -31,6 +32,7 @@ export default function TabelaProfissionais() {
                 <th className="px-6 py-4 font-bold">Profissional</th>
                 <th className="px-6 py-4 font-bold">Tipo</th>
                 <th className="px-6 py-4 font-bold">Especialidades que atende</th>
+                <th className="px-6 py-4 font-bold">Onde atende</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.07]">
@@ -90,6 +92,14 @@ export default function TabelaProfissionais() {
                           );
                         })}
                       </div>
+                    </td>
+
+                    <td className="px-6 py-5">
+                      <span className="text-xs font-medium text-black/65">
+                        {profissional.clinicaIds
+                          .map((id) => nomeDaClinica(id))
+                          .join(" · ")}
+                      </span>
                     </td>
                   </tr>
                 );
