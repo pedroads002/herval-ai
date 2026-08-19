@@ -16,6 +16,19 @@ export type Metas = {
   showRateCritico: number;
   /** Cancelamento acima deste %, alerta crítico (vermelho). */
   cancelamentoCritico: number;
+  /**
+   * Quantas vezes a cauda de espera da clínica precisa ser maior que a da base
+   * para virar alerta. A comparação é relativa de propósito: se o mês inteiro
+   * foi ruim, isso é assunto de meta, não de uma clínica específica.
+   */
+  multiplicadorDaCauda: number;
+  /** Acima deste múltiplo, o alerta da cauda é crítico. */
+  caudaCritica: number;
+  /**
+   * Mínimo de leads na cauda para o alerta existir. Percentual de evento raro
+   * dispara com um caso só — um lead perdido não é padrão de atendimento.
+   */
+  minimoNaCauda: number;
   /** Quantos alertas aparecem antes do "ver mais". */
   alertasVisiveis: number;
   /** Volume mínimo para o percentual ser considerado confiável. */
@@ -28,6 +41,9 @@ export const metasPadrao: Metas = {
   pisoShowRate: 70,
   showRateCritico: 55,
   cancelamentoCritico: 25,
+  multiplicadorDaCauda: 2,
+  caudaCritica: 3,
+  minimoNaCauda: 3,
   alertasVisiveis: 6,
   amostraMinima: 5,
 };
