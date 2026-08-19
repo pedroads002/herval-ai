@@ -23,6 +23,7 @@ import { calcularIndicadoresFila } from "@/data/indicadores";
 import { useLeads } from "@/components/ProvedorLeads";
 import {
   conversaDoLead,
+  ehDoLead,
   indexarMensagens,
   mensagensIniciais,
 } from "@/data/mensagens";
@@ -401,13 +402,13 @@ export default function TabelaTarefas() {
                         <td colSpan={7} className="px-6 py-6">
                           <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-black/50">
                             <MessageSquare className="h-3.5 w-3.5" />
-                            Histórico da IA com {tarefa.lead}
+                            Conversa com {tarefa.lead}
                           </h3>
 
                           {conversa.length === 0 ? (
                             <p className="mt-4 text-sm font-medium text-black/55">
-                              A IA ainda não enviou nenhuma mensagem para este
-                              lead. O primeiro contato é feito pelo CRC.
+                              Ainda não houve nenhuma mensagem com este lead. O
+                              primeiro contato é feito pelo CRC.
                             </p>
                           ) : (
                             <ol className="mt-4 space-y-4 border-l-2 border-herval-verde pl-5">
@@ -416,6 +417,11 @@ export default function TabelaTarefas() {
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-extrabold text-herval-preto">
                                       {tempoRelativo(mensagem.minutosAtras)}
+                                    </span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+                                      {ehDoLead(mensagem)
+                                        ? tarefa.lead.split(" ")[0]
+                                        : mensagem.remetente.tipo}
                                     </span>
                                     {mensagem.regra && (
                                       <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
