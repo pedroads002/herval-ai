@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Info, RefreshCw, TriangleAlert } from "lucide-react";
+import { Info, RefreshCw } from "lucide-react";
 import { useLeads } from "@/components/ProvedorLeads";
 import { clinicasIniciais } from "@/data/clinicas";
 import { metasPadrao } from "@/data/metas";
@@ -20,10 +20,22 @@ import {
   type LinhaProducao,
 } from "@/lib/relatorios";
 import { formatarMoeda, formatarNumero } from "@/lib/formato";
+import PainelFilaAtendimento from "@/components/PainelFilaAtendimento";
+import {
+  comPercentual,
+  estiloCampo,
+  Kpi,
+  Nome,
+  Num,
+  PontosDeAtencao,
+  Tabela,
+  Total,
+  type Coluna,
+} from "@/components/PecasDeRelatorio";
 
 const abas = [
-  { id: "funil", rotulo: "Funil Geral", disponivel: true },
-  { id: "fila", rotulo: "Fila de Atendimento", disponivel: false },
+  { id: "funil", rotulo: "Funil Geral" },
+  { id: "fila", rotulo: "Fila de Atendimento" },
 ] as const;
 
 const presets = ["Hoje", "Últimos 7 dias", "Este mês", "Mês passado"] as const;
@@ -93,7 +105,6 @@ export default function PainelRelatorios() {
   const [manual, setManual] = useState<Faixa | null>(null);
   const [clinicaId, setClinicaId] = useState<"todas" | number>("todas");
   const [mostrarSemAtividade, setMostrarSemAtividade] = useState(false);
-  const [todosOsAlertas, setTodosOsAlertas] = useState(false);
   const [aba, setAba] = useState<(typeof abas)[number]["id"]>("funil");
 
   useEffect(() => {
@@ -181,10 +192,6 @@ export default function PainelRelatorios() {
   const followVisivel = follow.filter((l) => idsVisiveis.has(l.clinica.id));
   const escondidas = funil.length - funilVisivel.length;
 
-  const alertasVisiveis = todosOsAlertas
-    ? alertas
-    : alertas.slice(0, metasPadrao.alertasVisiveis);
-
   function aplicarPreset(opcao: Preset) {
     if (!hoje) return;
     setPreset(opcao);
@@ -215,29 +222,16 @@ export default function PainelRelatorios() {
             <button
               key={opcao.id}
               type="button"
-              disabled={!opcao.disponivel}
-              onClick={() => opcao.disponivel && setAba(opcao.id)}
+              onClick={() => setAba(opcao.id)}
               aria-pressed={ativa}
-              title={
-                opcao.disponivel
-                  ? undefined
-                  : "Em breve: dados da fila de atendimento do CRC"
-              }
               className={[
-                "flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-colors",
+                "rounded-full px-5 py-2 text-sm font-bold transition-colors",
                 ativa
                   ? "bg-herval-verde text-herval-preto"
-                  : opcao.disponivel
-                    ? "text-black/60 hover:bg-black/5 hover:text-herval-preto"
-                    : "cursor-not-allowed text-black/30",
+                  : "text-black/60 hover:bg-black/5 hover:text-herval-preto",
               ].join(" ")}
             >
               {opcao.rotulo}
-              {!opcao.disponivel && (
-                <span className="rounded-full border border-black/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                  Em breve
-                </span>
-              )}
             </button>
           );
         })}
@@ -335,6 +329,48 @@ export default function PainelRelatorios() {
         </div>
       </section>
 
+      {/* Vale para as duas abas: ambas listam as mesmas clínicas. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={mostrarSemAtividade}
+          onClick={() => setMostrarSemAtividade((v) => !v)}
+          className="inline-flex items-center gap-3 text-sm font-bold text-herval-preto"
+        >
+          <span
+            className={[
+              "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+              mostrarSemAtividade ? "bg-herval-verde" : "bg-black/15",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "absolute top-0.5 h-5 w-5 rounded-full bg-herval-branco shadow-card transition-all",
+                mostrarSemAtividade ? "left-[1.375rem]" : "left-0.5",
+              ].join(" ")}
+            />
+          </span>
+          Mostrar clínicas sem atividade
+        </button>
+
+        {aba === "funil" && escondidas > 0 && !mostrarSemAtividade && (
+          <span className="text-xs font-medium text-black/45">
+            {escondidas}{" "}
+            {escondidas === 1 ? "clínica escondida" : "clínicas escondidas"} por
+            não ter movimento no período
+          </span>
+        )}
+      </div>
+
+      {aba === "fila" ? (
+        <PainelFilaAtendimento
+          faixa={faixa}
+          clinicas={clinicasFiltradas}
+          mostrarSemAtividade={mostrarSemAtividade}
+        />
+      ) : (
+        <div className="space-y-8">
       {/* KPIs */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Kpi
@@ -397,119 +433,12 @@ export default function PainelRelatorios() {
       </p>
 
       {/* Pontos de atenção */}
-      <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
-            <span className="h-4 w-1 rounded-full bg-herval-verde" />
-            Pontos de atenção
-          </h2>
-          <span
-            className={[
-              "rounded-full px-3 py-1 text-xs font-extrabold",
-              alertas.length > 0
-                ? "bg-herval-preto text-herval-branco"
-                : "border border-black/15 text-black/45",
-            ].join(" ")}
-          >
-            Ação necessária: {alertas.length}
-          </span>
-        </div>
-
-        <p className="mt-2 text-xs font-medium text-black/50">
-          Gerados a partir dos mesmos números das tabelas abaixo, comparados com
-          as metas. Clínicas com menos de {metasPadrao.amostraMinima}{" "}
-          agendamentos no período ficam de fora: percentual sobre volume baixo
-          gera alarme falso.
-        </p>
-
-        {alertas.length === 0 ? (
-          <p className="mt-6 rounded-controle bg-black/[0.03] px-4 py-4 text-sm font-medium text-black/60">
-            Nenhuma clínica fora das metas no período selecionado.
-          </p>
-        ) : (
-          <>
-            <ul className="mt-6 space-y-3">
-              {alertasVisiveis.map((alerta) => {
-                const critico = alerta.severidade === "critico";
-                return (
-                  <li
-                    key={alerta.id}
-                    className={[
-                      "flex items-start gap-3 rounded-controle border-l-4 bg-black/[0.02] px-4 py-3.5",
-                      critico
-                        ? "border-l-herval-vermelho"
-                        : "border-l-herval-atencao",
-                    ].join(" ")}
-                  >
-                    {critico ? (
-                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-herval-vermelho" />
-                    ) : (
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-herval-atencao" />
-                    )}
-                    <div>
-                      <p className="text-sm font-bold text-herval-preto">
-                        {alerta.clinica}
-                      </p>
-                      <p className="mt-0.5 text-sm font-medium text-black/65">
-                        {alerta.problema}
-                      </p>
-                      <p className="mt-1.5 text-sm font-bold text-herval-preto">
-                        {alerta.acao}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {alertas.length > metasPadrao.alertasVisiveis && (
-              <button
-                type="button"
-                onClick={() => setTodosOsAlertas((v) => !v)}
-                aria-expanded={todosOsAlertas}
-                className="mt-4 text-sm font-bold text-black/60 underline decoration-black/20 underline-offset-4 transition-colors hover:text-herval-preto"
-              >
-                {todosOsAlertas
-                  ? "Mostrar só os mais críticos"
-                  : `+${alertas.length - metasPadrao.alertasVisiveis} outros alertas no período`}
-              </button>
-            )}
-          </>
-        )}
-      </section>
-
-      {/* Toggle de clínicas sem atividade */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={mostrarSemAtividade}
-          onClick={() => setMostrarSemAtividade((v) => !v)}
-          className="inline-flex items-center gap-3 text-sm font-bold text-herval-preto"
-        >
-          <span
-            className={[
-              "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-              mostrarSemAtividade ? "bg-herval-verde" : "bg-black/15",
-            ].join(" ")}
-          >
-            <span
-              className={[
-                "absolute top-0.5 h-5 w-5 rounded-full bg-herval-branco shadow-card transition-all",
-                mostrarSemAtividade ? "left-[1.375rem]" : "left-0.5",
-              ].join(" ")}
-            />
-          </span>
-          Mostrar clínicas sem atividade
-        </button>
-
-        {escondidas > 0 && !mostrarSemAtividade && (
-          <span className="text-xs font-medium text-black/45">
-            {escondidas} {escondidas === 1 ? "clínica escondida" : "clínicas escondidas"}{" "}
-            por não ter movimento no período
-          </span>
-        )}
-      </div>
+      <PontosDeAtencao
+        alertas={alertas}
+        visiveis={metasPadrao.alertasVisiveis}
+        legenda={`Gerados a partir dos mesmos números das tabelas abaixo, comparados com as metas. Clínicas com menos de ${metasPadrao.amostraMinima} agendamentos no período ficam de fora: percentual sobre volume baixo gera alarme falso.`}
+        vazio="Nenhuma clínica fora das metas no período selecionado."
+      />
 
       {/* Tabela A */}
       <Tabela
@@ -663,169 +592,13 @@ export default function PainelRelatorios() {
           ))}
         </dl>
       </section>
-    </div>
-  );
-}
-
-// --- Peças da tela ---------------------------------------------------------
-
-const estiloCampo =
-  "rounded-controle border border-black/15 bg-herval-branco px-3.5 py-2.5 text-sm font-medium text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
-
-function comPercentual(valor: number | null) {
-  return valor === null ? "—" : `${valor}%`;
-}
-
-function Kpi({
-  rotulo,
-  valor,
-  detalhe,
-  alerta = false,
-}: {
-  rotulo: string;
-  valor: string;
-  detalhe?: string;
-  alerta?: boolean;
-}) {
-  return (
-    <div className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
-      <p className="text-xs font-bold uppercase tracking-wide text-black/45">
-        {rotulo}
-      </p>
-      <p
-        className={[
-          "mt-3 text-3xl font-extrabold tracking-tight",
-          alerta ? "text-herval-vermelho" : "text-herval-preto",
-        ].join(" ")}
-      >
-        {valor}
-      </p>
-      {detalhe && (
-        <p className="mt-3 text-xs font-medium text-black/50">{detalhe}</p>
+        </div>
       )}
     </div>
   );
 }
 
-function Tabela({
-  titulo,
-  legenda,
-  selo,
-  cabecalhos,
-  vazio,
-  children,
-}: {
-  titulo: string;
-  legenda: string;
-  selo?: string;
-  cabecalhos: string[];
-  vazio: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-card border border-black/10 bg-herval-branco shadow-card">
-      <div className="border-b border-black/10 p-8 pb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
-            <span className="h-4 w-1 rounded-full bg-herval-verde" />
-            {titulo}
-          </h2>
-          {selo && (
-            <span className="rounded-full bg-herval-verde px-3 py-1 text-[11px] font-extrabold text-herval-preto">
-              {selo}
-            </span>
-          )}
-        </div>
-        <p className="mt-2 max-w-4xl text-xs font-medium leading-relaxed text-black/50">
-          {legenda}
-        </p>
-      </div>
-
-      {vazio ? (
-        <p className="px-8 py-10 text-center text-sm font-medium text-black/45">
-          Nenhuma clínica com movimento no período. Ligue &quot;Mostrar clínicas
-          sem atividade&quot; para ver todas.
-        </p>
-      ) : (
-        // A primeira coluna fica presa para o nome da clínica não sumir ao
-        // rolar de lado: são muitas colunas.
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[56rem] border-collapse text-sm">
-            <thead>
-              <tr className="bg-black/[0.03]">
-                {cabecalhos.map((texto, indice) => (
-                  <th
-                    key={texto}
-                    scope="col"
-                    className={[
-                      "whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-black/45",
-                      indice === 0
-                        ? "sticky left-0 z-10 bg-[#F5F5F5] text-left"
-                        : "text-right",
-                    ].join(" ")}
-                  >
-                    {texto}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>{children}</tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function Nome({ clinica, ativa }: { clinica: string; ativa: boolean }) {
-  return (
-    <th
-      scope="row"
-      className="sticky left-0 z-10 whitespace-nowrap bg-herval-branco px-4 py-3 text-left text-sm font-bold text-herval-preto"
-    >
-      {clinica}
-      {!ativa && (
-        <span className="ml-2 rounded-full border border-black/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black/45">
-          Pausada
-        </span>
-      )}
-    </th>
-  );
-}
-
-function Num({
-  children,
-  alerta = false,
-  forte = false,
-}: {
-  children: React.ReactNode;
-  alerta?: boolean;
-  forte?: boolean;
-}) {
-  return (
-    <td
-      className={[
-        "whitespace-nowrap px-4 py-3 text-right tabular-nums",
-        alerta
-          ? "font-extrabold text-herval-vermelho"
-          : forte
-            ? "font-extrabold text-herval-preto"
-            : "font-medium text-black/70",
-      ].join(" ")}
-    >
-      {children}
-    </td>
-  );
-}
-
-/**
- * Como preencher cada coluna no rodapé de total. Colunas de percentual não
- * somam: recebem `taxa`, que refaz a conta sobre os totais das colunas que a
- * compõem — somar percentual daria média de média.
- */
-type Coluna<T> =
-  | { tipo: "soma"; valor: (linha: T) => number; moeda?: boolean }
-  | { tipo: "taxa"; parte: (linha: T) => number; total: (linha: T) => number };
+// --- Rodapés de total ------------------------------------------------------
 
 const colunasFunil: Coluna<LinhaFunil>[] = [
   { tipo: "soma", valor: (l) => l.leads },
@@ -854,34 +627,3 @@ const colunasProducao: Coluna<LinhaProducao>[] = [
   { tipo: "soma", valor: (l) => l.compareceram },
   { tipo: "taxa", parte: (l) => l.compareceram, total: (l) => l.consultaAteAData },
 ];
-
-function Total<T>({ linhas, colunas }: { linhas: T[]; colunas: Coluna<T>[] }) {
-  if (linhas.length === 0) return null;
-
-  const soma = (campo: (linha: T) => number) =>
-    linhas.reduce((total, linha) => total + campo(linha), 0);
-
-  return (
-    <tr className="border-t-2 border-black/15 bg-black/[0.02]">
-      <th
-        scope="row"
-        className="sticky left-0 z-10 whitespace-nowrap bg-[#FAFAFA] px-4 py-3 text-left text-sm font-extrabold text-herval-preto"
-      >
-        Total
-      </th>
-      {colunas.map((coluna, indice) => (
-        <Num key={indice} forte>
-          {coluna.tipo === "taxa"
-            ? razao(soma(coluna.parte), soma(coluna.total))
-            : coluna.moeda
-              ? formatarMoeda(soma(coluna.valor))
-              : formatarNumero(soma(coluna.valor))}
-        </Num>
-      ))}
-    </tr>
-  );
-}
-
-function razao(parte: number, total: number) {
-  return total === 0 ? "—" : `${Math.round((parte / total) * 100)}%`;
-}

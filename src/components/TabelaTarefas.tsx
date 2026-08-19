@@ -17,6 +17,7 @@ import {
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
 import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
 import { descricaoPrazo, grupoDoPrazo, gruposPrazo } from "@/lib/prazo";
+import { tempoRelativo } from "@/lib/tempo";
 import CartaoIndicador from "@/components/CartaoIndicador";
 import { calcularIndicadoresFila } from "@/data/indicadores";
 import { useLeads } from "@/components/ProvedorLeads";
@@ -405,7 +406,7 @@ export default function TabelaTarefas() {
                                 <li key={indice}>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-extrabold text-herval-preto">
-                                      {evento.quando}
+                                      {tempoRelativo(evento.minutosAtras)}
                                     </span>
                                     <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
                                       {evento.regra}

@@ -15,6 +15,12 @@ import {
   type MotivoPerda,
 } from "@/data/leads";
 import { tarefasIniciais, type StatusTarefa, type Tarefa } from "@/data/tarefas";
+import {
+  AGENTE_AUTOMATICO,
+  historicoDeEtapasInicial,
+  type Agente,
+  type MudancaDeEtapa,
+} from "@/data/historicoEtapas";
 
 /** O que o CRC precisa informar quando move o lead à mão. */
 export type DadosDaMovimentacao = {
@@ -34,6 +40,7 @@ export type DadosDaConsulta = {
 type ValorContexto = {
   tarefas: Tarefa[];
   agendamentos: Agendamento[];
+  historicoDeEtapas: MudancaDeEtapa[];
   definirStatus: (id: number, status: StatusTarefa) => void;
   moverEtapa: (
     id: number,
@@ -61,13 +68,29 @@ const ContextoLeads = createContext<ValorContexto | null>(null);
  * recarregar a página tudo volta ao estado inicial.
  */
 export default function ProvedorLeads({
+  usuario,
   children,
 }: {
+  /** Nome de quem está logado, vindo de `perfil.ts`. Assina as ações manuais. */
+  usuario?: string;
   children: React.ReactNode;
 }) {
   const [tarefas, setTarefas] = useState<Tarefa[]>(tarefasIniciais);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>(
     agendamentosIniciais,
+  );
+  const [historicoDeEtapas, setHistoricoDeEtapas] = useState<MudancaDeEtapa[]>(
+    historicoDeEtapasInicial,
+  );
+
+  /**
+   * Quem move o card na mão é o usuário autenticado. Não há cadastro de agente
+   * à parte: o login já é a identidade, e duplicar isso criaria duas versões da
+   * mesma pessoa. Sem sessão (o exemplo aberto), fica só "Humano".
+   */
+  const agenteHumano = useMemo<Agente>(
+    () => ({ tipo: "Humano", ...(usuario ? { nome: usuario } : {}) }),
+    [usuario],
   );
 
   const definirStatus = useCallback((id: number, status: StatusTarefa) => {
@@ -79,11 +102,48 @@ export default function ProvedorLeads({
   }, []);
 
   /**
+   * Grava a mudança de etapa. Sem isto a base só sabe onde o lead está agora,
+   * e não quando ele chegou lá — que é a pergunta de qualquer medida de tempo
+   * de resposta.
+   */
+  const registrar = useCallback(
+    (
+      leadId: number,
+      etapaAnterior: EtapaFunil | null,
+      etapaNova: EtapaFunil,
+      agente: Agente,
+    ) => {
+      setHistoricoDeEtapas((atuais) => [
+        ...atuais,
+        {
+          id: Math.max(0, ...atuais.map((m) => m.id)) + 1,
+          leadId,
+          etapaAnterior,
+          etapaNova,
+          minutosAtras: 0,
+          agente,
+        },
+      ]);
+    },
+    [],
+  );
+
+  /**
    * Aplica a etapa no lead. `dados` só vem quando o CRC move à mão para uma
    * etapa que exige informação; o sistema, movendo sozinho, nunca precisa.
    */
   const aplicarEtapa = useCallback(
-    (id: number, etapa: EtapaFunil, dados?: DadosDaMovimentacao) => {
+    (
+      id: number,
+      etapa: EtapaFunil,
+      dados?: DadosDaMovimentacao,
+      agente: Agente = AGENTE_AUTOMATICO,
+    ) => {
+      // A etapa de origem sai da lista atual, e não de dentro do setState: a
+      // função de atualização não roda na hora.
+      const anterior = tarefas.find((t) => t.id === id)?.etapa ?? null;
+      if (anterior === etapa) return;
+
       setTarefas((atuais) =>
         atuais.map((tarefa) => {
           if (tarefa.id !== id) return tarefa;
@@ -102,14 +162,17 @@ export default function ProvedorLeads({
           };
         }),
       );
+
+      registrar(id, anterior, etapa, agente);
     },
-    [],
+    [tarefas, registrar],
   );
 
   const moverEtapa = useCallback(
     (id: number, etapa: EtapaFunil, dados?: DadosDaMovimentacao) =>
-      aplicarEtapa(id, etapa, dados),
-    [aplicarEtapa],
+      // Movimento manual: quem assina é o usuário logado.
+      aplicarEtapa(id, etapa, dados, agenteHumano),
+    [aplicarEtapa, agenteHumano],
   );
 
   const definirStatusDoAgendamento = useCallback(
@@ -183,6 +246,8 @@ export default function ProvedorLeads({
       });
 
       // Remarcação efetivada: guarda a contagem e devolve o lead para agendado.
+      const anterior = tarefas.find((t) => t.id === leadId)?.etapa ?? null;
+
       setTarefas((atuais) =>
         atuais.map((tarefa) =>
           tarefa.id === leadId
@@ -196,14 +261,20 @@ export default function ProvedorLeads({
             : tarefa,
         ),
       );
+
+      // Marcar a consulta é ato de quem está na Agenda; a etapa vem junto.
+      if (anterior !== ETAPA_AGENDADO) {
+        registrar(leadId, anterior, ETAPA_AGENDADO, agenteHumano);
+      }
     },
-    [agendamentos, tarefas],
+    [agendamentos, tarefas, registrar, agenteHumano],
   );
 
   const valor = useMemo(
     () => ({
       tarefas,
       agendamentos,
+      historicoDeEtapas,
       definirStatus,
       moverEtapa,
       definirStatusDoAgendamento,
@@ -212,6 +283,7 @@ export default function ProvedorLeads({
     [
       tarefas,
       agendamentos,
+      historicoDeEtapas,
       definirStatus,
       moverEtapa,
       definirStatusDoAgendamento,

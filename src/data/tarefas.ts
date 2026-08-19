@@ -39,7 +39,8 @@ export type NivelScore = "Alta" | "Média" | "Baixa";
 
 /** Uma mensagem que a IA enviou ao lead, para rastreabilidade. */
 export type EventoHistorico = {
-  quando: string;
+  /** Há quantos minutos a mensagem foi enviada. */
+  minutosAtras: number;
   mensagem: string;
   regra: string;
 };
@@ -97,19 +98,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 14:33",
+        minutosAtras: 2753,
         mensagem:
           "Oi Mariana, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "11/03 09:47",
+        minutosAtras: 1599,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 1206,
         mensagem:
           "Mariana, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -138,13 +139,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 09:47",
+        minutosAtras: 2752,
         mensagem:
           "Carlos, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 2359,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -173,13 +174,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 16:20",
+        minutosAtras: 7103,
         mensagem:
           "Olá Juliana! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "12/03 08:55",
+        minutosAtras: 6108,
         mensagem:
           "Juliana, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
@@ -208,7 +209,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 08:55",
+        minutosAtras: 2737,
         mensagem:
           "Oi Rafael, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
@@ -237,13 +238,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 15:40",
+        minutosAtras: 2801,
         mensagem:
           "Ana, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "13/03 11:05",
+        minutosAtras: 1636,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -272,19 +273,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 11:05",
+        minutosAtras: 1291,
         mensagem:
           "Oi Diego, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "13/03 17:38",
+        minutosAtras: 898,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "14/03 09:14",
+        minutosAtras: 0,
         mensagem:
           "Diego, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -335,7 +336,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 09:14",
+        minutosAtras: 201,
         mensagem:
           "Oi Fernando, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
@@ -364,19 +365,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 12:26",
+        minutosAtras: 1306,
         mensagem:
           "Oi Camila, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "09/03 10:12",
+        minutosAtras: 0,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "10/03 14:33",
+        minutosAtras: 0,
         mensagem:
           "Camila, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -406,7 +407,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 10:12",
+        minutosAtras: 38616,
         mensagem:
           "Olá Lucas! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
         regra: "Verificação de localização",
@@ -435,7 +436,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 14:33",
+        minutosAtras: 0,
         mensagem:
           "Oi Renata, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
@@ -464,7 +465,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 09:47",
+        minutosAtras: 1373,
         mensagem:
           "Oi Bruno, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
@@ -493,13 +494,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 16:20",
+        minutosAtras: 4292,
         mensagem:
           "Letícia, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 08:55",
+        minutosAtras: 3297,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -528,13 +529,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 08:55",
+        minutosAtras: 8467,
         mensagem:
           "Gustavo, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 8062,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -563,7 +564,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 15:40",
+        minutosAtras: 8461,
         mensagem:
           "Olá Aline! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
@@ -592,13 +593,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 11:05",
+        minutosAtras: 11443,
         mensagem:
           "Marcelo, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "13/03 17:38",
+        minutosAtras: 11050,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -627,19 +628,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 17:38",
+        minutosAtras: 7569,
         mensagem:
           "Olá Vanessa! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "14/03 09:14",
+        minutosAtras: 6633,
         mensagem:
           "Vanessa, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "14/03 12:26",
+        minutosAtras: 6441,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Vanessa. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -668,19 +669,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 09:14",
+        minutosAtras: 7071,
         mensagem:
           "Olá Rodrigo! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "14/03 12:26",
+        minutosAtras: 0,
         mensagem:
           "Rodrigo, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "09/03 10:12",
+        minutosAtras: 0,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Rodrigo. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -709,7 +710,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 12:26",
+        minutosAtras: 7038,
         mensagem:
           "Olá Priscila! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
@@ -738,7 +739,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 10:12",
+        minutosAtras: 4246,
         mensagem:
           "Oi Thiago, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
@@ -767,7 +768,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 14:33",
+        minutosAtras: 11606,
         mensagem:
           "Olá Débora! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
@@ -796,13 +797,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 09:47",
+        minutosAtras: 17168,
         mensagem:
           "Eduardo, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 16775,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -831,19 +832,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 16:20",
+        minutosAtras: 11383,
         mensagem:
           "Olá Sabrina! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "12/03 08:55",
+        minutosAtras: 10388,
         mensagem:
           "Sabrina, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 9983,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Sabrina. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -872,19 +873,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 08:55",
+        minutosAtras: 11357,
         mensagem:
           "Olá Henrique! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 10952,
         mensagem:
           "Henrique, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "13/03 11:05",
+        minutosAtras: 9787,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Henrique. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -914,7 +915,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 15:40",
+        minutosAtras: 40247,
         mensagem:
           "Olá Natália! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
         regra: "Verificação de localização",
@@ -944,7 +945,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 11:05",
+        minutosAtras: 8590,
         mensagem:
           "Olá Felipe! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
         regra: "Verificação de localização",
@@ -973,13 +974,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 17:38",
+        minutosAtras: 4292,
         mensagem:
           "Oi Larissa, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "14/03 09:14",
+        minutosAtras: 3356,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
@@ -1009,7 +1010,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 09:14",
+        minutosAtras: 48726,
         mensagem:
           "Olá André! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
         regra: "Verificação de localização",
@@ -1038,19 +1039,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 12:26",
+        minutosAtras: 2750,
         mensagem:
           "Oi Bianca, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "09/03 10:12",
+        minutosAtras: 1049,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "10/03 14:33",
+        minutosAtras: 0,
         mensagem:
           "Bianca, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -1079,7 +1080,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 10:12",
+        minutosAtras: 20014,
         mensagem:
           "Olá Otávio! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
@@ -1130,13 +1131,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 09:47",
+        minutosAtras: 13858,
         mensagem:
           "Olá Vinícius! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 13465,
         mensagem:
           "Vinícius, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
@@ -1165,13 +1166,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 16:20",
+        minutosAtras: 18542,
         mensagem:
           "Manuela, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 08:55",
+        minutosAtras: 17547,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -1200,7 +1201,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 08:55",
+        minutosAtras: 1305,
         mensagem:
           "Oi Leandro, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
@@ -1230,7 +1231,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 15:40",
+        minutosAtras: 4212,
         mensagem:
           "Olá Tatiane! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
         regra: "Verificação de localização",
@@ -1259,13 +1260,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 11:05",
+        minutosAtras: 24100,
         mensagem:
           "Olá Ricardo! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "13/03 17:38",
+        minutosAtras: 23707,
         mensagem:
           "Ricardo, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
@@ -1294,19 +1295,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 17:38",
+        minutosAtras: 21431,
         mensagem:
           "Olá Isabela! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "14/03 09:14",
+        minutosAtras: 20495,
         mensagem:
           "Isabela, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "14/03 12:26",
+        minutosAtras: 20303,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Isabela. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -1379,19 +1380,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 10:12",
+        minutosAtras: 5720,
         mensagem:
           "Oi Paulo, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "10/03 14:33",
+        minutosAtras: 4019,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "11/03 09:47",
+        minutosAtras: 2865,
         mensagem:
           "Paulo, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -1420,19 +1421,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 14:33",
+        minutosAtras: 48711,
         mensagem:
           "Olá Simone! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "11/03 09:47",
+        minutosAtras: 47557,
         mensagem:
           "Simone, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 47164,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Simone. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -1462,7 +1463,7 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 09:47",
+        minutosAtras: 27178,
         mensagem:
           "Olá Alexandre! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
         regra: "Verificação de localização",
@@ -1491,13 +1492,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 16:20",
+        minutosAtras: 12832,
         mensagem:
           "Fernanda, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 08:55",
+        minutosAtras: 11837,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -1526,19 +1527,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 08:55",
+        minutosAtras: 48768,
         mensagem:
           "Olá Douglas! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 48363,
         mensagem:
           "Douglas, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "13/03 11:05",
+        minutosAtras: 47198,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Douglas. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -1567,19 +1568,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "12/03 15:40",
+        minutosAtras: 5594,
         mensagem:
           "Oi Elisa, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "13/03 11:05",
+        minutosAtras: 4429,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "13/03 17:38",
+        minutosAtras: 4036,
         mensagem:
           "Elisa, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -1608,13 +1609,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "13/03 11:05",
+        minutosAtras: 24313,
         mensagem:
           "Olá Rogério! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "13/03 17:38",
+        minutosAtras: 23920,
         mensagem:
           "Rogério, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
@@ -1687,13 +1688,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "14/03 12:26",
+        minutosAtras: 11383,
         mensagem:
           "Michele, sua avaliação ficou marcada. Confirma para mim?",
         regra: "Agendamento criado",
       },
       {
-        quando: "09/03 10:12",
+        minutosAtras: 4049,
         mensagem:
           "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
         regra: "Lembrete automático 24h",
@@ -1722,19 +1723,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 10:12",
+        minutosAtras: 48791,
         mensagem:
           "Olá Fábio! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "10/03 14:33",
+        minutosAtras: 47090,
         mensagem:
           "Fábio, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
       },
       {
-        quando: "11/03 09:47",
+        minutosAtras: 45936,
         mensagem:
           "Ainda dá tempo de garantir o horário desta semana, Fábio. Quer que eu reserve?",
         regra: "Follow-up D+3",
@@ -1763,19 +1764,19 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 14:33",
+        minutosAtras: 4115,
         mensagem:
           "Oi Rafaela, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
         regra: "Lead novo do site",
       },
       {
-        quando: "11/03 09:47",
+        minutosAtras: 2961,
         mensagem:
           "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
         regra: "Solicitação de valores",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 2568,
         mensagem:
           "Rafaela, consigo encaixar você esta semana. Prefere manhã ou tarde?",
         regra: "Pedido de horário",
@@ -1804,13 +1805,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "11/03 09:47",
+        minutosAtras: 55081,
         mensagem:
           "Olá Júlio! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Retomada de conversa",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 54688,
         mensagem:
           "Júlio, separei alguns resultados de pacientes com perfil parecido com o seu.",
         regra: "Follow-up D+2",
@@ -1840,13 +1841,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 47491,
         mensagem:
           "Oi Aline! Confirmei sua avaliação de harmonização facial.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 43069,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -1876,13 +1877,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 38830,
         mensagem:
           "Oi Débora! Confirmei sua avaliação de preenchimento labial.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 27303,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -1912,13 +1913,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 43177,
         mensagem:
           "Oi Felipe! Confirmei sua avaliação de toxina botulínica.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 35841,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -1948,13 +1949,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 14242,
         mensagem:
           "Oi Tatiane! Confirmei sua avaliação de bioestimulador de colágeno.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 7121,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -1984,13 +1985,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 30214,
         mensagem:
           "Oi Rodrigo! Confirmei sua avaliação de limpeza de pele.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 26946,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -2020,13 +2021,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 17102,
         mensagem:
           "Oi Priscila! Confirmei sua avaliação de harmonização facial.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 5611,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -2056,13 +2057,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 46035,
         mensagem:
           "Oi Márcio! Confirmei sua avaliação de preenchimento labial.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 33098,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -2092,13 +2093,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "10/03 09:12",
+        minutosAtras: 31534,
         mensagem:
           "Oi Simone! Confirmei sua avaliação de toxina botulínica.",
         regra: "Agendamento criado",
       },
       {
-        quando: "12/03 15:40",
+        minutosAtras: 22977,
         mensagem:
           "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
         regra: "Pós-procedimento",
@@ -2128,13 +2129,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 31624,
         mensagem:
           "Oi Cristina, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 28429,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2164,13 +2165,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 23974,
         mensagem:
           "Oi Anderson, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 20779,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2200,13 +2201,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 18602,
         mensagem:
           "Oi Elaine, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 15407,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2236,13 +2237,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 2721,
         mensagem:
           "Oi Gustavo, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 0,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2272,13 +2273,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 38724,
         mensagem:
           "Oi Larissa, tudo bem? Vi seu interesse em toxina botulínica. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 35529,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2308,13 +2309,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 22987,
         mensagem:
           "Oi Otávio, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 19792,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2344,13 +2345,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 51787,
         mensagem:
           "Oi Michele, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 48592,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2380,13 +2381,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 1364,
         mensagem:
           "Oi Paulo, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 0,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2416,13 +2417,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 27306,
         mensagem:
           "Oi Renata, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 24111,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2452,13 +2453,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 9978,
         mensagem:
           "Oi Diego, tudo bem? Vi seu interesse em toxina botulínica. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 6783,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2488,13 +2489,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 25439,
         mensagem:
           "Oi Fabiana, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 22244,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2524,13 +2525,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 44039,
         mensagem:
           "Oi Sérgio, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 40844,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2560,13 +2561,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 51512,
         mensagem:
           "Oi Karine, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 48317,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
@@ -2596,13 +2597,13 @@ export const tarefasIniciais: Tarefa[] = [
     },
     historico: [
       {
-        quando: "09/03 11:05",
+        minutosAtras: 27315,
         mensagem:
           "Oi Thiago, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
         regra: "Lead novo do Meta Ads",
       },
       {
-        quando: "11/03 16:20",
+        minutosAtras: 24120,
         mensagem:
           "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
         regra: "Follow-up D+2",
