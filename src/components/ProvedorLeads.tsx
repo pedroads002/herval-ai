@@ -21,6 +21,18 @@ import {
   type Agente,
   type MudancaDeEtapa,
 } from "@/data/historicoEtapas";
+import {
+  mensagensIniciais,
+  type FormatoMensagem,
+  type Mensagem,
+} from "@/data/mensagens";
+import {
+  ligacoesIniciais,
+  type CanalDeLigacao,
+  type DesfechoDaLigacao,
+  type Ligacao,
+} from "@/data/ligacoes";
+import { notasIniciais, type Nota } from "@/data/notas";
 
 /** O que o CRC precisa informar quando move o lead à mão. */
 export type DadosDaMovimentacao = {
@@ -35,12 +47,17 @@ export type DadosDaConsulta = {
   /** Dias até a consulta, no mesmo formato do agendamento. */
   consultaEmDias: number;
   hora: string;
+  /** Recado livre de quem marcou. Opcional. */
+  observacao?: string;
 };
 
 type ValorContexto = {
   tarefas: Tarefa[];
   agendamentos: Agendamento[];
   historicoDeEtapas: MudancaDeEtapa[];
+  mensagens: Mensagem[];
+  ligacoes: Ligacao[];
+  notas: Nota[];
   definirStatus: (id: number, status: StatusTarefa) => void;
   moverEtapa: (
     id: number,
@@ -54,6 +71,19 @@ type ValorContexto = {
   ) => void;
   /** Marca ou remarca a consulta de um lead. */
   definirConsulta: (leadId: number, dados: DadosDaConsulta) => void;
+  /** O CRC assume a conversa e manda uma mensagem pelo painel. */
+  enviarMensagem: (
+    leadId: number,
+    texto: string,
+    formato?: FormatoMensagem,
+  ) => void;
+  /** Registra uma tentativa de ligação. O número dela sai das anteriores. */
+  registrarLigacao: (
+    leadId: number,
+    canal: CanalDeLigacao,
+    desfecho: DesfechoDaLigacao,
+  ) => void;
+  adicionarNota: (leadId: number, texto: string) => void;
 };
 
 const ContextoLeads = createContext<ValorContexto | null>(null);
@@ -82,6 +112,9 @@ export default function ProvedorLeads({
   const [historicoDeEtapas, setHistoricoDeEtapas] = useState<MudancaDeEtapa[]>(
     historicoDeEtapasInicial,
   );
+  const [mensagens, setMensagens] = useState<Mensagem[]>(mensagensIniciais);
+  const [ligacoes, setLigacoes] = useState<Ligacao[]>(ligacoesIniciais);
+  const [notas, setNotas] = useState<Nota[]>(notasIniciais);
 
   /**
    * Quem move o card na mão é o usuário autenticado. Não há cadastro de agente
@@ -270,24 +303,101 @@ export default function ProvedorLeads({
     [agendamentos, tarefas, registrar, agenteHumano],
   );
 
+  /**
+   * Mensagem enviada pelo painel é do CRC, não da IA — por isso o remetente é
+   * o usuário logado, e não há regra de automação por trás dela.
+   */
+  const enviarMensagem = useCallback(
+    (leadId: number, texto: string, formato: FormatoMensagem = "texto") => {
+      const conteudo = texto.trim();
+      if (!conteudo) return;
+
+      setMensagens((atuais) => [
+        ...atuais,
+        {
+          id: Math.max(0, ...atuais.map((m) => m.id)) + 1,
+          leadId,
+          remetente: agenteHumano,
+          formato,
+          minutosAtras: 0,
+          texto: conteudo,
+        },
+      ]);
+    },
+    [agenteHumano],
+  );
+
+  /**
+   * O número da tentativa não é digitado nem guardado à parte: ele é quantas
+   * ligações este lead já tem, mais uma. Contador solto é o que começa a
+   * discordar do que de fato aconteceu.
+   */
+  const registrarLigacao = useCallback(
+    (leadId: number, canal: CanalDeLigacao, desfecho: DesfechoDaLigacao) => {
+      setLigacoes((atuais) => [
+        ...atuais,
+        {
+          id: Math.max(0, ...atuais.map((l) => l.id)) + 1,
+          leadId,
+          canal,
+          tentativa: atuais.filter((l) => l.leadId === leadId).length + 1,
+          minutosAtras: 0,
+          desfecho,
+        },
+      ]);
+    },
+    [],
+  );
+
+  const adicionarNota = useCallback(
+    (leadId: number, texto: string) => {
+      const conteudo = texto.trim();
+      if (!conteudo) return;
+
+      setNotas((atuais) => [
+        ...atuais,
+        {
+          id: Math.max(0, ...atuais.map((n) => n.id)) + 1,
+          leadId,
+          autor: agenteHumano,
+          minutosAtras: 0,
+          texto: conteudo,
+        },
+      ]);
+    },
+    [agenteHumano],
+  );
+
   const valor = useMemo(
     () => ({
       tarefas,
       agendamentos,
       historicoDeEtapas,
+      mensagens,
+      ligacoes,
+      notas,
       definirStatus,
       moverEtapa,
       definirStatusDoAgendamento,
       definirConsulta,
+      enviarMensagem,
+      registrarLigacao,
+      adicionarNota,
     }),
     [
       tarefas,
       agendamentos,
       historicoDeEtapas,
+      mensagens,
+      ligacoes,
+      notas,
       definirStatus,
       moverEtapa,
       definirStatusDoAgendamento,
       definirConsulta,
+      enviarMensagem,
+      registrarLigacao,
+      adicionarNota,
     ],
   );
 

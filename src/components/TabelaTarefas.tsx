@@ -21,12 +21,7 @@ import { tempoRelativo } from "@/lib/tempo";
 import CartaoIndicador from "@/components/CartaoIndicador";
 import { calcularIndicadoresFila } from "@/data/indicadores";
 import { useLeads } from "@/components/ProvedorLeads";
-import {
-  conversaDoLead,
-  ehDoLead,
-  indexarMensagens,
-  mensagensIniciais,
-} from "@/data/mensagens";
+import { conversaDoLead, ehDoLead, indexarMensagens } from "@/data/mensagens";
 import {
   situacaoDaEtapa,
   situacoesAtivas,
@@ -63,7 +58,7 @@ function estiloScore(nivel: NivelScore) {
 
 export default function TabelaTarefas() {
   // A base é a mesma do Funil: mover um card lá muda esta tabela na hora.
-  const { tarefas, definirStatus } = useLeads();
+  const { tarefas, mensagens, definirStatus } = useLeads();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
@@ -114,7 +109,7 @@ export default function TabelaTarefas() {
   const indicadores = useMemo(() => calcularIndicadoresFila(tarefas), [tarefas]);
 
   // A conversa não vem mais junto da tarefa: é buscada por lead, uma vez só.
-  const conversas = useMemo(() => indexarMensagens(mensagensIniciais), []);
+  const conversas = useMemo(() => indexarMensagens(mensagens), [mensagens]);
 
   // Mesma contagem do card "Pendentes": leads aguardando a primeira ação.
   const pendentes = tarefas.filter(

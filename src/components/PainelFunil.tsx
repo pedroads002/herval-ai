@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
-  ArrowRight,
   ExternalLink,
   Move,
   RotateCcw,
@@ -15,14 +15,8 @@ import {
   useLeads,
   type DadosDaMovimentacao,
 } from "@/components/ProvedorLeads";
-import {
-  ETAPA_GANHA,
-  ETAPA_PERDIDA,
-  etapasFunil,
-  motivosDePerda,
-  type EtapaFunil,
-  type MotivoPerda,
-} from "@/data/leads";
+import MenuDeEtapa, { type PassoDoMenu } from "@/components/MenuDeEtapa";
+import { etapasFunil, type EtapaFunil } from "@/data/leads";
 import type { Tarefa } from "@/data/tarefas";
 import { formatarMoeda } from "@/lib/formato";
 
@@ -45,7 +39,7 @@ export default function PainelFunil() {
    * Mover é livre, mas duas etapas cobram informação antes de aceitar: Venda
    * Ganha pede o valor e Venda Perdida pede o motivo. Daí o menu ter passos.
    */
-  const [passo, setPasso] = useState<PassoDoMenu>("etapas");
+  const [passo, setPasso] = useState<PassoDoMenu>("etapa");
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -70,13 +64,13 @@ export default function PainelFunil() {
 
   function abrirMenu(id: number) {
     setMovendo((atual) => (atual === id ? null : id));
-    setPasso("etapas");
+    setPasso("etapa");
   }
 
   function mover(id: number, etapa: EtapaFunil, dados?: DadosDaMovimentacao) {
     moverEtapa(id, etapa, dados);
     setMovendo(null);
-    setPasso("etapas");
+    setPasso("etapa");
   }
 
   return (
@@ -182,7 +176,6 @@ export default function PainelFunil() {
 }
 
 /** Passos do menu de mover: a lista, ou o campo que a etapa de destino exige. */
-type PassoDoMenu = "etapas" | "motivo" | "valor";
 
 function Cartao({
   tarefa,
@@ -241,14 +234,14 @@ function Cartao({
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
-        {/* Decorativo: ainda não existe conversa de verdade para abrir. */}
-        <button
-          type="button"
+        {/* Ponto de entrada do atendimento: o card do lead, sem lista nova. */}
+        <Link
+          href={`/atendimento/${tarefa.id}`}
           className="inline-flex items-center gap-1 text-xs font-bold text-black/55 transition-colors hover:text-herval-preto"
         >
-          Ir para a conversa
+          Atender
           <ExternalLink className="h-3 w-3" />
-        </button>
+        </Link>
 
         <button
           type="button"
@@ -268,122 +261,14 @@ function Cartao({
 
       {menuAberto && (
         <div className="mt-3 rounded-controle bg-black/[0.04] p-2.5">
-          {passo === "motivo" ? (
-            <ListaDeOpcoes
-              titulo="Motivo da perda"
-              opcoes={motivosDePerda}
-              apoios={apoioDoMotivo}
-              aoEscolher={(motivo) =>
-                aoMover(ETAPA_PERDIDA, { motivoPerda: motivo as MotivoPerda })
-              }
-            />
-          ) : passo === "valor" ? (
-            <CampoDeValor aoConfirmar={(valorVenda) => aoMover(ETAPA_GANHA, { valorVenda })} />
-          ) : (
-            <ListaDeOpcoes
-              titulo="Mover para"
-              opcoes={etapasFunil.filter((destino) => destino !== tarefa.etapa)}
-              aoEscolher={(destino) => {
-                // Estas duas cobram informação antes de aceitar o movimento.
-                if (destino === ETAPA_PERDIDA) return aoPedirPasso("motivo");
-                if (destino === ETAPA_GANHA) return aoPedirPasso("valor");
-                aoMover(destino as EtapaFunil);
-              }}
-            />
-          )}
+          <MenuDeEtapa
+            etapaAtual={tarefa.etapa}
+            passo={passo}
+            aoPedirPasso={aoPedirPasso}
+            aoMover={aoMover}
+          />
         </div>
       )}
     </article>
-  );
-}
-
-/**
- * Explicação curta em opções que o CRC costuma usar fora do lugar. Só "Spam"
- * precisa hoje: sem isso ele vira gaveta de lead que apenas esfriou, e esse
- * lead sairia da conta de qualificados sem ter deixado de ser lead de verdade.
- */
-const apoioDoMotivo: Record<string, string> = {
-  Spam: "mensagens sem sentido, sem interação real — não usar para quem só parou de responder",
-};
-
-function ListaDeOpcoes({
-  titulo,
-  opcoes,
-  apoios,
-  aoEscolher,
-}: {
-  titulo: string;
-  opcoes: readonly string[];
-  apoios?: Record<string, string>;
-  aoEscolher: (opcao: string) => void;
-}) {
-  return (
-    <>
-      <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
-        {titulo}
-      </p>
-      <ul className="max-h-56 space-y-1 overflow-y-auto">
-        {opcoes.map((opcao) => (
-          <li key={opcao}>
-            <button
-              type="button"
-              onClick={() => aoEscolher(opcao)}
-              className="flex w-full items-start gap-1.5 rounded px-2 py-1.5 text-left text-xs font-medium text-black/70 transition-colors hover:bg-herval-verde/20 hover:font-bold hover:text-herval-preto"
-            >
-              <ArrowRight className="mt-0.5 h-3 w-3 shrink-0" />
-              <span>
-                {opcao}
-                {apoios?.[opcao] && (
-                  <span className="mt-0.5 block text-[11px] font-normal leading-snug text-black/45">
-                    {apoios[opcao]}
-                  </span>
-                )}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
-/** Valor da venda: obrigatório para marcar Venda Ganha, e só o valor. */
-function CampoDeValor({
-  aoConfirmar,
-}: {
-  aoConfirmar: (valor: number) => void;
-}) {
-  const [texto, setTexto] = useState("");
-  const valor = Number(texto.replace(",", "."));
-  const valido = texto.trim() !== "" && Number.isFinite(valor) && valor > 0;
-
-  return (
-    <>
-      <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
-        Valor da venda (R$)
-      </p>
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        inputMode="decimal"
-        autoFocus
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && valido) aoConfirmar(valor);
-        }}
-        placeholder="0,00"
-        className="w-full rounded border border-black/15 bg-herval-branco px-2.5 py-1.5 text-xs font-bold text-herval-preto outline-none focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/30"
-      />
-      <button
-        type="button"
-        disabled={!valido}
-        onClick={() => aoConfirmar(valor)}
-        className="mt-2 w-full rounded bg-herval-verde px-2 py-1.5 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
-      >
-        Confirmar venda
-      </button>
-    </>
   );
 }
