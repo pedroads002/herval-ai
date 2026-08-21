@@ -106,7 +106,9 @@ Só então o lead segue pras etapas de Follow-Up (F1 em diante). **Confirmado:**
 
 Total possível: **até 6 tentativas de ligação por lead** (5 imediatas na chegada + 1 de recuperação 8h depois), com uma janela de atendimento por mensagem entre a 5ª e a 6ª, e essa mensagem automática de fechamento caso nada funcione.
 
-### 5.1.0.1 Os três desfechos possíveis quando uma ligação É atendida (dentro das 5 tentativas iniciais)
+### 5.1.0.1 Os três desfechos possíveis quando uma ligação É atendida
+
+**Decidido:** essa regra vale para qualquer ligação atendida — as 5 tentativas iniciais **e** a 6ª (recuperação, T+8h). Faz sentido: o objetivo declarado da 6ª é justamente "reconquistar a atenção do lead e tentar converter o agendamento" — o mesmo objetivo das 5 primeiras, então segue a mesma lógica de desfecho.
 
 Isso substitui minha suposição anterior (que qualquer ligação atendida movia o lead direto pra `Em Contato`) — a regra real é mais específica, com três caminhos:
 

@@ -33,13 +33,17 @@ function quandoEmDias(dias: number) {
 export function AbaAgenda({
   clinica,
   agendamentos,
+  aberto,
+  aoAlternar,
   aoAgendar,
 }: {
   clinica: Clinica | undefined;
   agendamentos: Agendamento[];
+  /** Controlado de fora: converter uma ligação já abre o formulário. */
+  aberto: boolean;
+  aoAlternar: (aberto: boolean) => void;
   aoAgendar: (dados: DadosDaConsulta) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -84,14 +88,14 @@ export function AbaAgenda({
           clinica={clinica}
           aoAgendar={(dados) => {
             aoAgendar(dados);
-            setAberto(false);
+            aoAlternar(false);
           }}
-          aoCancelar={() => setAberto(false)}
+          aoCancelar={() => aoAlternar(false)}
         />
       ) : (
         <button
           type="button"
-          onClick={() => setAberto(true)}
+          onClick={() => aoAlternar(true)}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
         >
           <CalendarPlus className="h-4 w-4" />

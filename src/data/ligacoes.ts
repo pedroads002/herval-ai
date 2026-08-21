@@ -27,15 +27,9 @@ export type Ligacao = {
   desfecho: DesfechoDaLigacao;
 };
 
-/** Quantas tentativas cabem em cada canal antes de passar para o seguinte. */
-export const TENTATIVAS_NO_DISCADOR = 3;
-export const TENTATIVAS_NO_WHATSAPP = 2;
-
-/** A tentativa de recuperação acontece oito horas depois da primeira. */
-export const ESPERA_DA_RECUPERACAO = 8 * 60;
-
-export const TOTAL_DE_TENTATIVAS =
-  TENTATIVAS_NO_DISCADOR + TENTATIVAS_NO_WHATSAPP + 1;
+// Quantas tentativas cabem em cada canal, e quanto se espera até a de
+// recuperação, ficam em `metas.ts`: são números combinados com o cliente, não
+// característica do registro. Este arquivo guarda o que aconteceu.
 
 /**
  * Formato compacto, como no resto da base. Cada linha é

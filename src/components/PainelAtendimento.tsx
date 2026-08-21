@@ -19,17 +19,21 @@ import {
   AbaLog,
   type AbaDoAtendimento,
 } from "@/components/AbasDoAtendimento";
+import RegistroDeLigacao from "@/components/RegistroDeLigacao";
+import type { Consequencia } from "@/lib/regua";
 import { clinicaPorId } from "@/data/clinicas";
+import { metasPadrao } from "@/data/metas";
+import {
+  situacaoDaRegua,
+  totalDeTentativas,
+  type EstadoDaRegua,
+} from "@/lib/regua";
+import { duracao } from "@/lib/tempo";
 import { conversaDoLead, ehDoLead } from "@/data/mensagens";
-import { ligacoesDoLead, type CanalDeLigacao } from "@/data/ligacoes";
+import { ligacoesDoLead } from "@/data/ligacoes";
 import { notasDoLead } from "@/data/notas";
 import { mudancasDoLead } from "@/data/historicoEtapas";
 import { tempoRelativo } from "@/lib/tempo";
-
-const canais: { canal: CanalDeLigacao; rotulo: string }[] = [
-  { canal: "discador", rotulo: "Discador" },
-  { canal: "whatsapp", rotulo: "WhatsApp" },
-];
 
 export default function PainelAtendimento({ leadId }: { leadId: number }) {
   const {
@@ -52,6 +56,8 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
   const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
   const [texto, setTexto] = useState("");
   const [nota, setNota] = useState("");
+  const [agendamentoAberto, setAgendamentoAberto] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const tarefa = tarefas.find((t) => t.id === leadId);
 
@@ -71,6 +77,25 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
     () => (tarefa ? mudancasDoLead(historicoDeEtapas, tarefa.id) : []),
     [historicoDeEtapas, tarefa],
   );
+  /**
+   * Em que ponto da régua de ligação o lead está. É conta, não alarme: muda
+   * quando a tela desenha, não sozinha enquanto alguém olha.
+   */
+  const situacao = useMemo(
+    () =>
+      situacaoDaRegua(chamadas, tarefa?.etapa ?? "Leads Recebidos", metasPadrao),
+    [chamadas, tarefa],
+  );
+
+  const estadoDaRegua = textoDaRegua(
+    situacao.estado,
+    situacao.proximaTentativa,
+    situacao.atrasoDaRecuperacao,
+    situacao.minutosDesdeAPrimeira === null
+      ? null
+      : metasPadrao.esperaDaRecuperacao - situacao.minutosDesdeAPrimeira,
+  );
+
   const consultas = useMemo(
     () => (tarefa ? agendamentos.filter((a) => a.leadId === tarefa.id) : []),
     [agendamentos, tarefa],
@@ -132,6 +157,19 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
               {tarefa.etapa}
             </span>
 
+            {estadoDaRegua !== null && (
+              <span
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-bold",
+                  situacao.estado === "recuperacao-devida"
+                    ? "bg-herval-vermelho text-herval-branco"
+                    : "border border-black/15 text-black/60",
+                ].join(" ")}
+              >
+                {estadoDaRegua}
+              </span>
+            )}
+
             <div className="relative">
               <button
                 type="button"
@@ -140,52 +178,41 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
                   setMenuAberto(false);
                 }}
                 aria-expanded={ligarAberto}
-                className="inline-flex items-center gap-1.5 rounded-full border border-black/15 px-3.5 py-1.5 text-xs font-bold text-black/70 transition-colors hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto"
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors",
+                  situacao.estado === "recuperacao-devida"
+                    ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                    : "border border-black/15 text-black/70 hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto",
+                ].join(" ")}
               >
                 <Phone className="h-3.5 w-3.5" />
                 Ligar
               </button>
 
               {ligarAberto && (
-                <div className="absolute right-0 z-10 mt-2 w-64 rounded-controle border border-black/10 bg-herval-branco p-3 shadow-card">
-                  <p className="pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
-                    Registrar tentativa
-                  </p>
-                  <div className="space-y-2">
-                    {canais.map(({ canal, rotulo }) => (
-                      <div key={canal} className="flex items-center gap-2">
-                        <span className="flex-1 text-xs font-bold text-herval-preto">
-                          {rotulo}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            registrarLigacao(tarefa.id, canal, "atendida");
-                            setLigarAberto(false);
-                            setAba("Ligações");
-                          }}
-                          className="rounded-full bg-herval-verde px-2.5 py-1 text-[11px] font-bold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
-                        >
-                          atendeu
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            registrarLigacao(tarefa.id, canal, "não atendida");
-                            setLigarAberto(false);
-                            setAba("Ligações");
-                          }}
-                          className="rounded-full border border-black/20 px-2.5 py-1 text-[11px] font-bold text-black/60 transition-colors hover:text-herval-preto"
-                        >
-                          não atendeu
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-[11px] font-medium leading-snug text-black/45">
-                    A ligação é sempre do CRC: quem escolhe o canal e registra o
-                    desfecho é você.
-                  </p>
+                <div className="absolute right-0 z-10 mt-2">
+                  <RegistroDeLigacao
+                    situacao={situacao}
+                    aoRegistrar={(canal, desfecho, resultado, motivoPerda) => {
+                      const efeito = registrarLigacao(
+                        tarefa.id,
+                        canal,
+                        desfecho,
+                        resultado,
+                        motivoPerda,
+                      );
+                      setLigarAberto(false);
+                      // O que a régua fez precisa aparecer. Automático que age
+                      // escondido é o que faz alguém desconfiar do sistema.
+                      setAviso(descreverEfeito(efeito));
+                      if (efeito.abrirAgendamento) {
+                        setAba("Agenda");
+                        setAgendamentoAberto(true);
+                      } else {
+                        setAba("Ligações");
+                      }
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -228,6 +255,19 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
           </div>
         </div>
       </div>
+
+      {aviso && (
+        <div className="flex items-start justify-between gap-4 rounded-card border border-herval-verde/40 bg-herval-verde/10 px-5 py-3.5">
+          <p className="text-sm font-bold text-herval-preto">{aviso}</p>
+          <button
+            type="button"
+            onClick={() => setAviso(null)}
+            className="text-xs font-bold text-black/50 transition-colors hover:text-herval-preto"
+          >
+            ok
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,22rem)]">
         {/* Coluna esquerda: dados e notas internas */}
@@ -434,6 +474,8 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
               <AbaAgenda
                 clinica={clinica}
                 agendamentos={consultas}
+                aberto={agendamentoAberto}
+                aoAlternar={setAgendamentoAberto}
                 aoAgendar={(dados) => definirConsulta(tarefa.id, dados)}
               />
             )}
@@ -454,4 +496,43 @@ function Dado({ rotulo, valor }: { rotulo: string; valor: string }) {
       <dd className="text-right text-xs font-bold text-herval-preto">{valor}</dd>
     </div>
   );
+}
+
+/** O que a régua fez, dito em uma frase para o CRC ver na hora. */
+function descreverEfeito(efeito: Consequencia): string | null {
+  if (efeito.retomada) {
+    return efeito.etapa
+      ? `A Helô enviou a mensagem de retomada e o lead foi para ${efeito.etapa}.`
+      : "A Helô enviou a mensagem de retomada. A etapa não mudou: o lead já passou do follow-up.";
+  }
+  if (efeito.abrirAgendamento) {
+    return "Converteu: marque a consulta abaixo para o lead ir para Agendamento.";
+  }
+  if (efeito.etapa) return `O lead foi para ${efeito.etapa}.`;
+  return null;
+}
+
+/** Como cada ponto da régua se descreve no cabeçalho. */
+function textoDaRegua(
+  estado: EstadoDaRegua,
+  proxima: number,
+  atraso: number | null,
+  restante: number | null,
+): string | null {
+  if (estado === "encerrada") return null;
+  if (estado === "aguardando-primeira") return "Nenhuma ligação ainda";
+  if (estado === "rajada-em-andamento") {
+    return `Rajada em andamento · ${proxima}ª de ${totalDeTentativas(metasPadrao)}`;
+  }
+  if (estado === "janela-de-mensagem") {
+    return restante === null
+      ? "Atendimento por mensagem"
+      : `Atendimento por mensagem · recuperação em ${duracao(restante)}`;
+  }
+  if (estado === "recuperacao-devida") {
+    return atraso === null
+      ? `${proxima}ª tentativa vencida`
+      : `${proxima}ª tentativa vencida há ${duracao(atraso)}`;
+  }
+  return "Sequência de ligações esgotada";
 }

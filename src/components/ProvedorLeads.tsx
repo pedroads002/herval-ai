@@ -33,6 +33,13 @@ import {
   type Ligacao,
 } from "@/data/ligacoes";
 import { notasIniciais, type Nota } from "@/data/notas";
+import { metasPadrao } from "@/data/metas";
+import {
+  consequenciaDaLigacao,
+  TEXTO_DE_RETOMADA,
+  type Consequencia,
+  type ResultadoDaConversa,
+} from "@/lib/regua";
 
 /** O que o CRC precisa informar quando move o lead à mão. */
 export type DadosDaMovimentacao = {
@@ -77,12 +84,18 @@ type ValorContexto = {
     texto: string,
     formato?: FormatoMensagem,
   ) => void;
-  /** Registra uma tentativa de ligação. O número dela sai das anteriores. */
+  /**
+   * Registra uma tentativa de ligação e aplica a régua: o número da tentativa
+   * sai das anteriores, e a etapa se move sozinha conforme o desfecho.
+   * Devolve o que a régua decidiu, para a tela poder mostrar.
+   */
   registrarLigacao: (
     leadId: number,
     canal: CanalDeLigacao,
     desfecho: DesfechoDaLigacao,
-  ) => void;
+    resultado?: ResultadoDaConversa,
+    motivoPerda?: MotivoPerda,
+  ) => Consequencia;
   adicionarNota: (leadId: number, texto: string) => void;
 };
 
@@ -333,20 +346,76 @@ export default function ProvedorLeads({
    * discordar do que de fato aconteceu.
    */
   const registrarLigacao = useCallback(
-    (leadId: number, canal: CanalDeLigacao, desfecho: DesfechoDaLigacao) => {
+    (
+      leadId: number,
+      canal: CanalDeLigacao,
+      desfecho: DesfechoDaLigacao,
+      resultado?: ResultadoDaConversa,
+      motivoPerda?: MotivoPerda,
+    ): Consequencia => {
+      // Tudo o que a régua precisa sai da lista atual, e não de dentro do
+      // setState: a função de atualização não roda na hora.
+      const tentativa = ligacoes.filter((l) => l.leadId === leadId).length + 1;
+      const etapa = tarefas.find((t) => t.id === leadId)?.etapa ?? null;
+
       setLigacoes((atuais) => [
         ...atuais,
         {
           id: Math.max(0, ...atuais.map((l) => l.id)) + 1,
           leadId,
           canal,
-          tentativa: atuais.filter((l) => l.leadId === leadId).length + 1,
+          tentativa,
           minutosAtras: 0,
           desfecho,
         },
       ]);
+
+      if (!etapa) return { etapa: null, retomada: false, abrirAgendamento: false };
+
+      const consequencia = consequenciaDaLigacao(
+        {
+          etapa,
+          tentativa,
+          atendida: desfecho === "atendida",
+          ...(resultado ? { resultado } : {}),
+          ...(motivoPerda ? { motivoPerda } : {}),
+        },
+        metasPadrao,
+      );
+
+      // A mensagem de fechamento é do sistema, e vai antes da mudança de etapa
+      // para a conversa contar a história na ordem em que aconteceu.
+      if (consequencia.retomada) {
+        setMensagens((atuais) => [
+          ...atuais,
+          {
+            id: Math.max(0, ...atuais.map((m) => m.id)) + 1,
+            leadId,
+            remetente: AGENTE_AUTOMATICO,
+            formato: "texto",
+            minutosAtras: 0,
+            texto: TEXTO_DE_RETOMADA,
+            regra: "Tentativas de ligação esgotadas",
+          },
+        ]);
+      }
+
+      // Quem assina é o CRC: a etapa mudou porque uma pessoa ligou. O sistema
+      // só escreveu o que a régua manda escrever.
+      if (consequencia.etapa) {
+        aplicarEtapa(
+          leadId,
+          consequencia.etapa,
+          consequencia.motivoPerda
+            ? { motivoPerda: consequencia.motivoPerda }
+            : undefined,
+          agenteHumano,
+        );
+      }
+
+      return consequencia;
     },
-    [],
+    [ligacoes, tarefas, aplicarEtapa, agenteHumano],
   );
 
   const adicionarNota = useCallback(
