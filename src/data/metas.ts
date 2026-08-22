@@ -33,6 +33,18 @@ export type Metas = {
   alertasVisiveis: number;
   /** Volume mínimo para o percentual ser considerado confiável. */
   amostraMinima: number;
+
+  /**
+   * A régua de ligação, na chegada do lead: uma rajada pelo discador, uma por
+   * chamada de WhatsApp, e uma tentativa de recuperação algumas horas depois.
+   *
+   * Está aqui, e não dentro do cálculo, pelo mesmo motivo do resto: é combinado
+   * com cada cliente. Uma clínica pode decidir que liga duas vezes, não três.
+   */
+  tentativasNoDiscador: number;
+  tentativasNoWhatsapp: number;
+  /** Minutos entre a primeira tentativa e a de recuperação. */
+  esperaDaRecuperacao: number;
 };
 
 export const metasPadrao: Metas = {
@@ -46,4 +58,7 @@ export const metasPadrao: Metas = {
   minimoNaCauda: 3,
   alertasVisiveis: 6,
   amostraMinima: 5,
+  tentativasNoDiscador: 3,
+  tentativasNoWhatsapp: 2,
+  esperaDaRecuperacao: 8 * 60,
 };

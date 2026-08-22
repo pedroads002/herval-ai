@@ -21,6 +21,7 @@ import { tempoRelativo } from "@/lib/tempo";
 import CartaoIndicador from "@/components/CartaoIndicador";
 import { calcularIndicadoresFila } from "@/data/indicadores";
 import { useLeads } from "@/components/ProvedorLeads";
+import { conversaDoLead, ehDoLead, indexarMensagens } from "@/data/mensagens";
 import {
   situacaoDaEtapa,
   situacoesAtivas,
@@ -57,7 +58,7 @@ function estiloScore(nivel: NivelScore) {
 
 export default function TabelaTarefas() {
   // A base é a mesma do Funil: mover um card lá muda esta tabela na hora.
-  const { tarefas, definirStatus } = useLeads();
+  const { tarefas, mensagens, definirStatus } = useLeads();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
@@ -106,6 +107,9 @@ export default function TabelaTarefas() {
 
   // Os cards saem das mesmas tarefas da tabela, então nunca divergem dela.
   const indicadores = useMemo(() => calcularIndicadoresFila(tarefas), [tarefas]);
+
+  // A conversa não vem mais junto da tarefa: é buscada por lead, uma vez só.
+  const conversas = useMemo(() => indexarMensagens(mensagens), [mensagens]);
 
   // Mesma contagem do card "Pendentes": leads aguardando a primeira ação.
   const pendentes = tarefas.filter(
@@ -230,6 +234,7 @@ export default function TabelaTarefas() {
                   {secao.itens.map((tarefa) => {
                 const alerta = tarefa.tipo === "alerta-humano";
                 const aberta = expandida === tarefa.id;
+                const conversa = aberta ? conversaDoLead(conversas, tarefa.id) : [];
 
                 return (
                   <Fragment key={tarefa.id}>
@@ -392,28 +397,35 @@ export default function TabelaTarefas() {
                         <td colSpan={7} className="px-6 py-6">
                           <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-black/50">
                             <MessageSquare className="h-3.5 w-3.5" />
-                            Histórico da IA com {tarefa.lead}
+                            Conversa com {tarefa.lead}
                           </h3>
 
-                          {tarefa.historico.length === 0 ? (
+                          {conversa.length === 0 ? (
                             <p className="mt-4 text-sm font-medium text-black/55">
-                              A IA ainda não enviou nenhuma mensagem para este
-                              lead. O primeiro contato é feito pelo CRC.
+                              Ainda não houve nenhuma mensagem com este lead. O
+                              primeiro contato é feito pelo CRC.
                             </p>
                           ) : (
                             <ol className="mt-4 space-y-4 border-l-2 border-herval-verde pl-5">
-                              {tarefa.historico.map((evento, indice) => (
-                                <li key={indice}>
+                              {conversa.map((mensagem) => (
+                                <li key={mensagem.id}>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-extrabold text-herval-preto">
-                                      {tempoRelativo(evento.minutosAtras)}
+                                      {tempoRelativo(mensagem.minutosAtras)}
                                     </span>
-                                    <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
-                                      {evento.regra}
+                                    <span className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+                                      {ehDoLead(mensagem)
+                                        ? tarefa.lead.split(" ")[0]
+                                        : mensagem.remetente.tipo}
                                     </span>
+                                    {mensagem.regra && (
+                                      <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
+                                        {mensagem.regra}
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="mt-1.5 max-w-3xl text-sm text-black/70">
-                                    {evento.mensagem}
+                                    {mensagem.texto}
                                   </p>
                                 </li>
                               ))}

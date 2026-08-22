@@ -7,6 +7,7 @@ import {
 } from "@/data/historicoEtapas";
 import type { Metas } from "@/data/metas";
 import { agendamentosIniciais, type Agendamento } from "@/data/agendamentos";
+import { primeiraTentativa, type Ligacoes } from "@/data/ligacoes";
 import {
   dentroDaFaixa,
   taxa,
@@ -78,6 +79,31 @@ export function minutosAteOPrimeiroContato(
   return chegada.minutosAtras - contato.minutosAtras;
 }
 
+/**
+ * Quanto o lead esperou até o CRC pegar o telefone. **Esta é a definição
+ * oficial de tempo de resposta.**
+ *
+ * A anterior media a entrada em "Em Contato", e quebrava com a régua de
+ * ligação: quem atende a ligação vai direto para `Agendamento` ou
+ * `Venda Perdida` e nunca passa por "Em Contato" — ou seja, justamente os
+ * leads bem atendidos sairiam da conta, e o número passaria a medir o tempo
+ * até a operação desistir do telefone.
+ *
+ * Só existe para quem tem ligação registrada, que hoje são os leads da fila.
+ * Nunca dá negativo: nenhuma ligação acontece antes de o lead chegar, e isso
+ * é invariante checada na base.
+ */
+export function minutosAteAPrimeiraTentativa(
+  historico: HistoricoDeEtapas,
+  ligacoes: Ligacoes,
+  leadId: number,
+): number | null {
+  const chegada = chegadaDoLead(historico, leadId);
+  const primeira = primeiraTentativa(ligacoes, leadId);
+  if (!chegada || !primeira) return null;
+  return chegada.minutosAtras - primeira.minutosAtras;
+}
+
 export type TempoDeResposta = {
   /** Média em minutos dos leads que já foram contatados. */
   media: number | null;
@@ -87,15 +113,16 @@ export type TempoDeResposta = {
   aguardando: number;
 };
 
-export function tempoDeResposta(
-  historico: HistoricoDeEtapas,
-  leadIds: number[],
-): TempoDeResposta {
+/**
+ * Recebe os tempos já apurados, e não os leads: assim quem chama decide por
+ * qual definição mediu, e não existe uma segunda cópia da regra aqui dentro.
+ * `null` é quem ainda espera — e nulo não é zero.
+ */
+export function tempoDeResposta(medidos: (number | null)[]): TempoDeResposta {
   const tempos: number[] = [];
   let aguardando = 0;
 
-  for (const id of leadIds) {
-    const minutos = minutosAteOPrimeiroContato(historico, id);
+  for (const minutos of medidos) {
     if (minutos === null) aguardando += 1;
     else tempos.push(minutos);
   }
@@ -186,8 +213,11 @@ export type LeadNaEspera = {
 };
 
 type EntradaDaFila = {
+  /** Base inteira: é dela que saem os números de volume. */
   leads: Lead[];
   historico: HistoricoDeEtapas;
+  /** Registro de ligação. Só existe para os leads da fila. */
+  ligacoes: Ligacoes;
   agendamentos?: Agendamento[];
   faixa: Faixa;
   clinicas?: Clinica[];
@@ -197,10 +227,20 @@ type EntradaDaFila = {
  * Uma linha por clínica, sempre sobre o mesmo grupo: os leads de campanha que
  * chegaram no período. Recebidos, contatados e agendados são degraus do mesmo
  * funil, e não três recortes diferentes que não fecham entre si.
+ *
+ * Dentro da linha convivem duas bases, de propósito:
+ *
+ * - **Volume** (recebidos, contatados, agendados) conta a base inteira. São os
+ *   mesmos números dos Relatórios, e precisam continuar batendo com eles.
+ * - **Tempo de resposta** (mediana, média, cauda) conta só quem tem ligação
+ *   registrada. A definição nova mede da primeira tentativa de ligação, e esse
+ *   dado não existe no histórico — misturar as duas bases num agregado só
+ *   inventaria um número que não corresponde a nenhuma das duas.
  */
 export function montarFila({
   leads,
   historico,
+  ligacoes,
   agendamentos = agendamentosIniciais,
   faixa,
   clinicas = clinicasIniciais,
@@ -219,21 +259,25 @@ export function montarFila({
         dentroDaFaixa(l.diasAtras, faixa),
     );
 
-    const resposta = tempoDeResposta(
-      indice,
-      daClinica.map((l) => l.id),
-    );
+    // Volume: quem chegou a "Em Contato" ou além, na base inteira.
+    const contatados = daClinica.filter(
+      (l) => minutosAteOPrimeiroContato(indice, l.id) !== null,
+    ).length;
 
-    const tempos = daClinica
-      .map((l) => minutosAteOPrimeiroContato(indice, l.id))
-      .filter((t): t is number => t !== null);
+    // Tempo de resposta: só quem tem ligação registrada.
+    const medidos = daClinica
+      .filter((l) => primeiraTentativa(ligacoes, l.id) !== null)
+      .map((l) => minutosAteAPrimeiraTentativa(indice, ligacoes, l.id));
+    const resposta = tempoDeResposta(medidos);
+
+    const tempos = medidos.filter((t): t is number => t !== null);
     const naCauda = tempos.filter(estaNaCauda).length;
 
     return {
       clinica,
       recebidos: daClinica.length,
-      contatados: resposta.atendidos,
-      taxaDeContato: taxa(resposta.atendidos, daClinica.length),
+      contatados,
+      taxaDeContato: taxa(contatados, daClinica.length),
       resposta,
       naCauda,
       percentualNaCauda: taxa(naCauda, tempos.length),
@@ -254,10 +298,16 @@ export type ResumoDaFila = {
   percentualNaCauda: number | null;
 };
 
+/**
+ * O total da tela, com o mesmo split das linhas: volume somado das clínicas
+ * visíveis, tempo de resposta refeito sobre os leads que têm ligação — porque
+ * mediana de medianas não é mediana.
+ */
 export function montarResumoDaFila(
   linhas: LinhaFila[],
   leads: Lead[],
   historico: HistoricoDeEtapas,
+  ligacoes: Ligacoes,
   faixa: Faixa,
 ): ResumoDaFila {
   const indice =
@@ -272,16 +322,15 @@ export function montarResumoDaFila(
   // A mediana do conjunto não sai da média das medianas de cada clínica: só
   // refazendo a conta sobre todos os tempos juntos.
   const idsVisiveis = new Set(linhas.map((l) => l.clinica.id));
-  const tempos = doPeriodo
-    .filter((l) => idsVisiveis.has(l.clinicaId))
-    .map((l) => minutosAteOPrimeiroContato(indice, l.id))
-    .filter((t): t is number => t !== null);
+  const medidos = doPeriodo
+    .filter(
+      (l) =>
+        idsVisiveis.has(l.clinicaId) && primeiraTentativa(ligacoes, l.id) !== null,
+    )
+    .map((l) => minutosAteAPrimeiraTentativa(indice, ligacoes, l.id));
 
-  const resposta = tempoDeResposta(
-    indice,
-    doPeriodo.filter((l) => idsVisiveis.has(l.clinicaId)).map((l) => l.id),
-  );
-
+  const resposta = tempoDeResposta(medidos);
+  const tempos = medidos.filter((t): t is number => t !== null);
   const naCauda = tempos.filter(estaNaCauda).length;
 
   return {
@@ -341,14 +390,40 @@ export function aguardandoContato(
  *    mediana resiste a exceção por construção, e alerta existe justamente para
  *    pegar exceção. A cauda é onde a diferença entre clínicas aparece.
  */
+export type RecuperacaoVencida = {
+  id: number;
+  clinicaId: number;
+  nome: string | null;
+  /** Há quantos minutos a tentativa de recuperação deveria ter acontecido. */
+  atraso: number;
+};
+
 export function montarAlertasDaFila(
   linhas: LinhaFila[],
   esperando: LeadNaEspera[],
   caudaDaBase: number | null,
   metas: Metas,
   nomeDaClinica: (id: number) => string,
+  recuperacoes: RecuperacaoVencida[] = [],
 ): Alerta[] {
   const alertas: Alerta[] = [];
+
+  /**
+   * Terceiro gatilho: a régua de ligação prevê uma tentativa de recuperação
+   * algumas horas depois da rajada, e ela venceu. Não há job que dispare isso
+   * — é conta feita na hora de desenhar, e por isso ela precisa aparecer em
+   * algum lugar onde alguém olhe, senão a régua só existe no papel.
+   */
+  for (const lead of recuperacoes) {
+    const horas = Math.round(lead.atraso / 60);
+    alertas.push({
+      id: `recuperacao-${lead.id}`,
+      clinica: nomeDaClinica(lead.clinicaId),
+      severidade: lead.atraso >= ESPERA_CRITICA ? "critico" : "atencao",
+      problema: `${lead.nome ?? `Lead ${lead.id}`} esgotou a rajada de ligações e a tentativa de recuperação está vencida há ${horas}h.`,
+      acao: "Fazer a última tentativa por WhatsApp antes de o lead cair no follow-up.",
+    });
+  }
 
   for (const lead of esperando) {
     if (lead.minutosDeEspera <= ESPERA_CRITICA) continue;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { nomeDaClinica } from "@/data/clinicas";
+import { clinicaPorId, nomeDaClinica, oferece } from "@/data/clinicas";
 import {
   CalendarPlus,
   ChevronLeft,
@@ -32,7 +32,10 @@ import {
   type StatusConsulta,
 } from "@/data/agenda";
 import { especialidadesIniciais, especialidadePorId } from "@/data/especialidades";
-import { profissionaisIniciais } from "@/data/profissionais";
+import {
+  profissionaisDisponiveis,
+  profissionaisIniciais,
+} from "@/data/profissionais";
 import type { Agendamento } from "@/data/agendamentos";
 import type { Tarefa } from "@/data/tarefas";
 import { formatarDuracao } from "@/lib/formato";
@@ -641,20 +644,27 @@ function FormularioNovaConsulta({
   aoMarcar: (leadId: number, dados: DadosDaConsulta) => void;
   aoFechar: () => void;
 }) {
-  const ativas = especialidadesIniciais.filter((e) => e.ativa);
-
   const [leadId, setLeadId] = useState<number | "">(semHorario[0]?.id ?? "");
-  const [especialidadeId, setEspecialidadeId] = useState<number>(
-    ativas[0]?.id ?? 1,
-  );
+  const [especialidadeId, setEspecialidadeId] = useState<number>(1);
   const [diaIndice, setDiaIndice] = useState(1);
   const [hora, setHora] = useState("09:00");
   const [erro, setErro] = useState<string | null>(null);
 
-  // Só aparecem os profissionais que atendem a especialidade escolhida.
-  const habilitados = profissionaisIniciais.filter((p) =>
-    p.especialidadeIds.includes(especialidadeId),
+  // A consulta acontece na clínica do lead, então é ela que decide o que dá
+  // para oferecer: nem toda clínica faz todo procedimento, e nenhum
+  // profissional atende em todas.
+  const clinicaId = semHorario.find((t) => t.id === leadId)?.clinicaId ?? 0;
+  const clinica = clinicaPorId(clinicaId);
+
+  const ativas = especialidadesIniciais.filter(
+    (e) => e.ativa && clinica !== undefined && oferece(clinica, e.id),
   );
+  const especialidadeValida = ativas.some((e) => e.id === especialidadeId)
+    ? especialidadeId
+    : (ativas[0]?.id ?? 1);
+
+  // Só aparecem os profissionais que atendem essa especialidade nessa clínica.
+  const habilitados = profissionaisDisponiveis(clinicaId, especialidadeValida);
   const [profissionalId, setProfissionalId] = useState<number>(
     habilitados[0]?.id ?? 1,
   );
@@ -680,7 +690,7 @@ function FormularioNovaConsulta({
     setErro(null);
     aoMarcar(Number(leadId), {
       profissionalId: profissionalValido,
-      especialidadeId,
+      especialidadeId: especialidadeValida,
       consultaEmDias: diasAteAData(data, hoje),
       hora,
     });
@@ -733,7 +743,7 @@ function FormularioNovaConsulta({
 
             <Campo rotulo="Especialidade">
               <select
-                value={especialidadeId}
+                value={especialidadeValida}
                 onChange={(e) => setEspecialidadeId(Number(e.target.value))}
                 className={estiloCampo}
               >

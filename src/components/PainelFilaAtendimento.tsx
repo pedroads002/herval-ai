@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { Info } from "lucide-react";
 import { useLeads } from "@/components/ProvedorLeads";
+import { indexarLigacoes, ligacoesDoLead } from "@/data/ligacoes";
+import { situacaoDaRegua } from "@/lib/regua";
 import { clinicasIniciais, nomeDaClinica } from "@/data/clinicas";
 import { historicoDeEtapasInicial, indexarPorLead } from "@/data/historicoEtapas";
 import { metasPadrao } from "@/data/metas";
@@ -38,7 +40,7 @@ export default function PainelFilaAtendimento({
   clinicas: Clinica[];
   mostrarSemAtividade: boolean;
 }) {
-  const { tarefas } = useLeads();
+  const { tarefas, ligacoes } = useLeads();
 
   const dados = useMemo(() => {
     const leads = baseDeLeads(tarefas);
@@ -47,8 +49,15 @@ export default function PainelFilaAtendimento({
     const indice = indexarPorLead(historicoDeEtapasInicial);
     const nomes = new Map(tarefas.map((t) => [t.id, t.lead]));
 
-    const linhas = montarFila({ leads, historico: indice, faixa, clinicas });
-    const resumo = montarResumoDaFila(linhas, leads, indice, faixa);
+    const porLead = indexarLigacoes(ligacoes);
+    const linhas = montarFila({
+      leads,
+      historico: indice,
+      ligacoes: porLead,
+      faixa,
+      clinicas,
+    });
+    const resumo = montarResumoDaFila(linhas, leads, indice, porLead, faixa);
 
     // Ao vivo: não olha o período nem a clínica escolhida, de propósito.
     const esperando = aguardandoContato(
@@ -56,6 +65,26 @@ export default function PainelFilaAtendimento({
       indice,
       nomes,
     );
+
+    // Também ao vivo: quem esgotou a rajada e está com a tentativa de
+    // recuperação vencida. É estado calculado, não alarme agendado.
+    const recuperacoes = tarefas
+      .map((tarefa) => ({
+        tarefa,
+        situacao: situacaoDaRegua(
+          ligacoesDoLead(porLead, tarefa.id),
+          tarefa.etapa,
+          metasPadrao,
+        ),
+      }))
+      .filter(({ situacao }) => situacao.estado === "recuperacao-devida")
+      .map(({ tarefa, situacao }) => ({
+        id: tarefa.id,
+        clinicaId: tarefa.clinicaId,
+        nome: tarefa.lead,
+        atraso: situacao.atrasoDaRecuperacao ?? 0,
+      }))
+      .sort((a, b) => b.atraso - a.atraso);
 
     return {
       linhas,
@@ -67,9 +96,10 @@ export default function PainelFilaAtendimento({
         resumo.percentualNaCauda,
         metasPadrao,
         nomeDaClinica,
+        recuperacoes,
       ),
     };
-  }, [tarefas, faixa, clinicas]);
+  }, [tarefas, ligacoes, faixa, clinicas]);
 
   const { linhas, resumo, esperando, alertas } = dados;
 
@@ -108,13 +138,19 @@ export default function PainelFilaAtendimento({
           rotulo="Contatados"
           valor={formatarNumero(resumo.contatados)}
           detalhe={`${comPercentual(resumo.taxaDeContato)} dos recebidos · ${formatarNumero(
-            resumo.resposta.aguardando,
+            resumo.recebidos - resumo.contatados,
           )} ainda sem contato`}
         />
         <Kpi
           rotulo="Tempo de resposta"
-          valor={mediana === null ? "—" : duracao(mediana)}
-          detalhe="mediana até o primeiro contato"
+          valor={mediana === null ? "sem amostra" : duracao(mediana)}
+          detalhe={
+            mediana === null
+              ? "nenhum lead de campanha com ligação registrada no período — o campo fica vazio em vez de mostrar o número de outro recorte"
+              : `mediana até a primeira tentativa de ligação, sobre ${formatarNumero(
+                  resumo.resposta.atendidos,
+                )} ${resumo.resposta.atendidos === 1 ? "lead" : "leads"} com ligação registrada`
+          }
           alerta={mediana !== null && mediana >= 120}
         />
         <Kpi
@@ -133,10 +169,13 @@ export default function PainelFilaAtendimento({
             <span className="font-bold text-herval-preto">
               Tempo de resposta
             </span>{" "}
-            é a mediana: metade dos leads foi atendida em até {duracao(mediana)}.
-            A média é de {duracao(media)}, puxada pelos{" "}
-            {comPercentual(resumo.percentualNaCauda)} que esperaram mais de um
-            dia.
+            conta da chegada do lead até a primeira tentativa de ligação, que é
+            a definição do sistema desde que a régua de ligação existe. Metade
+            deles esperou até {duracao(mediana)}. A média é de {duracao(media)},
+            puxada pelos {comPercentual(resumo.percentualNaCauda)} que esperaram
+            mais de um dia. Só entram aqui os leads com ligação registrada:
+            volume e tempo de resposta não saem da mesma base, porque o
+            histórico antigo não tem registro de ligação.
           </span>
         </p>
       )}
@@ -198,14 +237,14 @@ export default function PainelFilaAtendimento({
       <PontosDeAtencao
         alertas={alertas}
         visiveis={metasPadrao.alertasVisiveis}
-        legenda={`Lead parado há mais de um dia sem contato, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento.`}
-        vazio="Nenhum lead parado e nenhuma clínica com cauda fora do padrão da base no período."
+        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento.`}
+        vazio="Nenhum lead parado, nenhuma recuperação vencida e nenhuma clínica com cauda fora do padrão da base no período."
       />
 
       {/* Tabela por clínica */}
       <Tabela
         titulo="Atendimento por clínica (leads do período)"
-        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Contato é a entrada na etapa “Em Contato”, que é a definição de primeiro contato do sistema. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
+        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos, contatados e agendados contam a base inteira, e são os mesmos números dos Relatórios. Já a mediana e a média contam só os leads com ligação registrada, porque o tempo de resposta passou a ser medido da chegada até a primeira tentativa de ligação, e o histórico antigo não tem esse registro — por isso as colunas de tempo podem estar vazias onde há volume. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
         cabecalhos={[
           "Clínica",
           "Recebidos",

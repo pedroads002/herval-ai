@@ -37,19 +37,15 @@ export type {
 
 export type NivelScore = "Alta" | "Média" | "Baixa";
 
-/** Uma mensagem que a IA enviou ao lead, para rastreabilidade. */
-export type EventoHistorico = {
-  /** Há quantos minutos a mensagem foi enviada. */
-  minutosAtras: number;
-  mensagem: string;
-  regra: string;
-};
-
 /**
  * Uma tarefa é um lead da fila com os campos de operação em cima: qual regra
- * disparou, o que a IA sugere, o histórico da conversa. Os campos do lead em
+ * disparou, o que a IA sugere, quanto tempo está parada. Os campos do lead em
  * si (clínica, origem, etapa, safra) vêm de `Lead`, que é o que os relatórios
  * leem — assim a fila e o relatório nunca discordam sobre o mesmo lead.
+ *
+ * A conversa com o lead não mora mais aqui: virou `mensagens.ts`, entidade
+ * própria por lead. Enquanto era campo da tarefa, só quem estava na fila tinha
+ * conversa, e só o lado da IA aparecia.
  */
 export type Tarefa = Lead & {
   lead: string;
@@ -71,7 +67,6 @@ export type Tarefa = Lead & {
     nivel: NivelScore;
     motivo: string;
   };
-  historico: EventoHistorico[];
 };
 
 // Dados de exemplo. Ainda não vêm de banco nem de API.
@@ -96,26 +91,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Pediu horário para esta semana",
     },
-    historico: [
-      {
-        minutosAtras: 2753,
-        mensagem:
-          "Oi Mariana, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 1599,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 1206,
-        mensagem:
-          "Mariana, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 2,
@@ -137,20 +112,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Confirmou interesse no procedimento",
     },
-    historico: [
-      {
-        minutosAtras: 2752,
-        mensagem:
-          "Carlos, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 2359,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 3,
@@ -172,20 +133,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Abriu o orçamento duas vezes, mas não respondeu",
     },
-    historico: [
-      {
-        minutosAtras: 7103,
-        mensagem:
-          "Olá Juliana! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 6108,
-        mensagem:
-          "Juliana, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 4,
@@ -207,14 +154,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Pediu horário para esta semana",
     },
-    historico: [
-      {
-        minutosAtras: 2737,
-        mensagem:
-          "Oi Rafael, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-    ],
   },
   {
     id: 5,
@@ -236,20 +175,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Confirmou interesse no procedimento",
     },
-    historico: [
-      {
-        minutosAtras: 2801,
-        mensagem:
-          "Ana, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 1636,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 6,
@@ -271,26 +196,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Respondeu em menos de 5 minutos",
     },
-    historico: [
-      {
-        minutosAtras: 1291,
-        mensagem:
-          "Oi Diego, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 898,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Diego, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 7,
@@ -312,7 +217,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Interação muito recente",
     },
-    historico: [],
   },
   {
     id: 8,
@@ -334,14 +238,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Demonstrou interesse, mas travou no valor",
     },
-    historico: [
-      {
-        minutosAtras: 201,
-        mensagem:
-          "Oi Fernando, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-    ],
   },
   {
     id: 9,
@@ -363,26 +259,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Pediu horário para esta semana",
     },
-    historico: [
-      {
-        minutosAtras: 1306,
-        mensagem:
-          "Oi Camila, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Camila, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 10,
@@ -405,14 +281,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Buscava apenas tabela de preços",
     },
-    historico: [
-      {
-        minutosAtras: 38616,
-        mensagem:
-          "Olá Lucas! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
-        regra: "Verificação de localização",
-      },
-    ],
   },
   {
     id: 11,
@@ -434,14 +302,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Pediu horário para esta semana",
     },
-    historico: [
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Oi Renata, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-    ],
   },
   {
     id: 12,
@@ -463,14 +323,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Respondeu em menos de 5 minutos",
     },
-    historico: [
-      {
-        minutosAtras: 1373,
-        mensagem:
-          "Oi Bruno, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-    ],
   },
   {
     id: 13,
@@ -492,20 +344,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Confirmou interesse no procedimento",
     },
-    historico: [
-      {
-        minutosAtras: 4292,
-        mensagem:
-          "Letícia, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 3297,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 14,
@@ -527,20 +365,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Consulta marcada e orçamento aceito",
     },
-    historico: [
-      {
-        minutosAtras: 8467,
-        mensagem:
-          "Gustavo, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 8062,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 15,
@@ -562,14 +386,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 8461,
-        mensagem:
-          "Olá Aline! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-    ],
   },
   {
     id: 16,
@@ -591,20 +407,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Confirmou interesse no procedimento",
     },
-    historico: [
-      {
-        minutosAtras: 11443,
-        mensagem:
-          "Marcelo, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 11050,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 17,
@@ -626,26 +428,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Sem interação nos últimos 6 meses",
     },
-    historico: [
-      {
-        minutosAtras: 7569,
-        mensagem:
-          "Olá Vanessa! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 6633,
-        mensagem:
-          "Vanessa, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 6441,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Vanessa. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 18,
@@ -667,26 +449,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Abriu o orçamento duas vezes, mas não respondeu",
     },
-    historico: [
-      {
-        minutosAtras: 7071,
-        mensagem:
-          "Olá Rodrigo! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Rodrigo, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Rodrigo. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 19,
@@ -708,14 +470,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Sem interação nos últimos 6 meses",
     },
-    historico: [
-      {
-        minutosAtras: 7038,
-        mensagem:
-          "Olá Priscila! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-    ],
   },
   {
     id: 20,
@@ -737,14 +491,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Respondeu em menos de 5 minutos",
     },
-    historico: [
-      {
-        minutosAtras: 4246,
-        mensagem:
-          "Oi Thiago, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-    ],
   },
   {
     id: 21,
@@ -766,14 +512,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Abriu o orçamento duas vezes, mas não respondeu",
     },
-    historico: [
-      {
-        minutosAtras: 11606,
-        mensagem:
-          "Olá Débora! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-    ],
   },
   {
     id: 22,
@@ -795,20 +533,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Consulta marcada e orçamento aceito",
     },
-    historico: [
-      {
-        minutosAtras: 17168,
-        mensagem:
-          "Eduardo, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 16775,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 23,
@@ -830,26 +554,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 11383,
-        mensagem:
-          "Olá Sabrina! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 10388,
-        mensagem:
-          "Sabrina, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 9983,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Sabrina. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 24,
@@ -871,26 +575,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Sem interação nos últimos 6 meses",
     },
-    historico: [
-      {
-        minutosAtras: 11357,
-        mensagem:
-          "Olá Henrique! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 10952,
-        mensagem:
-          "Henrique, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 9787,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Henrique. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 25,
@@ -913,14 +597,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Buscava apenas tabela de preços",
     },
-    historico: [
-      {
-        minutosAtras: 40247,
-        mensagem:
-          "Olá Natália! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
-        regra: "Verificação de localização",
-      },
-    ],
   },
   {
     id: 26,
@@ -943,14 +619,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Buscava apenas tabela de preços",
     },
-    historico: [
-      {
-        minutosAtras: 8590,
-        mensagem:
-          "Olá Felipe! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
-        regra: "Verificação de localização",
-      },
-    ],
   },
   {
     id: 27,
@@ -972,20 +640,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Respondeu em menos de 5 minutos",
     },
-    historico: [
-      {
-        minutosAtras: 4292,
-        mensagem:
-          "Oi Larissa, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 3356,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-    ],
   },
   {
     id: 28,
@@ -1008,14 +662,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Buscava apenas tabela de preços",
     },
-    historico: [
-      {
-        minutosAtras: 48726,
-        mensagem:
-          "Olá André! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
-        regra: "Verificação de localização",
-      },
-    ],
   },
   {
     id: 29,
@@ -1037,26 +683,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Respondeu em menos de 5 minutos",
     },
-    historico: [
-      {
-        minutosAtras: 2750,
-        mensagem:
-          "Oi Bianca, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 1049,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Bianca, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 30,
@@ -1078,14 +704,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Sem interação nos últimos 6 meses",
     },
-    historico: [
-      {
-        minutosAtras: 20014,
-        mensagem:
-          "Olá Otávio! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-    ],
   },
   {
     id: 31,
@@ -1107,7 +725,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Interação muito recente",
     },
-    historico: [],
   },
   {
     id: 32,
@@ -1129,20 +746,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Leu a mensagem e não retornou",
     },
-    historico: [
-      {
-        minutosAtras: 13858,
-        mensagem:
-          "Olá Vinícius! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 13465,
-        mensagem:
-          "Vinícius, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 33,
@@ -1164,20 +767,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Consulta marcada e orçamento aceito",
     },
-    historico: [
-      {
-        minutosAtras: 18542,
-        mensagem:
-          "Manuela, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 17547,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 34,
@@ -1199,14 +788,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Perguntou sobre formas de pagamento",
     },
-    historico: [
-      {
-        minutosAtras: 1305,
-        mensagem:
-          "Oi Leandro, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-    ],
   },
   {
     id: 35,
@@ -1229,14 +810,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Mora em outro estado",
     },
-    historico: [
-      {
-        minutosAtras: 4212,
-        mensagem:
-          "Olá Tatiane! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
-        regra: "Verificação de localização",
-      },
-    ],
   },
   {
     id: 36,
@@ -1258,20 +831,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 24100,
-        mensagem:
-          "Olá Ricardo! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 23707,
-        mensagem:
-          "Ricardo, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 37,
@@ -1293,26 +852,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 21431,
-        mensagem:
-          "Olá Isabela! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 20495,
-        mensagem:
-          "Isabela, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 20303,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Isabela. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 38,
@@ -1334,7 +873,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Interação muito recente",
     },
-    historico: [],
   },
   {
     id: 39,
@@ -1356,7 +894,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Interação muito recente",
     },
-    historico: [],
   },
   {
     id: 40,
@@ -1378,26 +915,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Perguntou sobre formas de pagamento",
     },
-    historico: [
-      {
-        minutosAtras: 5720,
-        mensagem:
-          "Oi Paulo, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 4019,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 2865,
-        mensagem:
-          "Paulo, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 41,
@@ -1419,26 +936,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 48711,
-        mensagem:
-          "Olá Simone! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 47557,
-        mensagem:
-          "Simone, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 47164,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Simone. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 42,
@@ -1461,14 +958,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Buscava apenas tabela de preços",
     },
-    historico: [
-      {
-        minutosAtras: 27178,
-        mensagem:
-          "Olá Alexandre! Nosso atendimento é presencial em Porto Alegre. Você consegue vir até uma das unidades?",
-        regra: "Verificação de localização",
-      },
-    ],
   },
   {
     id: 43,
@@ -1490,20 +979,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Consulta marcada e orçamento aceito",
     },
-    historico: [
-      {
-        minutosAtras: 12832,
-        mensagem:
-          "Fernanda, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 11837,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 44,
@@ -1525,26 +1000,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Leu a mensagem e não retornou",
     },
-    historico: [
-      {
-        minutosAtras: 48768,
-        mensagem:
-          "Olá Douglas! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 48363,
-        mensagem:
-          "Douglas, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 47198,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Douglas. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 45,
@@ -1566,26 +1021,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Demonstrou interesse, mas travou no valor",
     },
-    historico: [
-      {
-        minutosAtras: 5594,
-        mensagem:
-          "Oi Elisa, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 4429,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 4036,
-        mensagem:
-          "Elisa, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 46,
@@ -1607,20 +1042,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Abriu o orçamento duas vezes, mas não respondeu",
     },
-    historico: [
-      {
-        minutosAtras: 24313,
-        mensagem:
-          "Olá Rogério! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 23920,
-        mensagem:
-          "Rogério, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 47,
@@ -1642,7 +1063,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Interação muito recente",
     },
-    historico: [],
   },
   {
     id: 48,
@@ -1664,7 +1084,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Interação muito recente",
     },
-    historico: [],
   },
   {
     id: 49,
@@ -1686,20 +1105,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Consulta marcada e orçamento aceito",
     },
-    historico: [
-      {
-        minutosAtras: 11383,
-        mensagem:
-          "Michele, sua avaliação ficou marcada. Confirma para mim?",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 4049,
-        mensagem:
-          "Lembrete: sua consulta é amanhã. Chegue com 10 minutos de antecedência.",
-        regra: "Lembrete automático 24h",
-      },
-    ],
   },
   {
     id: 50,
@@ -1721,26 +1126,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Média",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 48791,
-        mensagem:
-          "Olá Fábio! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 47090,
-        mensagem:
-          "Fábio, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-      {
-        minutosAtras: 45936,
-        mensagem:
-          "Ainda dá tempo de garantir o horário desta semana, Fábio. Quer que eu reserve?",
-        regra: "Follow-up D+3",
-      },
-    ],
   },
   {
     id: 51,
@@ -1762,26 +1147,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Pediu horário para esta semana",
     },
-    historico: [
-      {
-        minutosAtras: 4115,
-        mensagem:
-          "Oi Rafaela, tudo bem? Vi seu interesse no procedimento. Posso te explicar como funciona a avaliação?",
-        regra: "Lead novo do site",
-      },
-      {
-        minutosAtras: 2961,
-        mensagem:
-          "Enviei o orçamento completo. O valor inclui o acompanhamento de 90 dias.",
-        regra: "Solicitação de valores",
-      },
-      {
-        minutosAtras: 2568,
-        mensagem:
-          "Rafaela, consigo encaixar você esta semana. Prefere manhã ou tarde?",
-        regra: "Pedido de horário",
-      },
-    ],
   },
   {
     id: 52,
@@ -1803,20 +1168,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o valor",
     },
-    historico: [
-      {
-        minutosAtras: 55081,
-        mensagem:
-          "Olá Júlio! Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Retomada de conversa",
-      },
-      {
-        minutosAtras: 54688,
-        mensagem:
-          "Júlio, separei alguns resultados de pacientes com perfil parecido com o seu.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 53,
@@ -1839,20 +1190,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Fechou o pacote na avaliação",
     },
-    historico: [
-      {
-        minutosAtras: 47491,
-        mensagem:
-          "Oi Aline! Confirmei sua avaliação de harmonização facial.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 43069,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 54,
@@ -1875,20 +1212,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Assinou o termo no mesmo dia",
     },
-    historico: [
-      {
-        minutosAtras: 38830,
-        mensagem:
-          "Oi Débora! Confirmei sua avaliação de preenchimento labial.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 27303,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 55,
@@ -1911,20 +1234,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Fechou o pacote na avaliação",
     },
-    historico: [
-      {
-        minutosAtras: 43177,
-        mensagem:
-          "Oi Felipe! Confirmei sua avaliação de toxina botulínica.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 35841,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 56,
@@ -1947,20 +1256,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Assinou o termo no mesmo dia",
     },
-    historico: [
-      {
-        minutosAtras: 14242,
-        mensagem:
-          "Oi Tatiane! Confirmei sua avaliação de bioestimulador de colágeno.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 7121,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 57,
@@ -1983,20 +1278,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Fechou o pacote na avaliação",
     },
-    historico: [
-      {
-        minutosAtras: 30214,
-        mensagem:
-          "Oi Rodrigo! Confirmei sua avaliação de limpeza de pele.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 26946,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 58,
@@ -2019,20 +1300,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Assinou o termo no mesmo dia",
     },
-    historico: [
-      {
-        minutosAtras: 17102,
-        mensagem:
-          "Oi Priscila! Confirmei sua avaliação de harmonização facial.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 5611,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 59,
@@ -2055,20 +1322,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Fechou o pacote na avaliação",
     },
-    historico: [
-      {
-        minutosAtras: 46035,
-        mensagem:
-          "Oi Márcio! Confirmei sua avaliação de preenchimento labial.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 33098,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 60,
@@ -2091,20 +1344,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Alta",
       motivo: "Assinou o termo no mesmo dia",
     },
-    historico: [
-      {
-        minutosAtras: 31534,
-        mensagem:
-          "Oi Simone! Confirmei sua avaliação de toxina botulínica.",
-        regra: "Agendamento criado",
-      },
-      {
-        minutosAtras: 22977,
-        mensagem:
-          "Que bom que deu tudo certo! O acompanhamento de 90 dias já está ativo.",
-        regra: "Pós-procedimento",
-      },
-    ],
   },
   {
     id: 61,
@@ -2127,20 +1366,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o orçamento",
     },
-    historico: [
-      {
-        minutosAtras: 31624,
-        mensagem:
-          "Oi Cristina, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 28429,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 62,
@@ -2163,20 +1388,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o orçamento",
     },
-    historico: [
-      {
-        minutosAtras: 23974,
-        mensagem:
-          "Oi Anderson, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 20779,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 63,
@@ -2199,20 +1410,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o orçamento",
     },
-    historico: [
-      {
-        minutosAtras: 18602,
-        mensagem:
-          "Oi Elaine, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 15407,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 64,
@@ -2235,20 +1432,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Parou de responder após o orçamento",
     },
-    historico: [
-      {
-        minutosAtras: 2721,
-        mensagem:
-          "Oi Gustavo, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 65,
@@ -2271,20 +1454,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Sete tentativas sem retorno",
     },
-    historico: [
-      {
-        minutosAtras: 38724,
-        mensagem:
-          "Oi Larissa, tudo bem? Vi seu interesse em toxina botulínica. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 35529,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 66,
@@ -2307,20 +1476,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Sete tentativas sem retorno",
     },
-    historico: [
-      {
-        minutosAtras: 22987,
-        mensagem:
-          "Oi Otávio, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 19792,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 67,
@@ -2343,20 +1498,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Sete tentativas sem retorno",
     },
-    historico: [
-      {
-        minutosAtras: 51787,
-        mensagem:
-          "Oi Michele, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 48592,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 68,
@@ -2379,20 +1520,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Sete tentativas sem retorno",
     },
-    historico: [
-      {
-        minutosAtras: 1364,
-        mensagem:
-          "Oi Paulo, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 0,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 69,
@@ -2415,20 +1542,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Mora fora da região atendida",
     },
-    historico: [
-      {
-        minutosAtras: 27306,
-        mensagem:
-          "Oi Renata, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 24111,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 70,
@@ -2451,20 +1564,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Mora fora da região atendida",
     },
-    historico: [
-      {
-        minutosAtras: 9978,
-        mensagem:
-          "Oi Diego, tudo bem? Vi seu interesse em toxina botulínica. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 6783,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 71,
@@ -2487,20 +1586,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Disse que só queria saber o valor",
     },
-    historico: [
-      {
-        minutosAtras: 25439,
-        mensagem:
-          "Oi Fabiana, tudo bem? Vi seu interesse em bioestimulador de colágeno. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 22244,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 72,
@@ -2523,20 +1608,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Disse que só queria saber o valor",
     },
-    historico: [
-      {
-        minutosAtras: 44039,
-        mensagem:
-          "Oi Sérgio, tudo bem? Vi seu interesse em limpeza de pele. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 40844,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 73,
@@ -2559,20 +1630,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Pediu para retomar no ano que vem",
     },
-    historico: [
-      {
-        minutosAtras: 51512,
-        mensagem:
-          "Oi Karine, tudo bem? Vi seu interesse em harmonização facial. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 48317,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
   {
     id: 74,
@@ -2595,20 +1652,6 @@ export const tarefasIniciais: Tarefa[] = [
       nivel: "Baixa",
       motivo: "Pediu para retomar no ano que vem",
     },
-    historico: [
-      {
-        minutosAtras: 27315,
-        mensagem:
-          "Oi Thiago, tudo bem? Vi seu interesse em preenchimento labial. Posso te explicar?",
-        regra: "Lead novo do Meta Ads",
-      },
-      {
-        minutosAtras: 24120,
-        mensagem:
-          "Passando para saber se ficou alguma dúvida sobre o que conversamos.",
-        regra: "Follow-up D+2",
-      },
-    ],
   },
 ];
 

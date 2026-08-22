@@ -55,6 +55,12 @@ export type Agendamento = {
   hora: string | null;
   /** O paciente respondeu confirmando presença. */
   confirmada: boolean;
+  /**
+   * Recado livre de quem marcou: o que o paciente pediu, o que a clínica
+   * precisa lembrar. Opcional, e ausente em tudo que já existia — ninguém
+   * escreveu observação em consulta marcada antes de haver onde escrever.
+   */
+  observacao?: string;
 };
 
 /**
