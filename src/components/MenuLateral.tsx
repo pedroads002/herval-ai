@@ -10,6 +10,7 @@ import {
   Building2,
   MessageSquareWarning,
   MessageSquareText,
+  MessagesSquare,
   Plug,
   LayoutDashboard,
   Workflow,
@@ -23,6 +24,7 @@ const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/relatorios", rotulo: "Relatórios", Icone: BarChart3 },
   { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
+  { href: "/atendimento", rotulo: "Atendimento", Icone: MessagesSquare },
   { href: "/funil", rotulo: "Funil", Icone: KanbanSquare },
   { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
   { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
@@ -47,7 +49,14 @@ export default function MenuLateral() {
       {/* Com o menu maior, a lista rola sozinha em telas baixas. */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-6">
         {itens.map(({ href, rotulo, Icone }) => {
-          const ativo = caminho === href;
+          /**
+           * O item continua aceso nas telas internas da seção — abrir a
+           * conversa de um lead não apaga "Atendimento" no menu. A raiz fica
+           * de fora da regra: todo caminho começa com "/".
+           */
+          const ativo =
+            caminho === href ||
+            (href !== "/" && caminho.startsWith(`${href}/`));
           return (
             <Link
               key={href}

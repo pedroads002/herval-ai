@@ -117,11 +117,11 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
           antigos ficam só nos relatórios, sem conversa nem contato para abrir.
         </p>
         <Link
-          href="/funil"
+          href="/atendimento"
           className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-5 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar para o Funil
+          Voltar para o Atendimento
         </Link>
       </div>
     );
@@ -134,11 +134,11 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
       {/* Cabeçalho */}
       <div className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
         <Link
-          href="/funil"
+          href="/atendimento"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 transition-colors hover:text-herval-preto"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Funil
+          Atendimento
         </Link>
 
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
