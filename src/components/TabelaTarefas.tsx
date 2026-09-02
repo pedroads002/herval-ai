@@ -24,23 +24,15 @@ import { useLeads } from "@/components/ProvedorLeads";
 import { conversaDoLead, ehDoLead, indexarMensagens } from "@/data/mensagens";
 import {
   situacaoDaEtapa,
-  situacoesAtivas,
   type NivelScore,
   type StatusTarefa,
 } from "@/data/tarefas";
-
-const filtros = [
-  "Ativos",
-  "Todos",
-  "Pendentes",
-  "Em Atendimento",
-  "Aguardando Resposta",
-  "Agendados",
-  "Ganhos",
-  "Desqualificados",
-] as const;
-
-type Filtro = (typeof filtros)[number];
+import {
+  combinaComBusca,
+  combinaComFiltro,
+  filtrosDeSituacao,
+  type FiltroDeSituacao,
+} from "@/lib/filtros";
 
 const tomDoStatus: Record<StatusTarefa, TomEtiqueta> = {
   Pendente: "contorno",
@@ -60,37 +52,15 @@ export default function TabelaTarefas() {
   // A base é a mesma do Funil: mover um card lá muda esta tabela na hora.
   const { tarefas, mensagens, definirStatus } = useLeads();
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("Ativos");
+  const [filtro, setFiltro] = useState<FiltroDeSituacao>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
-    return tarefas.filter((t) => {
-      const situacao = situacaoDaEtapa(t.etapa);
-      const combinaBusca =
-        termo === "" ||
-        t.lead.toLowerCase().includes(termo) ||
-        t.telefone.toLowerCase().includes(termo) ||
-        nomeDaClinica(t.clinicaId).toLowerCase().includes(termo);
-
-      const combinaFiltro =
-        filtro === "Todos"
-          ? true
-          : filtro === "Ativos"
-            ? situacoesAtivas.includes(situacao)
-            : filtro === "Pendentes"
-              ? situacao === "Pendente"
-              : filtro === "Agendados"
-                ? situacao === "Agendado"
-                : filtro === "Ganhos"
-                  ? situacao === "Ganho"
-                  : filtro === "Desqualificados"
-                    ? situacao === "Desqualificado"
-                    : situacao === filtro;
-
-      return combinaBusca && combinaFiltro;
-    });
+    return tarefas.filter(
+      (t) => combinaComBusca(t, termo) && combinaComFiltro(t, filtro),
+    );
   }, [tarefas, busca, filtro]);
 
   // Agrupa por urgência, mantendo a ordem: atrasadas primeiro.
@@ -147,10 +117,10 @@ export default function TabelaTarefas() {
 
         <select
           value={filtro}
-          onChange={(e) => setFiltro(e.target.value as Filtro)}
+          onChange={(e) => setFiltro(e.target.value as FiltroDeSituacao)}
           className="rounded-full border border-black/15 bg-herval-branco px-5 py-3 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
         >
-          {filtros.map((opcao) => (
+          {filtrosDeSituacao.map((opcao) => (
             <option key={opcao} value={opcao}>
               {opcao}
             </option>
