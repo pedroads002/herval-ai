@@ -2,12 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MessageSquare, Search } from "lucide-react";
+import { ListFilter, MessageSquare, Search } from "lucide-react";
 import { useLeads } from "@/components/ProvedorLeads";
 import { ehDoLead, indexarMensagens, ultimaMensagem } from "@/data/mensagens";
 import { nomeDaClinica } from "@/data/clinicas";
 import { minutosDeDias, tempoRelativo } from "@/lib/tempo";
 import { situacaoDaEtapa, type Tarefa } from "@/data/tarefas";
+import {
+  combinaComBusca,
+  combinaComFiltro,
+  filtrosDeSituacao,
+  type FiltroDeSituacao,
+} from "@/lib/filtros";
 
 /**
  * Venda Ganha e Venda Perdida não pedem atendimento, mesmo quando a última
@@ -40,6 +46,12 @@ type Conversa = {
 export default function ListaAtendimentos() {
   const { tarefas, mensagens } = useLeads();
   const [busca, setBusca] = useState("");
+  /**
+   * "Todos" e não "Ativos" como padrão: aqui a lista já separa por si o que
+   * pede resposta do que é só histórico, então esconder metade da base na
+   * abertura tiraria conversa de vista sem a pessoa ter pedido.
+   */
+  const [filtro, setFiltro] = useState<FiltroDeSituacao>("Todos");
 
   // A conversa inteira é varrida uma vez, e não uma vez por linha da lista.
   const porLead = useMemo(() => indexarMensagens(mensagens), [mensagens]);
@@ -79,13 +91,11 @@ export default function ListaAtendimentos() {
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (termo === "") return conversas;
     return conversas.filter(
       ({ tarefa }) =>
-        tarefa.lead.toLowerCase().includes(termo) ||
-        tarefa.telefone.toLowerCase().includes(termo),
+        combinaComBusca(tarefa, termo) && combinaComFiltro(tarefa, filtro),
     );
-  }, [conversas, busca]);
+  }, [conversas, busca, filtro]);
 
   /**
    * Quem espera há mais tempo aparece primeiro — e não quem falou por último.
@@ -117,16 +127,46 @@ export default function ListaAtendimentos() {
 
   return (
     <div className="space-y-7">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
-        <input
-          type="text"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou telefone"
-          className="w-full rounded-full border border-black/15 bg-herval-branco py-3 pl-11 pr-4 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
-        />
+      {/* Busca e filtro, no mesmo formato da Fila de Tarefas. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, telefone ou clínica"
+            className="w-full rounded-full border border-black/15 bg-herval-branco py-3 pl-11 pr-4 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
+          />
+        </div>
+
+        <div className="relative shrink-0">
+          <ListFilter className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
+          <select
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value as FiltroDeSituacao)}
+            aria-label="Filtrar por situação do lead"
+            className="w-full rounded-full border border-black/15 bg-herval-branco py-3 pl-11 pr-5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20 sm:w-auto"
+          >
+            {filtrosDeSituacao.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      <p className="text-sm font-medium text-black/55">
+        <span className="font-extrabold text-herval-preto">
+          {visiveis.length}
+        </span>{" "}
+        {visiveis.length === 1 ? "conversa exibida" : "conversas exibidas"} de{" "}
+        <span className="font-extrabold text-herval-preto">
+          {conversas.length}
+        </span>{" "}
+        na fila.
+      </p>
 
       <Secao
         titulo="Aguardando resposta"
