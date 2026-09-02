@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, CalendarPlus } from "lucide-react";
 import type { Agendamento } from "@/data/agendamentos";
 import type { Ligacao } from "@/data/ligacoes";
@@ -13,6 +13,7 @@ import {
 } from "@/data/clinicas";
 import { especialidadePorId, especialidadesIniciais } from "@/data/especialidades";
 import { profissionaisDisponiveis } from "@/data/profissionais";
+import { diasAteAData, inicioDoDia, somarDias } from "@/data/agenda";
 import { formatarDuracao, formatarMoeda } from "@/lib/formato";
 import { duracao, tempoRelativo } from "@/lib/tempo";
 import type { DadosDaConsulta } from "@/components/ProvedorLeads";
@@ -29,6 +30,33 @@ function quandoEmDias(dias: number) {
   if (dias === 0) return "hoje";
   return dias < 0 ? `em ${duracao(-dias * 1440)}` : `há ${duracao(dias * 1440)}`;
 }
+
+/**
+ * O campo de calendário do navegador fala "2026-09-04". Estas duas funções
+ * traduzem para Date e de volta, e existem por um motivo estreito: montar a
+ * data à mão, e não com `new Date(texto)`, que leria o texto como UTC e em
+ * Brasília cairia no dia anterior.
+ *
+ * O que é guardado continua sendo a distância em dias, como no resto da base.
+ * O calendário é só a forma de digitar.
+ */
+function textoDaData(data: Date) {
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${data.getFullYear()}-${mes}-${dia}`;
+}
+
+function dataDoTexto(texto: string) {
+  const [ano, mes, dia] = texto.split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+const dataPorExtenso = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "America/Sao_Paulo",
+});
 
 export function AbaAgenda({
   clinica,
@@ -131,9 +159,22 @@ function FormularioDeConsulta({
 
   const [especialidadeId, setEspecialidadeId] = useState(oferecidas[0]?.id ?? 0);
   const [profissionalId, setProfissionalId] = useState(0);
-  const [dias, setDias] = useState(1);
   const [hora, setHora] = useState("09:00");
   const [observacao, setObservacao] = useState("");
+
+  /**
+   * A data de hoje só é lida depois que a tela monta, para o servidor e o
+   * navegador nunca renderizarem dias diferentes. É o mesmo cuidado que a
+   * Agenda já tomava.
+   */
+  const [hoje, setHoje] = useState<Date | null>(null);
+  const [data, setData] = useState("");
+
+  useEffect(() => {
+    const agora = inicioDoDia(new Date());
+    setHoje(agora);
+    setData(textoDaData(somarDias(agora, 1)));
+  }, []);
 
   const equipe = profissionaisDisponiveis(clinica?.id ?? 0, especialidadeId);
   const profissionalValido = equipe.some((p) => p.id === profissionalId)
@@ -142,6 +183,17 @@ function FormularioDeConsulta({
 
   const especialidade = especialidadePorId(especialidadeId);
   const podeMarcar = oferecidas.length > 0 && equipe.length > 0;
+
+  const diaEscolhido = data === "" ? null : dataDoTexto(data);
+  /**
+   * A distância da consulta até hoje, na mesma convenção do resto da base:
+   * negativo é futuro. É este número que vai para o agendamento — a data
+   * escolhida no calendário serve só para chegar até ele.
+   */
+  const diasDaConsulta =
+    diaEscolhido && hoje ? diasAteAData(diaEscolhido, hoje) : null;
+  const dataNoPassado = diasDaConsulta !== null && diasDaConsulta > 0;
+  const dataValida = diasDaConsulta !== null && !dataNoPassado;
 
   if (!podeMarcar) {
     return (
@@ -187,17 +239,13 @@ function FormularioDeConsulta({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={rotulo}>Data</label>
-          <select
-            value={dias}
-            onChange={(e) => setDias(Number(e.target.value))}
+          <input
+            type="date"
+            value={data}
+            min={hoje ? textoDaData(hoje) : undefined}
+            onChange={(e) => setData(e.target.value)}
             className={`mt-1 ${campo}`}
-          >
-            {Array.from({ length: 15 }, (_, i) => i).map((d) => (
-              <option key={d} value={d}>
-                {d === 0 ? "hoje" : d === 1 ? "amanhã" : `em ${d} dias`}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div>
           <label className={rotulo}>Horário</label>
@@ -215,10 +263,23 @@ function FormularioDeConsulta({
         </div>
       </div>
 
+      {diaEscolhido && (
+        <p className="text-[11px] font-medium text-black/50">
+          {dataPorExtenso.format(diaEscolhido)}
+          {diasDaConsulta !== null && ` · ${quandoEmDias(diasDaConsulta)}`}
+        </p>
+      )}
+
       {especialidade && (
         <p className="text-[11px] font-medium text-black/50">
           A consulta leva {formatarDuracao(especialidade.duracaoMinutos)} — o
           horário de término sai daí, não é digitado.
+        </p>
+      )}
+
+      {dataNoPassado && (
+        <p className="text-[11px] font-bold text-herval-vermelho">
+          Essa data já passou. Escolha hoje ou um dia à frente.
         </p>
       )}
 
@@ -236,16 +297,18 @@ function FormularioDeConsulta({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() =>
+          disabled={!dataValida}
+          onClick={() => {
+            if (diasDaConsulta === null || dataNoPassado) return;
             aoAgendar({
               especialidadeId,
               profissionalId: profissionalValido,
-              consultaEmDias: -dias,
+              consultaEmDias: diasDaConsulta,
               hora,
               ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
-            })
-          }
-          className="flex-1 rounded-full bg-herval-verde px-4 py-2 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
+            });
+          }}
+          className="flex-1 rounded-full bg-herval-verde px-4 py-2 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
         >
           Confirmar
         </button>
