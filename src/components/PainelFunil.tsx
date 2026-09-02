@@ -234,7 +234,7 @@ function Cartao({
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
-        {/* Ponto de entrada do atendimento: o card do lead, sem lista nova. */}
+        {/* Atalho para o atendimento sem sair do funil. */}
         <Link
           href={`/atendimento/${tarefa.id}`}
           className="inline-flex items-center gap-1 text-xs font-bold text-black/55 transition-colors hover:text-herval-preto"

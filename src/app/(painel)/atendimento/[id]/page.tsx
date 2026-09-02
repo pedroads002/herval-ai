@@ -1,8 +1,12 @@
 import PainelAtendimento from "@/components/PainelAtendimento";
 
 /**
- * O atendimento de um lead. A rota entra pelo card do Funil, e não por uma
- * lista própria: duplicar a fila era o que a especificação pediu para evitar.
+ * O atendimento de um lead. Chega-se aqui pela lista de conversas em
+ * `/atendimento` ou pelo card do Funil — a tela é a mesma nos dois caminhos.
+ *
+ * A lista não é a segunda fila que a especificação pediu para evitar: aquela
+ * regra é sobre não repetir a medição da Fila de Atendimento, e aqui não se
+ * mede nada, só se ordena quem responder primeiro.
  */
 export default async function PaginaAtendimento({
   params,
