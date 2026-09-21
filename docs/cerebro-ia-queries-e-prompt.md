@@ -60,6 +60,31 @@ with ctx as (
 select
   ctx.*,
 
+  -- ── TRAVA 4: handoff humano em andamento ──────────────────────────────
+  -- Avaliada PRIMEIRA, apesar do número. É a mais específica e a mais
+  -- urgente: alguém da equipe está com a conversa na mão neste momento.
+  --
+  -- Quem escreve nesta coluna (conferido nos nodes em 21/09/2026):
+  --   Pausar IA1   grava 'pause'      quando a equipe manda qualquer
+  --                                   mensagem que não seja "Atendimento
+  --                                   finalizado"
+  --   Reativar IA1 grava 'reativada'  1 minuto depois de a equipe mandar
+  --                                   exatamente "Atendimento finalizado"
+  --                                   (o node Wait1 é essa espera)
+  --
+  -- A coluna guarda estado atual, não histórico: 'reativada' sobrescreve
+  -- 'pause'. Por isso não é preciso checar "e não foi reativada depois" —
+  -- se ainda diz 'pause', é porque ninguém reativou.
+  --
+  -- Valor inesperado bloqueia junto com 'pause'. Se um dia alguém gravar
+  -- 'pausado' ou 'PAUSE', o erro deve ser a IA calar, não a IA atropelar
+  -- um atendimento humano.
+  case
+    when ctx.lead_atendimento_ia is null                       then true
+    when lower(trim(ctx.lead_atendimento_ia)) = 'reativada'    then true
+    else false
+  end as trava4_ok,
+
   -- ── TRAVA 1: modo de atendimento da clínica ───────────────────────────
   -- Sem clínica vinculada, a IA não tem como saber o modo: não responde.
   -- "Só marketing" usa a mesma lista de origens pagas do painel
@@ -156,11 +181,22 @@ inexistente — trate como erro do chamador, não como lead novo.
 
 Nenhum deles calcula nada. Condição, em ordem:
 
-| Node | Condição (boolean, is true) | Falso vai para |
-|---|---|---|
-| `Trava 1 — Clínica permite?` | `{{ $json.trava1_ok }}` | `Gravar mensagem do lead` → fim |
-| `Trava 2 — Já houve conversa?` | `{{ $json.trava2_ok }}` | `Gravar + sinalizar CRC` → fim |
-| `Trava 3 — Especialidade ativa?` | `{{ $json.trava3_ok }}` | `Responder com texto fixo` → fim |
+| Ordem | Node | Condição (boolean, is true) | Falso vai para |
+|---|---|---|---|
+| 1º | `Trava 4 — Humano está atendendo?` | `{{ $json.trava4_ok }}` | `Gravar mensagem do lead` → fim |
+| 2º | `Trava 1 — Clínica permite?` | `{{ $json.trava1_ok }}` | `Gravar + sinalizar CRC` → fim |
+| 3º | `Trava 2 — Já houve conversa?` | `{{ $json.trava2_ok }}` | `Gravar + sinalizar CRC` → fim |
+| 4º | `Trava 3 — Especialidade ativa?` | `{{ $json.trava3_ok }}` | `Responder com texto fixo` → fim |
+
+A trava 4 vem primeiro apesar de ter o número maior. Como as quatro saem da
+mesma consulta, a ordem não muda quem bloqueia — muda só qual motivo fica
+registrado quando mais de uma barra ao mesmo tempo. E o motivo mais útil para
+quem for olhar depois é "tinha gente atendendo", não "a clínica está em modo X".
+
+**A trava 4 é a única que não sinaliza o CRC.** As outras gravam uma linha
+`Automática` pedindo atenção humana. Aqui o humano já está lá — avisar seria
+encher a conversa de recado para quem está lendo em tempo real. Grava só a
+mensagem do lead e para.
 
 ---
 
@@ -344,6 +380,22 @@ from ctx;
 | 12 | Especialidade pausada | ✓ | ✓ | ✗ | texto fixo + sinaliza |
 | 13 | Sem especialidade de interesse | ✓ | ✓ | ✓ | IA responde |
 
+E a trava 4, com a mesma técnica (sete casos, nenhuma escrita):
+
+| # | `atendimento_ia` | T4 | Resultado |
+|---|---|:--:|---|
+| 14 | `'pause'` | ✗ | humano está atendendo, IA cala |
+| 15 | `'reativada'` | ✓ | IA volta a responder |
+| 16 | `null` (nunca houve handoff) | ✓ | IA responde |
+| 17 | `'PAUSE'` | ✗ | valor inesperado bloqueia |
+| 18 | `'pausado'` | ✗ | valor inesperado bloqueia |
+| 19 | `'pause'` + clínica `Pausada` | ✗ | bloqueia pelo motivo da trava 4 |
+| 20 | `' Pause '` (espaço e maiúscula) | ✗ | bloqueia |
+
+Os casos 17, 18 e 20 são de propósito: se um dia alguém gravar um valor
+diferente de `'pause'` e `'reativada'`, o erro resultante deve ser a IA calar,
+nunca a IA atropelar uma conversa que um humano está conduzindo.
+
 O caso 11 é o que a regra existe para pegar: o lead está cadastrado, mas
 ninguém nunca falou com ele. A IA não abre conversa.
 
@@ -352,20 +404,64 @@ seguro — sem saber de onde o lead veio, não dá para afirmar que é de campan
 
 ---
 
-## 5. Três coisas para você decidir
+## 5. Um impedimento: hoje a trava 1 barraria 100% dos leads
 
-**a) Clínica inativa bloqueia a IA?** Coloquei `clinica_ativa is not true` na
-trava 1. A especificação não pede isso — ela só fala de `modo_atendimento`.
-Coloquei porque erra para o lado seguro, que é o critério que você mesmo
-estabeleceu. Se discordar, é apagar uma linha.
+Ao rastrear `atendimento_ia` pelos nodes, encontrei outra coisa. Procurei
+`clinica_id` no JSON inteiro do workflow — **112 nodes, zero ocorrências**.
+O mesmo para `especialidade_interesse_id` e para `clinicas.instancia_whatsapp`.
 
-**b) Todos os preços estão nulos.** As três linhas de `clinica_especialidades`
-existem com `valor` em branco. Do jeito que está, a Helô vai responder
-"confirmo com a equipe" para qualquer pergunta de preço — que é o
-comportamento correto, mas significa que nenhum teste de preço vai exercitar
-o caminho de verdade. Vale cadastrar ao menos um valor antes de testar.
+O node que cria lead, `Criar Cliente1`, grava exatamente quatro campos:
 
-**c) `leads.atendimento_ia` não é usado por nada aqui.** A coluna existe no
-banco, os nodes `Pausar IA1` e `Reativar IA1` escrevem nela, e nenhuma das três
-travas lê. Ou ela é uma quarta trava que ninguém documentou, ou é resto de um
-desenho antigo. Não inventei uso para ela — precisa de uma decisão sua.
+```
+nome      ← NomeWhatsapp
+telefone  ← remoteJid do webhook
+criado_em ← $now
+origem    ← "WhatsApp"   (literal, fixo)
+```
+
+Sem `clinica_id`. E a trava 1 barra lead sem clínica vinculada — decisão sua,
+confirmada, e correta. O resultado combinado é que **todo lead novo vindo do
+WhatsApp seria bloqueado**, sempre, com o motivo "lead sem clínica vinculada".
+A Helô nunca responderia ninguém.
+
+Isso não é defeito da trava. É um pedaço que falta antes dela: alguém precisa
+decidir de qual clínica é a conversa.
+
+A peça para isso já existe e está sem uso: **`clinicas.instancia_whatsapp`**.
+O webhook da Evolution API diz por qual instância a mensagem chegou; a coluna
+liga instância a clínica. É quase certamente para isso que ela foi criada.
+
+Não implementei porque é decisão de negócio, não de código:
+
+- Confirmar que `instancia_whatsapp` é mesmo o vínculo pretendido.
+- Definir o que fazer quando a instância não bater com nenhuma clínica —
+  bloquear (seguro) ou cair numa clínica padrão (arriscado com 12 clientes).
+- Decidir se `Criar Cliente1` passa a gravar `clinica_id` na criação, ou se um
+  node novo resolve isso antes das travas.
+
+Enquanto isso não for decidido, as travas estão certas mas o caminho feliz
+nunca acontece. Vale resolver antes de montar os nodes na cópia.
+
+Um efeito menor do mesmo achado: como `especialidade_interesse_id` também
+nunca é preenchido, a metade SQL da trava 3 hoje passa sempre. Quem segura
+especialidade pausada, na prática, é só o prompt. A trava continua valendo a
+pena — ela passa a funcionar no dia em que o interesse for registrado.
+
+---
+
+## 6. Onde ficaram as decisões
+
+**a) Clínica inativa bloqueia a IA — DECIDIDO (21/09/2026).** `clinica_ativa
+is not true` fica na trava 1. Erra para o lado seguro.
+
+**b) Preços nulos — em aberto, não bloqueante.** As três linhas de
+`clinica_especialidades` existem com `valor` em branco, e são dado real da
+clínica, não dado de teste. A Helô vai responder "confirmo com a equipe" em
+qualquer pergunta de preço — comportamento correto, mas nenhum teste de preço
+exercita o caminho de verdade enquanto isso. Quem cuida do cadastro vai
+preencher ao menos um valor antes dos cenários de preço.
+
+**c) `leads.atendimento_ia` — RESOLVIDO (21/09/2026).** Não era resto de
+desenho antigo: é o mecanismo de handoff humano manual, ativo. Virou a trava 4.
+
+**d) Vínculo lead ↔ clínica — em aberto e BLOQUEANTE.** Ver seção 5.
