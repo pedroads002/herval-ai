@@ -404,7 +404,81 @@ seguro — sem saber de onde o lead veio, não dá para afirmar que é de campan
 
 ---
 
-## 5. Um impedimento: hoje a trava 1 barraria 100% dos leads
+## 4-A. Impedimento maior: o pacote da Evolution não está instalado
+
+Descoberto em 21/09/2026. O pacote `n8n-nodes-evolution-api` não está
+instalado no servidor. Isso é mais amplo do que parecia:
+
+1. **Trava o envio de resposta.** Os nodes `Evolution API`,
+   `Enviar Mensagem WhatsApp` e `Enviar texto1` não rodam.
+2. **Trava toda edição programática do workflow.** Não é a ferramenta que não
+   reconhece o node — é o servidor que não tem o pacote, então a validação do
+   workflow inteiro falha. Testado: tentar acrescentar **um post-it** ao
+   workflow é recusado com `Unrecognized node type:
+   n8n-nodes-evolution-api.evolutionApi`.
+
+O ponto 2 desfaz uma suposição do handoff. A seção 4 dele atribuía o bloqueio
+de escrita a uma limitação da tool MCP e sugeria contornar pela API REST. Não
+contorna: a causa é a mesma do ponto 1, e vale para qualquer via de escrita.
+
+Consequência prática: **duplicar o workflow não ajuda em nada nesse ponto** —
+a cópia carrega os mesmos três nodes e é igualmente intocável. Enquanto o
+pacote não for instalado, qualquer construção precisa acontecer fora de um
+workflow que contenha nodes da Evolution.
+
+Instalar o pacote destrava as duas coisas de uma vez. É o item de maior
+prioridade da lista.
+
+---
+
+## 4-B. A trava 4 já existia — em `Rota Atendimento1`
+
+Ao procurar o ponto de emenda, encontrei o node `Rota Atendimento1`, um
+switch que já faz exatamente o que a trava 4 faria:
+
+| saída | condição | destino |
+|---|---|---|
+| 0 — "IA Ativa" | `atendimento_ia != 'pause'` | `ROTA Mensagens1` |
+| 1 — "IA pausada" | `atendimento_ia == 'pause'` | `Salvar Historico2` |
+
+Acrescentar a trava 4 como node novo criaria a mesma regra em dois lugares —
+o problema que este projeto passa a vida evitando. São duas saídas possíveis:
+
+**Apontar `Rota Atendimento1` para `trava4_ok`.** A regra passa a existir só
+na consulta, e o switch vira leitor. Exige que o contexto rode antes dele.
+
+**Deixar como está e tirar `trava4_ok` da consulta.** Menos mexida, mas perde
+o tratamento de valor inesperado.
+
+A diferença entre as duas implementações não é cosmética. A atual compara com
+`'pause'` exato: `'PAUSE'` ou `'pausado'` caem em "IA Ativa" e a IA atropela
+um atendimento humano. A da consulta bloqueia qualquer valor que não seja
+`'reativada'` ou nulo. Some-se a isso que a comparação atual roda com
+`typeValidation: strict` contra um campo que costuma ser nulo.
+
+Decisão pendente.
+
+---
+
+## 4-C. O vínculo lead ↔ clínica — decidido em 21/09/2026
+
+- `instancia_whatsapp` é **provavelmente** o vínculo certo (formato padrão da
+  Evolution API), mas o nome exato do campo no payload só pode ser confirmado
+  com um payload real. Não existe nenhum no histórico de execuções: a única
+  execução registrada falhou antes de chegar lá, pelo mesmo motivo do 4-A.
+  **Pendente de confirmação** assim que o pacote estiver instalado.
+- Instância sem clínica correspondente: **bloqueia e sinaliza humano.** Sem
+  clínica padrão automática.
+- Entra um node novo, **`Resolver Clínica`**, logo após o webhook — antes de
+  `Buscar Cliente1`/`Criar Cliente1` e antes das travas. Resolve `clinica_id`
+  pela instância; não achando, desvia para o bloqueio.
+- `Criar Cliente1` passa a gravar `clinica_id`.
+- `Buscar Cliente1` passa a filtrar por **telefone + clinica_id**, não só
+  telefone — evita misturar lead de clínicas diferentes com número parecido.
+
+---
+
+## 5. Consequência: hoje a trava 1 barraria 100% dos leads
 
 Ao rastrear `atendimento_ia` pelos nodes, encontrei outra coisa. Procurei
 `clinica_id` no JSON inteiro do workflow — **112 nodes, zero ocorrências**.
