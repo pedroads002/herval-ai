@@ -595,6 +595,71 @@ lead não for gravada, o resto não deve seguir como se tivesse sido.
 
 ---
 
+## 5-B. A perna da IA, depois das travas
+
+Montada em 22/09/2026. O `Liberado para a IA` deixou de ser node vazio:
+
+```
+Liberado para a IA
+  → Montar prompt          (Code)
+  → Chamar Claude          (HTTP Request)
+       ├ sucesso → Gravar resposta da IA
+       └ erro    → Sinalizar CRC — Falha na IA
+```
+
+### `Montar prompt`
+
+Um node Code, e não expressões espalhadas, por um motivo concreto: transformar
+histórico em turnos `user`/`assistant` não cabe numa expressão. A API da
+Anthropic exige alternância, então mensagens seguidas do mesmo lado precisam
+virar um turno só, e a conversa precisa começar pelo lead.
+
+Três detalhes que o código resolve e que não são óbvios:
+
+- **A mensagem nova não está no histórico.** `Contexto e Travas` roda *antes*
+  de `Gravar mensagem do lead` — de propósito, é o que faz `total_mensagens`
+  contar só o que veio antes, que é a pergunta da trava 2. Então a mensagem
+  que acabou de chegar é anexada ao prompt à parte.
+- **`json_agg` pode chegar como array ou como texto**, dependendo do driver.
+  A função `lista()` aceita os dois.
+- **Campo vazio vira `(nao cadastrado)`**, e o prompt diz explicitamente que
+  isso significa "não sei, vou confirmar" e nunca "não existe". Sem isso, a IA
+  preenche o buraco sozinha — "não trabalhamos com convênios" é uma frase que
+  ela inventaria com naturalidade, e que hoje seria mentira.
+
+### `Chamar Claude`
+
+`POST https://api.anthropic.com/v1/messages`, modelo `claude-sonnet-5` — o
+mesmo já configurado no `Anthropic Chat Model` do workflow principal. Resposta
+de WhatsApp é curta, então `max_tokens: 400`.
+
+A chave vem de uma **credencial do n8n** (`anthropicApi`), nunca escrita no
+node.
+
+**Duas tentativas, 2 segundos entre elas.** Uma oscilação de rede não deve
+virar chamado para humano. Se as duas falharem, aí sim.
+
+### O ramo de erro
+
+Seção 3.2 da especificação: falha na chamada não pode deixar o lead em
+silêncio, e muito menos virar resposta inventada. A saída de erro do HTTP grava
+uma linha `Automática` com a regra `Erro - chamada à IA falhou` e para.
+
+A mensagem do lead já foi gravada lá atrás, antes de qualquer decisão — então
+mesmo nesse caminho a conversa não some.
+
+### O que falta
+
+**Credencial da Anthropic.** É a única coisa entre isto e rodar os 4 cenários
+do `src/data/testeIa.ts` de ponta a ponta.
+
+Não há envio de WhatsApp aqui, e isso é de propósito: o webhook devolve a
+resposta gerada (o `returning id, texto` do último node), que é o que a seção
+3.1 item 9 da especificação pede para esta fase. Quem envia é o workflow
+principal, quando o pacote da Evolution for instalado.
+
+---
+
 ## 6. Onde ficaram as decisões
 
 **a) Clínica inativa bloqueia a IA — DECIDIDO (21/09/2026).** `clinica_ativa
