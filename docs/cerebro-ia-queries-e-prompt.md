@@ -590,8 +590,9 @@ Parte dinâmica entra concatenada dentro do array, com `+`.
 O mesmo defeito estava em `Gravar mensagem do lead`, e ali **não apareceu nos
 testes** porque os três trechos tinham chaves. Mas quebraria na primeira
 mensagem de lead com vírgula — que em texto de WhatsApp é quase toda. Foi
-corrigido junto, e o node ganhou `onError: stopWorkflow`: se a mensagem do
-lead não for gravada, o resto não deve seguir como se tivesse sido.
+corrigido junto: se a mensagem do lead não for gravada, o resto não deve
+seguir como se tivesse sido, e parar em erro já é o comportamento padrão do
+n8n para esse node.
 
 ---
 
@@ -630,14 +631,54 @@ Três detalhes que o código resolve e que não são óbvios:
 ### `Chamar Claude`
 
 `POST https://api.anthropic.com/v1/messages`, modelo `claude-sonnet-5` — o
-mesmo já configurado no `Anthropic Chat Model` do workflow principal. Resposta
-de WhatsApp é curta, então `max_tokens: 400`.
+mesmo já configurado no `Anthropic Chat Model` do workflow principal.
 
 A chave vem de uma **credencial do n8n** (`anthropicApi`), nunca escrita no
 node.
 
 **Duas tentativas, 2 segundos entre elas.** Uma oscilação de rede não deve
 virar chamado para humano. Se as duas falharem, aí sim.
+
+### O bloco de thinking — e por que `max_tokens: 400` estava errado
+
+Custou um teste com crédito real. No Sonnet 5 **o raciocínio é adaptativo e já
+vem ligado**: não é preciso pedir, e omitir o parâmetro não desliga. A resposta
+então chega assim:
+
+```json
+{ "content": [ {"type": "thinking", ...}, {"type": "text", "text": "..."} ] }
+```
+
+Duas consequências, e as duas mordem:
+
+**1. `content[0]` não é a resposta.** É o bloco de raciocínio. Ler por índice
+fixo pegava o bloco errado e o insert quebrava com `null value in column texto`.
+Procura-se **por tipo**, nunca por posição — e juntando todos os blocos de
+texto, porque pode vir mais de um.
+
+**2. O raciocínio consome do mesmo `max_tokens`.** Com 400, o teto podia se
+esgotar antes de sobrar espaço para a resposta. Subiu para **2000**, folgado
+para duas a quatro linhas, e o `effort` passou a **`low`** — conversa curta de
+WhatsApp não paga esforço alto, e é o nível indicado para esse tipo de rota.
+
+O `thinking` ficou ligado de propósito. Ajuda a respeitar as regras duras (não
+inventar valor, não oferecer procedimento pausado), que é onde um erro custa
+caro. Desligar é possível no Sonnet 5, se algum dia o custo pesar mais que isso.
+
+### `Extrair resposta`
+
+Existe porque há três casos em que a API responde **HTTP 200 e mesmo assim não
+existe resposta para o lead**:
+
+| Caso | `stop_reason` | O que seria gravado sem o node |
+|---|---|---|
+| A IA recusou | `refusal` | linha vazia, violando o `not null` |
+| Resposta cortada no meio | `max_tokens` | meia frase enviada a um paciente |
+| Nenhum bloco de texto | qualquer | linha vazia |
+
+Nos três o node falha alto, e a falha cai no mesmo `Sinalizar CRC - Falha na
+IA` do ramo de erro do HTTP. Chamar um humano é melhor que mandar qualquer
+coisa.
 
 ### O ramo de erro
 
