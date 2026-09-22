@@ -717,3 +717,52 @@ preencher ao menos um valor antes dos cenários de preço.
 desenho antigo: é o mecanismo de handoff humano manual, ativo. Virou a trava 4.
 
 **d) Vínculo lead ↔ clínica — em aberto e BLOQUEANTE.** Ver seção 5.
+
+---
+
+## 7. Mensageria real do WhatsApp — estado em 22/09/2026
+
+**O pacote da Evolution foi instalado.** O impedimento do 4-A caiu: a definição
+do node resolve e a escrita programática voltou a funcionar em workflows que
+contêm esses nós. Tudo que estava travado por ele está liberado.
+
+### Feito
+
+- **`mensagens.formato`** aceita agora `texto`, `audio`, `imagem` e `video`.
+  Nenhuma linha existente violava. Atenção: `src/data/mensagens.ts` ainda
+  declara `FormatoMensagem = "texto" | "audio"` — precisa alargar quando o
+  painel passar a ler do banco.
+- **`ROTA Mensagens1`** ganhou a saída `video` para `messageType =
+  "videoMessage"`, no mesmo formato das outras quatro.
+- **`Dados1`** mapeia `content_type = 'video'`, a URL do vídeo e a legenda
+  dele (a legenda entrou junto porque o node já fazia isso para imagem, e sem
+  ela o texto que o lead escreveu junto do vídeo se perderia).
+
+### Onde a mensagem do lead é gravada: em lugar nenhum
+
+Confirmado varrendo os 112 nós. Só **um** escreve em `mensagens`:
+`Cria Histórico Supabase1`, sempre com `remetente_tipo: 'IA'` e `formato:
+'texto'` fixos. Os nós `Salvar Historico2` e `Salvar Historico3` gravam em
+`n8n_chat_histories`, que é a memória do agente — não é histórico de CRM.
+
+Não precisa ser inventado: o node `Gravar mensagem do lead`, já construído e
+testado no `Helô - Travas (dev)`, faz exatamente isso. Entra junto com as
+travas, no transplante.
+
+### Três coisas que não foram feitas, e por quê
+
+**A saída de vídeo ficou sem ligação.** O caminho da imagem é
+`Edit Fields4 → Converter Foto1 → OpenAI (visão)`. Mandar vídeo por ali
+analisaria um vídeo como se fosse foto. Para onde o vídeo deve ir é decisão de
+negócio.
+
+**O `instanceName` fixo `"cheffin"` continua nos dois nós.** Trocar pela
+referência do `Evolution API` quebraria: `Enviar Mensagem WhatsApp` nasce do
+`Schedule Trigger3` e `Enviar texto1` do `Schedule Trigger` — **`Dados1` não
+está no caminho de nenhum dos dois**, e referenciar um node que não executou
+falha em tempo de execução. A fonte certa é `clinicas.instancia_whatsapp`,
+que existe e segue sem uso.
+
+**A captura de anúncio (CTWA) não foi codificada.** O próprio arquivo de
+payloads diz que `contextInfo.externalAdReply` é estimativa não validada.
+Continua pendente de um clique real num anúncio ou da documentação.
