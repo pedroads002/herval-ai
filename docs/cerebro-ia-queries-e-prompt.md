@@ -456,7 +456,14 @@ um atendimento humano. A da consulta bloqueia qualquer valor que não seja
 `'reativada'` ou nulo. Some-se a isso que a comparação atual roda com
 `typeValidation: strict` contra um campo que costuma ser nulo.
 
-Decisão pendente.
+**DECIDIDO em 21/09/2026: `Rota Atendimento1` passa a ler `trava4_ok`.** A
+regra fica só na consulta e o switch vira leitor.
+
+**Aplicado pela metade, e não por escolha.** No `Helô - Travas (dev)` já é
+assim por construção — o `Trava 4 — Humano atendendo?` lê `trava4_ok`. No
+workflow principal e na cópia, a edição está **bloqueada pelo 4-A**: não dá
+para tocar em `Rota Atendimento1` enquanto o pacote da Evolution não estiver
+instalado. Fica na fila do transplante.
 
 ---
 
@@ -520,6 +527,44 @@ Um efeito menor do mesmo achado: como `especialidade_interesse_id` também
 nunca é preenchido, a metade SQL da trava 3 hoje passa sempre. Quem segura
 especialidade pausada, na prática, é só o prompt. A trava continua valendo a
 pena — ela passa a funcionar no dia em que o interesse for registrado.
+
+---
+
+## 5-A. Estado da construção
+
+**`Helô - Travas (dev)`** — id `J1rCthAxvek0491j`, projeto pessoal, criado em
+22/09/2026, `active: false`. Doze nodes, conferidos no JSON bruto depois de
+criar.
+
+```
+Entrada de teste (webhook POST /helo-travas)
+  → Contexto e Travas          (uma consulta, os 4 vereditos + insumos)
+  → Gravar mensagem do lead    (antes de qualquer decisão)
+  → Trava 4 — Humano atendendo?
+       ├ não → Humano já está atendendo        (fim, sem sinalizar)
+       └ sim → Trava 1 — Clínica permite?
+                  ├ não → Sinalizar CRC — Trava 1
+                  └ sim → Trava 2 — Já houve conversa?
+                             ├ não → Sinalizar CRC — Trava 2
+                             └ sim → Trava 3 — Especialidade ativa?
+                                        ├ não → Sinalizar CRC — Trava 3
+                                        └ sim → Liberado para a IA
+```
+
+Os quatro `IF` leem `$('Contexto e Travas').item.json.travaN_ok`. Nenhum
+calcula nada — a regra existe só na consulta.
+
+`Liberado para a IA` é um node vazio de propósito: é onde entram o montar
+prompt, a chamada ao Claude e o gravar da resposta, na próxima fase.
+
+Nasceu fora do workflow principal pelo motivo do 4-A, não por preferência.
+Quando o pacote da Evolution for instalado, vira sub-workflow chamado pelo
+principal ou é transplantado para dentro dele.
+
+**Falta antes de rodar:** anexar a credencial de Postgres/Supabase aos cinco
+nodes de banco (`Contexto e Travas`, `Gravar mensagem do lead` e os três
+`Sinalizar CRC`). Nenhuma credencial existe na instância hoje — a criação
+não anexou nada, como esperado.
 
 ---
 
