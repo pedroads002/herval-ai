@@ -561,10 +561,37 @@ Nasceu fora do workflow principal pelo motivo do 4-A, não por preferência.
 Quando o pacote da Evolution for instalado, vira sub-workflow chamado pelo
 principal ou é transplantado para dentro dele.
 
-**Falta antes de rodar:** anexar a credencial de Postgres/Supabase aos cinco
-nodes de banco (`Contexto e Travas`, `Gravar mensagem do lead` e os três
-`Sinalizar CRC`). Nenhuma credencial existe na instância hoje — a criação
-não anexou nada, como esperado.
+Credencial `Supabase - Helô` anexada aos cinco nodes de banco em 22/09/2026.
+
+### Query Parameters: use um array, nunca texto solto com vírgula
+
+Esta é uma armadilha do node Postgres do n8n que custou três nodes quebrados.
+
+O campo *Query Parameters* **parece** aceitar uma lista separada por vírgula,
+misturando texto literal e expressões:
+
+```
+❌ ={{ $json.lead_id }},Primeiro contato deste lead.,Trava 2
+```
+
+O n8n descarta os trechos que não estão dentro de `{{ }}`. Sobra um parâmetro
+onde a query espera três, e o Postgres responde `there is no parameter $2`.
+
+O formato certo é **uma expressão só, devolvendo um array**:
+
+```
+✅ ={{ [$('Contexto e Travas').item.json.lead_id,
+       "Primeiro contato deste lead. A IA não abre conversa.",
+       "Trava 2 - primeiro contato é humano"] }}
+```
+
+Parte dinâmica entra concatenada dentro do array, com `+`.
+
+O mesmo defeito estava em `Gravar mensagem do lead`, e ali **não apareceu nos
+testes** porque os três trechos tinham chaves. Mas quebraria na primeira
+mensagem de lead com vírgula — que em texto de WhatsApp é quase toda. Foi
+corrigido junto, e o node ganhou `onError: stopWorkflow`: se a mensagem do
+lead não for gravada, o resto não deve seguir como se tivesse sido.
 
 ---
 
