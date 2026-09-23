@@ -766,3 +766,58 @@ que existe e segue sem uso.
 **A captura de anúncio (CTWA) não foi codificada.** O próprio arquivo de
 payloads diz que `contextInfo.externalAdReply` é estimativa não validada.
 Continua pendente de um clique real num anúncio ou da documentação.
+
+---
+
+## 8. Transplante para o `Helô - base` — 23/09/2026
+
+A cadeia validada no `Helô - Travas (dev)` entrou no workflow principal
+(`gDP9Cy9pPeRGaRS5`), que continua **inativo**. 112 → 120 nós.
+
+### O caminho da mensagem recebida, agora
+
+```
+ROTA Entrando ou Saindo1 [incoming]
+  → Contexto e Travas          os 4 vereditos + insumos, numa consulta
+  → Gravar mensagem do lead    antes de qualquer decisão
+  → Rota Atendimento1          passou a ler trava4_ok
+       ├ IA pausada → Salvar Historico2        (como antes)
+       └ IA Ativa   → Trava 1 → Trava 2 → Trava 3 → ROTA Mensagens1
+                        ↓         ↓         ↓
+                     Sinalizar CRC — Trava 1 / 2 / 3
+```
+
+**`ROTA Mensagens1` passou a ter uma única entrada: `Trava 3`.** É a
+verificação que importa — não existe caminho que chegue à IA sem passar pelas
+quatro travas.
+
+### Duas mudanças com consequência
+
+**`Rota Atendimento1` deixou de comparar `atendimento_ia` com `'pause'`.** Lê
+`trava4_ok`. Era obrigatório, não opcional: com nós novos antes dele, `$json`
+deixou de ser a linha do lead. De quebra resolveu o furo — `'PAUSE'` ou
+`'pausado'` agora bloqueiam em vez de liberar.
+
+**O `CASE` de tradução do formato.** `Dados1.content_type` fala inglês
+(`text`, `audio`, `image`, `video`) e `mensagens.formato` fala português. A
+tradução acontece dentro do `insert`, num lugar só, com `'texto'` como padrão
+para tipo desconhecido.
+
+### Removido
+
+`Supervisor1 → Busca Telefone1`, a conexão morta que a seção 7 do handoff
+pedia para tirar. O nó continua existindo, desativado e agora desconectado.
+
+### O que ainda impede a ativação
+
+1. **Credenciais da Evolution API e do Redis não existem.** Só há
+   `Supabase - Helô` e `Anthropic account`. Os nós de envio e o buffer de
+   mensagens falham na primeira execução real.
+2. **Destino da saída de vídeo** — decisão de negócio (seção 7).
+3. **Fonte do `instanceName`** — `clinicas.instancia_whatsapp` (seção 7).
+4. **Campo do CTWA** — pendente de payload real (seção 7).
+
+Uma observação para quando rodar: mensagem de áudio ou vídeo sem legenda grava
+`texto` vazio. O formato fica correto, e a lista do painel já mostra "Áudio"
+pelo `formato` — mas a bolha da conversa pode aparecer em branco. Vale decidir
+se o painel renderiza por formato ou se o `insert` guarda um marcador.
