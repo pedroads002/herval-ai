@@ -1258,3 +1258,26 @@ de texto puro.** Não é só áudio.
 Saída possível sem contratar OpenAI: trocar o modelo do `Split de mensagens1`
 pelo Anthropic, que já tem credencial. Áudio continuaria precisando de OpenAI
 (a Anthropic não faz transcrição), e imagem também, do jeito que está.
+
+### A troca do modelo do Split
+
+Feita em 23/09/2026. `Split de mensagens1` passou a usar **`Anthropic Split`**
+(`claude-sonnet-5`, a credencial que já existia). O `OpenAI Split1` ficou
+desativado e desconectado.
+
+Nó próprio, e não o mesmo do `Supervisor1`: um conversa com paciente, o outro
+só fatia texto em mensagens de WhatsApp. Separados, dá para ajustar um sem
+mexer no outro.
+
+Modelo igual ao do `Supervisor1` porque foi a escolha já feita neste workflow —
+não é recomendação minha para a tarefa. Fatiar texto é mecânico e caberia num
+modelo menor; se o custo pesar, é o primeiro lugar a olhar.
+
+**O que observar no teste:** o `Split de mensagens1` tem um
+`outputParserStructured` esperando `{ "messages": [...] }`. Trocar o modelo
+troca quem obedece esse formato. Se a resposta vier fora do esquema, é aí.
+
+Depois da troca, o caminho do texto não depende mais de OpenAI. Continuam
+dependendo, e seguem sem credencial: `OpenAI5` (transcrição de áudio) e
+`OpenAI` (descrição de imagem). Áudio não tem saída pela Anthropic — ela não
+transcreve.
