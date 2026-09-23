@@ -34,11 +34,42 @@ export type Remetente = {
 };
 
 /**
- * Texto ou áudio. O formato importa porque a régua de atendimento pede que a
- * conversa seja majoritariamente em nota de voz depois que as ligações falham
- * — sem este campo não há como conferir se foi isso que aconteceu.
+ * Texto, áudio, imagem ou vídeo. O formato importa porque a régua de
+ * atendimento pede que a conversa seja majoritariamente em nota de voz depois
+ * que as ligações falham — sem este campo não há como conferir se foi isso que
+ * aconteceu. Imagem e vídeo entraram quando o WhatsApp real passou a alimentar
+ * a tabela; o CHECK de `mensagens.formato` aceita os quatro.
  */
-export type FormatoMensagem = "texto" | "audio";
+export type FormatoMensagem = "texto" | "audio" | "imagem" | "video";
+
+/** Os formatos que não são texto, com os dois rótulos que a tela usa. */
+export const formatosDeMidia = {
+  audio: { curto: "áudio", semTexto: "Áudio enviado" },
+  imagem: { curto: "imagem", semTexto: "Imagem enviada" },
+  video: { curto: "vídeo", semTexto: "Vídeo enviado" },
+} as const;
+
+export type FormatoDeMidia = keyof typeof formatosDeMidia;
+
+export function ehMidia(formato: FormatoMensagem): formato is FormatoDeMidia {
+  return formato !== "texto";
+}
+
+/**
+ * O que a tela mostra no lugar do texto da mensagem.
+ *
+ * Áudio e vídeo chegam do WhatsApp sem legenda com frequência, e uma bolha
+ * vazia não diz nada a quem está lendo a conversa. O rótulo é decisão de
+ * exibição e mora aqui: o que está gravado continua sendo o texto real, vazio
+ * como veio. Inventar conteúdo no banco seria pior que uma bolha sem graça —
+ * quem lê o histórico depois não teria como saber o que o lead escreveu e o
+ * que o sistema preencheu por ele.
+ */
+export function textoVisivel(mensagem: Pick<Mensagem, "texto" | "formato">) {
+  const texto = mensagem.texto.trim();
+  if (texto !== "") return texto;
+  return ehMidia(mensagem.formato) ? formatosDeMidia[mensagem.formato].semTexto : "";
+}
 
 /**
  * Confirmação vinda do WhatsApp. Nasce vazia de propósito: sem a integração

@@ -821,3 +821,73 @@ Uma observação para quando rodar: mensagem de áudio ou vídeo sem legenda gra
 `texto` vazio. O formato fica correto, e a lista do painel já mostra "Áudio"
 pelo `formato` — mas a bolha da conversa pode aparecer em branco. Vale decidir
 se o painel renderiza por formato ou se o `insert` guarda um marcador.
+
+---
+
+## 9. Vídeo, bolha sem texto, e uma regressão que eu causei
+
+### A regressão, primeiro
+
+No transplante da seção 8 eu removi `Supervisor1 → Busca Telefone1`, seguindo
+a seção 7 do handoff. **Isso quebrou a gravação da resposta da IA.**
+
+A cadeia real era:
+
+```
+Supervisor1 → [Busca Telefone1] → [If] → [Adiciona CHAT supabase1] → Cria Histórico Supabase1
+                 desativado      desativado     desativado              ATIVO
+```
+
+No n8n, **nó desativado passa o dado adiante**. Os três desativados eram um
+cano, e `Cria Histórico Supabase1` — o único nó que grava a resposta da IA em
+`mensagens` — bebia dali. Cortar a ponta do cano secou o nó do fim.
+
+Nem o aviso de nó desconectado apontava para isso: ele reclamou do
+`Busca Telefone1`, que é inerte, e não do nó ativo que dependia dele.
+
+Consertado ligando **`Supervisor1 → Cria Histórico Supabase1` direto**. Melhor
+que restaurar a ligação antiga: acaba a dependência de passagem por nós
+desativados, que foi o que escondeu o problema.
+
+### Vídeo recebido
+
+```
+ROTA Mensagens1 [video]
+  → Resposta padrão - vídeo   (Set: o texto mora aqui, num lugar só)
+  → Responder vídeo           (envio próprio)
+  → Gravar resposta - vídeo   (Automática, status enviada)
+```
+
+Não processa o vídeo. O conteúdo já ficou salvo pelo `Gravar mensagem do lead`
+para a equipe revisar; aqui é só o acolhimento.
+
+Três decisões: o texto vive num nó `Set` para não existir duas vezes (envio e
+gravação leem dele); o envio tem nó próprio em vez de reusar o `Evolution API`,
+que vive dentro do laço que fatia a resposta da IA em várias mensagens; e a
+gravação vem **depois** do envio, com `status: 'enviada'`, para o histórico só
+registrar o que de fato saiu.
+
+E, por construção, esse ramo está depois das quatro travas — um vídeo de lead
+em primeiro contato, ou de clínica pausada, não recebe a resposta padrão.
+
+### Bolha sem texto
+
+`textoVisivel()` em `mensagens.ts`: devolve o texto quando existe, e o rótulo
+do formato quando não existe. A mesma função alimenta a bolha da conversa e o
+trecho da lista de Atendimento, para as duas telas nunca discordarem.
+
+**O `insert` não mudou** — continua gravando o texto real, vazio como veio.
+O rótulo é decisão de exibição. Inventar conteúdo no banco tiraria de quem lê
+o histórico a capacidade de distinguir o que o lead escreveu do que o sistema
+preencheu por ele.
+
+Usei ícone do lucide (`Mic`, `Image`, `Video`) em vez de emoji, para ficar
+igual ao resto do painel. Se preferir o emoji, é uma linha.
+
+Sete casos testados na função, incluindo texto só com espaços e mídia **com**
+legenda (que mostra a legenda, não o rótulo).
+
+**O que não deu para verificar ao vivo:** a bolha vazia em si. Os dados fixos
+do painel não têm nenhuma mensagem sem texto — isso só aparece quando o
+WhatsApp real gravar. Conferi que a conversa atual continua renderizando igual,
+e a lógica por teste direto.

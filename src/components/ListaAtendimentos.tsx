@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ListFilter, MessageSquare, Search } from "lucide-react";
 import { useLeads } from "@/components/ProvedorLeads";
-import { ehDoLead, indexarMensagens, ultimaMensagem } from "@/data/mensagens";
+import {
+  ehDoLead,
+  indexarMensagens,
+  textoVisivel,
+  ultimaMensagem,
+} from "@/data/mensagens";
 import { nomeDaClinica } from "@/data/clinicas";
 import { minutosDeDias, tempoRelativo } from "@/lib/tempo";
 import { situacaoDaEtapa, type Tarefa } from "@/data/tarefas";
@@ -77,9 +82,10 @@ export default function ListaAtendimentos() {
         const doLead = ehDoLead(ultima);
         return {
           tarefa,
-          trecho:
-            (doLead ? "" : "Você: ") +
-            (ultima.formato === "audio" ? "Áudio" : ultima.texto),
+          // Mídia com legenda mostra a legenda; sem legenda, o rótulo do
+          // formato. É a mesma função que a bolha da conversa usa, para a
+          // lista e a tela do lead nunca discordarem sobre o que foi dito.
+          trecho: (doLead ? "" : "Você: ") + textoVisivel(ultima),
           quando: ultima.minutosAtras,
           aguardando: doLead && !fechado,
           fechado,
