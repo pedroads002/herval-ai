@@ -891,3 +891,63 @@ legenda (que mostra a legenda, não o rótulo).
 do painel não têm nenhuma mensagem sem texto — isso só aparece quando o
 WhatsApp real gravar. Conferi que a conversa atual continua renderizando igual,
 e a lógica por teste direto.
+
+---
+
+## 10. A instância do WhatsApp vem da clínica — 23/09/2026
+
+O `"cheffin"` fixo saiu dos dois nós de envio agendado. Nenhuma das duas
+cadeias consultava clínica, então entraram dois nós de consulta:
+
+```
+AI Agent1       → Resolver instância - chat     → Tem instância? → Enviar texto1
+Secretary Agent → Resolver instância - lembrete → Tem instância? → Enviar Mensagem WhatsApp
+                                                         ↓ não
+                                             Sinalizar CRC - sem instância
+```
+
+### A consulta, e por que ela normaliza o telefone
+
+```sql
+select l.id as lead_id, c.instancia_whatsapp
+from leads l
+left join clinicas c on c.id = l.clinica_id
+where regexp_replace(l.telefone, '\D', '', 'g')
+    = regexp_replace($1::text, '\D', '', 'g')
+order by l.criado_em desc
+limit 1;
+```
+
+A normalização não é zelo: **sem ela a consulta nunca acharia nada.**
+`Criar Cliente1` grava `leads.telefone` a partir do `remoteJid`, ou seja o JID
+completo (`5511977776666@s.whatsapp.net`); já `Extrair Número do Cliente1`
+produz só dígitos, de um regex sobre a descrição do evento do Calendar.
+Comparar os dois direto daria zero sempre.
+
+Testado no banco com os três formatos — JID, dígitos crus e número formatado
+com parênteses e hífen. Os três casam com o mesmo lead; telefone desconhecido
+devolve nada.
+
+### Os dois jeitos de não enviar
+
+| Situação | O que acontece |
+|---|---|
+| Telefone não casa com nenhum lead | a consulta devolve **zero linhas** e a cadeia para. Sem envio e sem registro — não há lead a que anexar a nota. |
+| Lead existe, clínica sem instância | um lead existe, então grava linha `Automática` com a regra `Envio bloqueado - sem instância`, **sem `status`** (não foi enviada). |
+
+### Um efeito imediato que vale saber
+
+**Nenhuma clínica tem `instancia_whatsapp` preenchida hoje.** Com os dados
+atuais, todo envio agendado cai no ramo de bloqueio e sinaliza em vez de
+enviar. É o comportamento correto — e é bem melhor que mandar para `"cheffin"`,
+que não existe — mas significa que preencher essa coluna virou pré-requisito
+de qualquer envio.
+
+### Um erro que a inserção quase causou
+
+`Enviar Mensagem WhatsApp` lia o texto de `{{ $json.output }}`. Com nós novos
+antes dele, `$json` deixaria de ser a saída do `Secretary Agent` e passaria a
+ser a linha da consulta — o envio sairia sem texto. Passou a referenciar
+`$('Secretary Agent')` explicitamente. É o mesmo tipo de armadilha do
+`Rota Atendimento1` na seção 8: inserir um nó no meio de uma cadeia muda o que
+`$json` significa dali para frente.
