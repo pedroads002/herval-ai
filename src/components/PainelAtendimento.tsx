@@ -78,6 +78,7 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
   const [nota, setNota] = useState("");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   const tarefa = tarefas.find((t) => t.id === leadId);
 
@@ -460,15 +461,22 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
             />
             <button
               type="button"
-              disabled={texto.trim() === ""}
-              onClick={() => {
-                enviarMensagem(tarefa.id, texto);
-                setTexto("");
+              disabled={texto.trim() === "" || enviando}
+              onClick={async () => {
+                const conteudo = texto;
+                setEnviando(true);
+                setAviso(null);
+                const resultado = await enviarMensagem(tarefa.id, conteudo);
+                setEnviando(false);
+                // O texto só some do campo se a mensagem saiu. Dando errado,
+                // ele continua lá para o CRC reenviar sem redigitar.
+                if (resultado.enviada) setTexto("");
+                else setAviso(resultado.motivo ?? "A mensagem não foi enviada.");
               }}
               className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
             >
               <Send className="h-4 w-4" />
-              Enviar
+              {enviando ? "Enviando..." : "Enviar"}
             </button>
           </div>
         </section>

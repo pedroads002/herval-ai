@@ -1114,3 +1114,85 @@ Construir isso é trabalho novo dos dois lados: uma rota no Next que recebe o
 texto, e um webhook no n8n que grava em `mensagens` como `Humano` e manda pela
 Evolution — ou o painel falando direto com a Evolution, o que espalharia a
 credencial para o servidor do painel.
+
+---
+
+## 13. O envio manual do CRC — 23/09/2026
+
+Antes disto, a resposta que o CRC escrevia na tela não saía do navegador.
+Agora existe o caminho inteiro.
+
+### Workflow próprio, e não dentro do `Helô - base`
+
+**`Helô - Envio manual do CRC`** — id `8pTjqhisibOKbZOv`, 7 nós.
+
+Separado de propósito: **pode ser ativado sem ligar a IA.** O `Helô - base`
+tem 135 nós e não está pronto para ir ao ar; o envio humano está, e não faz
+sentido um esperar o outro.
+
+```
+Entrada do painel (POST /crc/enviar, header auth)
+  → Resolver destino (Postgres: telefone e instância, do banco)
+  → Tem para onde mandar?
+       ├ sim → Enviar pela Evolution → Gravar como Humano → Resposta - enviada
+       └ não → Resposta - não enviada (com o motivo)
+```
+
+### Duas coisas que o navegador não decide
+
+**Para quem vai.** O telefone e a instância saem do banco, dentro do n8n. O
+que o painel manda serve para *conferir*, não para endereçar — a consulta
+exige que o `leadId` **e** o telefone batam:
+
+```sql
+where l.id = $1::int
+  and regexp_replace(l.telefone, '\D', '', 'g')
+    = regexp_replace($2::text, '\D', '', 'g')
+```
+
+Isso não é zelo abstrato. O painel roda sobre dado fixo, cujos ids **não
+correspondem** aos do banco. Sem a conferência, um id que coincidisse mandaria
+WhatsApp para a pessoa errada. Com ela, id coincidente sem telefone igual não
+envia nada.
+
+**Quem está falando.** O `autor` sai da sessão do Supabase, no servidor. Um
+cliente adulterado não assina como outra pessoa.
+
+### A rota do Next
+
+`src/app/api/crc/enviar/route.ts`. Exige sessão, valida a entrada e repassa ao
+n8n com o token no cabeçalho.
+
+Ela não fala com a Evolution direto, e isso foi escolha: assim a credencial da
+Evolution existe **num lugar só**. Se o painel mandasse direto, a mesma chave
+passaria a viver também no servidor do Next — dois lugares para girar quando
+ela mudar.
+
+Três variáveis novas, todas **sem `NEXT_PUBLIC_`**: `N8N_ENVIO_URL`,
+`N8N_ENVIO_TOKEN` e `N8N_ENVIO_HEADER`. O token é o que autoriza mandar
+WhatsApp em nome da clínica; no navegador, qualquer pessoa com o console
+aberto poderia usá-lo.
+
+### A ordem importa: envia, depois mostra
+
+A mensagem só entra na conversa depois de a rota confirmar que saiu. Mostrar
+primeiro e desfazer depois faria o CRC acreditar que respondeu quando não
+respondeu — e ninguém confere o WhatsApp para saber se a tela disse a verdade.
+
+Dando errado: o motivo aparece no aviso e **o texto continua no campo**, para
+reenviar sem redigitar.
+
+### Testado ao vivo
+
+- Sem sessão: o proxy barra antes da rota (307 para `/login`).
+- Com sessão e sem configuração: `503` com "O envio não está configurado neste
+  ambiente".
+- Na tela: o aviso aparece, a mensagem **não** entra na conversa, e o texto
+  permanece no campo.
+
+### O que falta para funcionar de fato
+
+1. Criar no n8n a credencial **Header Auth** `Painel Helô - envio manual` (o
+   nó já a referencia, vazia).
+2. Preencher `N8N_ENVIO_URL` e `N8N_ENVIO_TOKEN` no `.env.local` e na Vercel.
+3. **Ativar o `Helô - Envio manual do CRC`** — só ele, não o `Helô - base`.
