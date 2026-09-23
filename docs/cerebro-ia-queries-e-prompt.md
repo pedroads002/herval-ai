@@ -951,3 +951,93 @@ ser a linha da consulta — o envio sairia sem texto. Passou a referenciar
 `$('Secretary Agent')` explicitamente. É o mesmo tipo de armadilha do
 `Rota Atendimento1` na seção 8: inserir um nó no meio de uma cadeia muda o que
 `$json` significa dali para frente.
+
+---
+
+## 11. O buffer de rajada saiu do Redis — 23/09/2026
+
+Não havia Redis nenhum configurado: zero credenciais do tipo, e os sete nós
+Redis sem credencial. Em vez de provisionar um serviço, o buffer passou a sair
+da própria conversa — que já é gravada em `mensagens` desde o transplante.
+
+### Como era e como ficou
+
+| | Redis | Postgres |
+|---|---|---|
+| Onde a mensagem ficava | lista com chave = telefone | `mensagens`, onde já estava |
+| Quem desempatava | comparar o **texto** da mensagem com o último da lista | comparar o **id** |
+| Limpar depois | dois nós de `delete` | nada a limpar |
+| Transcrição do áudio | empilhada só na lista | **atualiza a linha do CRM** |
+
+```
+ROTA Mensagens1 [texto] ────────────────────────────┐
+OpenAI5 → Texto do áudio ─────┐                     │
+If7 → Texto da imagem ────────┼→ Atualizar texto ───┤
+If7 → Texto da imagem c/ leg ─┘    da mídia         │
+                                                     ▼
+                                                 Mensagem1
+                                                     ↓
+                                          Intervalo entre Mensagens1
+                                                     ↓
+                                            Mensagens pendentes
+                                                     ↓
+                                             Compara Memoria
+                                    ├ sou a última → Mensagem Completa → Supervisor1
+                                    └ não sou      → No Operation
+```
+
+### A consulta que substitui o buffer
+
+```sql
+select
+  coalesce(string_agg(nullif(btrim(texto), ''), E'\n' order by id), '') as mensagem_completa,
+  coalesce(max(id), 0)::int as ultima_id,
+  count(*)::int as quantas
+from mensagens
+where lead_id = $1::int
+  and remetente_tipo = 'Lead'
+  and id > coalesce((select max(id) from mensagens
+                      where lead_id = $1::int
+                        and remetente_tipo <> 'Lead'), 0);
+```
+
+A fronteira do "já respondido" é a última linha que **não** é do lead. Ela anda
+sozinha quando a resposta é gravada — por isso não existe buffer para limpar,
+e os dois nós de `delete` do Redis deixaram de ter função.
+
+### Três ganhos que não eram o objetivo
+
+**O desempate ficou correto.** O anterior comparava o *texto* da mensagem com
+o último item da lista. Se o lead mandasse "oi" duas vezes seguidas, as duas
+execuções se achariam a última e a Helô responderia duas vezes. Comparando id,
+isso não acontece.
+
+**A transcrição do áudio entra no histórico.** Antes ela só existia dentro da
+lista do Redis, e a linha em `mensagens` ficava sem texto. Agora o nó
+`Atualizar texto da mídia` atualiza a mesma linha — o CRM passa a mostrar o que
+foi dito no áudio, não "Áudio enviado".
+
+**Um serviço a menos** para provisionar, monitorar e que pode cair.
+
+### Testado
+
+Quatro execuções simuladas no banco, sem gravar nada. Rajada de três mensagens:
+as duas primeiras param, a terceira responde, e as três veem o mesmo texto
+agrupado. Lead sem resposta anterior: pega tudo desde o começo. Mensagem em
+branco no meio: fica fora do texto agrupado.
+
+### A janela é de 1 segundo — e provavelmente é curta demais
+
+`Intervalo entre Mensagens1` tem `amount: 1` e nenhuma unidade. O padrão do nó
+Wait é **segundos**, então o agrupamento só pega mensagens separadas por menos
+de um segundo.
+
+Isso é anterior a esta mudança, mas importa: com um segundo, alguém digitando
+"Oi" e depois "quanto custa?" recebe duas respostas. Janela típica de digitação
+é de 5 a 15 segundos. Não mexi porque é decisão de produto — mais janela
+significa resposta mais lenta.
+
+### Os sete nós do Redis
+
+Desativados **e desconectados**. As duas coisas: no n8n, nó desativado passa o
+dado adiante, e foi exatamente isso que escondeu a regressão da seção 9.
