@@ -83,7 +83,7 @@ type ValorContexto = {
     leadId: number,
     texto: string,
     formato?: FormatoMensagem,
-  ) => void;
+  ) => Promise<ResultadoDoEnvio>;
   /**
    * Registra uma tentativa de ligação e aplica a régua: o número da tentativa
    * sai das anteriores, e a etapa se move sozinha conforme o desfecho.
@@ -98,6 +98,9 @@ type ValorContexto = {
   ) => Consequencia;
   adicionarNota: (leadId: number, texto: string) => void;
 };
+
+/** O que a rota de envio devolve, e que a tela mostra quando dá errado. */
+export type ResultadoDoEnvio = { enviada: boolean; motivo?: string };
 
 const ContextoLeads = createContext<ValorContexto | null>(null);
 
@@ -320,10 +323,46 @@ export default function ProvedorLeads({
    * Mensagem enviada pelo painel é do CRC, não da IA — por isso o remetente é
    * o usuário logado, e não há regra de automação por trás dela.
    */
+  /**
+   * Manda a resposta do CRC para o WhatsApp do lead, via /api/crc/enviar.
+   *
+   * A mensagem só entra na conversa depois de a rota confirmar que saiu. A
+   * ordem importa: mostrar primeiro e desfazer depois faria o CRC acreditar
+   * que respondeu quando não respondeu — e ninguém confere o WhatsApp para
+   * saber se a tela disse a verdade.
+   */
   const enviarMensagem = useCallback(
-    (leadId: number, texto: string, formato: FormatoMensagem = "texto") => {
+    async (
+      leadId: number,
+      texto: string,
+      formato: FormatoMensagem = "texto",
+    ): Promise<ResultadoDoEnvio> => {
       const conteudo = texto.trim();
-      if (!conteudo) return;
+      if (!conteudo) return { enviada: false, motivo: "A mensagem está vazia." };
+
+      const lead = tarefas.find((t) => t.id === leadId);
+      if (!lead) return { enviada: false, motivo: "Lead não encontrado." };
+
+      let resultado: ResultadoDoEnvio;
+      try {
+        const resposta = await fetch("/api/crc/enviar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            leadId,
+            telefone: lead.telefone,
+            texto: conteudo,
+          }),
+        });
+        resultado = (await resposta.json()) as ResultadoDoEnvio;
+      } catch {
+        return {
+          enviada: false,
+          motivo: "Sem conexão com o painel. A mensagem não foi enviada.",
+        };
+      }
+
+      if (!resultado.enviada) return resultado;
 
       setMensagens((atuais) => [
         ...atuais,
@@ -334,10 +373,13 @@ export default function ProvedorLeads({
           formato,
           minutosAtras: 0,
           texto: conteudo,
+          status: "enviada",
         },
       ]);
+
+      return resultado;
     },
-    [agenteHumano],
+    [agenteHumano, tarefas],
   );
 
   /**

@@ -4,11 +4,24 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Image as ImagemIcone,
+  Mic,
   Move,
   Phone,
   Send,
   StickyNote,
+  Video,
 } from "lucide-react";
+
+/** O ícone que acompanha a bolha quando a mensagem chegou sem texto. */
+const iconeDoFormato: Record<
+  FormatoDeMidia,
+  typeof Mic
+> = {
+  audio: Mic,
+  imagem: ImagemIcone,
+  video: Video,
+};
 import { useLeads } from "@/components/ProvedorLeads";
 import MenuDeEtapa, { type PassoDoMenu } from "@/components/MenuDeEtapa";
 import {
@@ -29,7 +42,14 @@ import {
   type EstadoDaRegua,
 } from "@/lib/regua";
 import { duracao } from "@/lib/tempo";
-import { conversaDoLead, ehDoLead } from "@/data/mensagens";
+import {
+  conversaDoLead,
+  ehDoLead,
+  ehMidia,
+  formatosDeMidia,
+  textoVisivel,
+  type FormatoDeMidia,
+} from "@/data/mensagens";
 import { ligacoesDoLead } from "@/data/ligacoes";
 import { notasDoLead } from "@/data/notas";
 import { mudancasDoLead } from "@/data/historicoEtapas";
@@ -58,6 +78,7 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
   const [nota, setNota] = useState("");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   const tarefa = tarefas.find((t) => t.id === leadId);
 
@@ -392,22 +413,30 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
                         <span className="text-[11px] font-medium text-black/40">
                           {tempoRelativo(mensagem.minutosAtras)}
                         </span>
-                        {mensagem.formato === "audio" && (
+                        {ehMidia(mensagem.formato) && (
                           <span className="rounded-full border border-black/15 px-2 py-0.5 text-[10px] font-bold text-black/50">
-                            áudio
+                            {formatosDeMidia[mensagem.formato].curto}
                           </span>
                         )}
                       </div>
 
                       <p
                         className={[
-                          "mt-1 rounded-controle px-3.5 py-2.5 text-sm leading-relaxed",
+                          "mt-1 flex items-center gap-2 rounded-controle px-3.5 py-2.5 text-sm leading-relaxed",
                           doLead
                             ? "bg-black/[0.05] text-black/75"
                             : "bg-herval-verde/15 text-herval-preto",
+                          // Sem texto, a bolha vira um rótulo do que chegou.
+                          mensagem.texto.trim() === "" ? "italic text-black/55" : "",
                         ].join(" ")}
                       >
-                        {mensagem.texto}
+                        {mensagem.texto.trim() === "" &&
+                          ehMidia(mensagem.formato) &&
+                          (() => {
+                            const Icone = iconeDoFormato[mensagem.formato];
+                            return <Icone className="h-4 w-4 shrink-0" />;
+                          })()}
+                        {textoVisivel(mensagem)}
                       </p>
 
                       {mensagem.regra && (
@@ -432,15 +461,22 @@ export default function PainelAtendimento({ leadId }: { leadId: number }) {
             />
             <button
               type="button"
-              disabled={texto.trim() === ""}
-              onClick={() => {
-                enviarMensagem(tarefa.id, texto);
-                setTexto("");
+              disabled={texto.trim() === "" || enviando}
+              onClick={async () => {
+                const conteudo = texto;
+                setEnviando(true);
+                setAviso(null);
+                const resultado = await enviarMensagem(tarefa.id, conteudo);
+                setEnviando(false);
+                // O texto só some do campo se a mensagem saiu. Dando errado,
+                // ele continua lá para o CRC reenviar sem redigitar.
+                if (resultado.enviada) setTexto("");
+                else setAviso(resultado.motivo ?? "A mensagem não foi enviada.");
               }}
               className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
             >
               <Send className="h-4 w-4" />
-              Enviar
+              {enviando ? "Enviando..." : "Enviar"}
             </button>
           </div>
         </section>
