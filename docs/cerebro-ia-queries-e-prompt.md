@@ -1041,3 +1041,76 @@ significa resposta mais lenta.
 
 Desativados **e desconectados**. As duas coisas: no n8n, nó desativado passa o
 dado adiante, e foi exatamente isso que escondeu a regressão da seção 9.
+
+---
+
+## 12. Resolver Clínica, e por que os testes ainda não rodaram — 23/09/2026
+
+### O vínculo lead ↔ clínica fechou
+
+A decisão da seção 4-C virou nó. `Resolver Clínica` entra **depois** do
+`Normal ou Treinamento1` e antes do `Buscar Cliente1`:
+
+```sql
+select id as clinica_id, nome as clinica_nome, instancia_whatsapp
+from clinicas
+where instancia_whatsapp = $1::text
+limit 1;
+```
+
+Depois, e não antes, por um motivo concreto: `Normal ou Treinamento1` lê
+`$json.message.content`, e um nó novo no meio mudaria o que `$json` significa
+— a mesma armadilha do `Rota Atendimento1` e do `Enviar Mensagem WhatsApp`.
+
+**Não filtra por `ativa`** de propósito. Clínica inativa deve ser barrada pela
+trava 1, que grava o motivo no histórico, e não sumir em silêncio aqui.
+
+`Criar Cliente1` passou a gravar `clinica_id`, e `Buscar Cliente1` a filtrar
+por telefone **e** clínica.
+
+Testado: `helo-teste` resolve para a clínica 1; instância desconhecida devolve
+nada, e a cadeia para.
+
+### Sem isso, os sete testes dariam o mesmo resultado
+
+`Criar Cliente1` não gravava `clinica_id`, e a trava 1 barra lead sem clínica.
+Todo payload de teste terminaria em `Sinalizar CRC - Trava 1`, com o motivo
+"lead sem clínica vinculada". Sete execuções idênticas, nenhuma exercitando o
+que se queria testar.
+
+### Por que os testes não rodaram
+
+Os dois webhooks recusam POST enquanto o workflow está inativo:
+
+| URL | Resposta |
+|---|---|
+| `/webhook-test/<path>` | 404 — *"Click the 'Execute workflow' button on the canvas, then try again. In test mode, the webhook only works for one call after you click this button"* |
+| `/webhook/<path>` | 404 — *"The workflow must be active for a production URL to run successfully"* |
+
+E o `test_workflow` do n8n não serve: ele **fixa** todo nó com credencial, o
+que inclui os cinco Postgres e os quatro da Evolution. Não escreveria em
+`mensagens` nem exercitaria as travas — testaria a fiação, não o
+comportamento.
+
+Então os testes dependem de uma das duas: alguém clicar "Execute workflow" no
+canvas antes de cada disparo (uma chamada por clique, então sete cliques), ou
+o workflow ser ativado.
+
+### O envio pelo painel não existe
+
+Pergunta mais crítica da rodada, e a resposta é curta: **quando o CRC responde
+pela tela de atendimento, a mensagem não sai do navegador.**
+
+`enviarMensagem` em `ProvedorLeads.tsx` faz uma coisa só — `setMensagens`, que
+acrescenta um item ao estado do React. Não há `fetch`, não há webhook, não há
+Evolution. Recarregar a página apaga.
+
+Não é defeito: o painel foi construído como demonstração sobre dado fixo, e o
+comentário do provedor diz isso desde sempre. Mas significa que **o caminho
+humano → lead não existe em lugar nenhum** — nem pelo n8n, nem direto. Só o
+caminho da IA existe.
+
+Construir isso é trabalho novo dos dois lados: uma rota no Next que recebe o
+texto, e um webhook no n8n que grava em `mensagens` como `Humano` e manda pela
+Evolution — ou o painel falando direto com a Evolution, o que espalharia a
+credencial para o servidor do painel.
