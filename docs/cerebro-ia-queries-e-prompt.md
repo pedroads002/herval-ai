@@ -1196,3 +1196,65 @@ reenviar sem redigitar.
    nó já a referencia, vazia).
 2. Preencher `N8N_ENVIO_URL` e `N8N_ENVIO_TOKEN` no `.env.local` e na Vercel.
 3. **Ativar o `Helô - Envio manual do CRC`** — só ele, não o `Helô - base`.
+
+---
+
+## 14. O prompt do Supervisor1 era de outra empresa — 23/09/2026
+
+O `systemMessage` do `Supervisor1` tinha **22.461 caracteres da Gestall
+Marketing**: uma persona chamada Renata Soliver, vendendo consultoria de
+marketing **para** donos de clínica, com metodologia, prova social e horários
+que não são da Herval.
+
+É o oposto do que a Helô faz. Ela atende **paciente**, em nome da clínica.
+
+Resquício do template de onde este workflow foi clonado — a mesma origem do
+`instanceName` `"cheffin"`, das tabelas `chat_messages` e `n8n_chat_histories`,
+dos nós de RAG e do agente de calendário.
+
+Substituído pelo prompt da Helô. A ficha da clínica, os procedimentos ativos
+com valor, os pausados com roteiro, as objeções e os dados do lead **saem do
+`Contexto e Travas`**, não de texto fixo — a mesma fonte que as travas usam.
+
+Preservada a mecânica de ferramenta que não era da Gestall: o telefone
+repassado ao agente de agendamento, e a proibição de mexer na agenda direto.
+
+### Um detalhe de robustez
+
+As três listas (`objecoes`, `especialidades_ativas`, `roteiro_das_pausadas`)
+vêm de `json_agg`, que pode chegar como array ou como texto dependendo do
+driver. Cada expressão testa antes:
+
+```
+{{ (typeof X === 'string' ? JSON.parse(X) : X).map(...) }}
+```
+
+É o mesmo cuidado que a função `lista()` faz no `Montar prompt` do workflow
+isolado.
+
+---
+
+## 15. A dependência de OpenAI no caminho da resposta
+
+Cinco nós usam OpenAI e **nenhum tem credencial**; não existe credencial de
+OpenAI na conta.
+
+| Nó | Para quê | Está no caminho do texto? |
+|---|---|---|
+| `OpenAI Split1` | modelo do `Split de mensagens1` | **sim** |
+| `OpenAI5` | transcrição de áudio | só áudio |
+| `OpenAI` | descrição de imagem | só imagem |
+| `OpenAI Chat Model4` | modelo do `AI Agent1` (follow-up agendado) | não |
+| `OpenAI Chat Model5` | modelo do `Secretary Agent` (gatilho desativado) | não |
+
+O primeiro é o que importa: `Supervisor1 → Split de mensagens1 → Split de
+Mensagem1 → Loop Over Items4 → Evolution API`. O `Split de mensagens1` é uma
+cadeia de LLM que quebra a resposta em várias mensagens de WhatsApp, e o
+modelo dela é OpenAI.
+
+**Sem credencial de OpenAI, a resposta da IA não chega ao lead nem em conversa
+de texto puro.** Não é só áudio.
+
+Saída possível sem contratar OpenAI: trocar o modelo do `Split de mensagens1`
+pelo Anthropic, que já tem credencial. Áudio continuaria precisando de OpenAI
+(a Anthropic não faz transcrição), e imagem também, do jeito que está.
