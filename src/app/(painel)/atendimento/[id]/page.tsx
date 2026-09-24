@@ -1,3 +1,4 @@
+import AtualizacaoAutomatica from "@/components/AtualizacaoAutomatica";
 import ConversaReal from "@/components/ConversaReal";
 import { carregarConversa } from "@/lib/dados/atendimento";
 
@@ -30,13 +31,16 @@ export default async function PaginaDoAtendimento({
     Boolean(process.env.N8N_ENVIO_URL) && Boolean(process.env.N8N_ENVIO_TOKEN);
 
   return (
-    <ConversaReal
-      lead={lead}
-      mensagens={mensagens}
-      notas={notas}
-      clinica={clinica}
-      falha={falha}
-      envioConfigurado={envioConfigurado}
-    />
+    <>
+      <AtualizacaoAutomatica />
+      <ConversaReal
+        lead={lead}
+        mensagens={mensagens}
+        notas={notas}
+        clinica={clinica}
+        falha={falha}
+        envioConfigurado={envioConfigurado}
+      />
+    </>
   );
 }
