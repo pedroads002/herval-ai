@@ -3,22 +3,24 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ListFilter, MessageSquare, Search } from "lucide-react";
-import { useLeads } from "@/components/ProvedorLeads";
 import {
   ehDoLead,
   indexarMensagens,
   textoVisivel,
   ultimaMensagem,
 } from "@/data/mensagens";
-import { nomeDaClinica } from "@/data/clinicas";
-import { minutosDeDias, tempoRelativo } from "@/lib/tempo";
-import { situacaoDaEtapa, type Tarefa } from "@/data/tarefas";
+import { tempoRelativo } from "@/lib/tempo";
+import { situacaoDaEtapa } from "@/data/tarefas";
 import {
   combinaComBusca,
   combinaComFiltro,
   filtrosDeSituacao,
   type FiltroDeSituacao,
 } from "@/lib/filtros";
+import type {
+  LeadEmAtendimento,
+  MensagemEmAtendimento,
+} from "@/lib/dados/atendimento";
 
 /**
  * Venda Ganha e Venda Perdida não pedem atendimento, mesmo quando a última
@@ -26,8 +28,8 @@ import {
  * aberto. A regra sai de `situacaoDaEtapa`, a mesma que a Fila de Tarefas e o
  * Funil usam, para as três telas não discordarem sobre o mesmo lead.
  */
-function encerrado(tarefa: Tarefa) {
-  const situacao = situacaoDaEtapa(tarefa.etapa);
+function encerrado(lead: LeadEmAtendimento) {
+  const situacao = situacaoDaEtapa(lead.etapa);
   return situacao === "Ganho" || situacao === "Desqualificado";
 }
 
@@ -40,7 +42,7 @@ function encerrado(tarefa: Tarefa) {
  * essa pessoa está sem retorno.
  */
 type Conversa = {
-  tarefa: Tarefa;
+  lead: LeadEmAtendimento;
   trecho: string;
   quando: number;
   aguardando: boolean;
@@ -48,8 +50,15 @@ type Conversa = {
   esperaEmMinutos: number;
 };
 
-export default function ListaAtendimentos() {
-  const { tarefas, mensagens } = useLeads();
+export default function ListaAtendimentos({
+  leads,
+  mensagens,
+  falha,
+}: {
+  leads: LeadEmAtendimento[];
+  mensagens: MensagemEmAtendimento[];
+  falha: string | null;
+}) {
   const [busca, setBusca] = useState("");
   /**
    * "Todos" e não "Ativos" como padrão: aqui a lista já separa por si o que
@@ -63,25 +72,26 @@ export default function ListaAtendimentos() {
 
   const conversas = useMemo<Conversa[]>(
     () =>
-      tarefas.map((tarefa) => {
-        const ultima = ultimaMensagem(porLead, tarefa.id);
-        const chegada = minutosDeDias(tarefa.diasAtras);
-        const fechado = encerrado(tarefa);
+      leads.map((lead) => {
+        const ultima = ultimaMensagem(porLead, lead.id);
+        const fechado = encerrado(lead);
 
+        // Lead sem mensagem nenhuma: chegou e ninguém falou com ele. É a fila
+        // mais antiga que existe, e por isso entra pelo tempo de chegada.
         if (!ultima) {
           return {
-            tarefa,
+            lead,
             trecho: "Nenhuma mensagem ainda.",
-            quando: chegada,
+            quando: lead.minutosAtras,
             aguardando: !fechado,
             fechado,
-            esperaEmMinutos: chegada,
+            esperaEmMinutos: lead.minutosAtras,
           };
         }
 
         const doLead = ehDoLead(ultima);
         return {
-          tarefa,
+          lead,
           // Mídia com legenda mostra a legenda; sem legenda, o rótulo do
           // formato. É a mesma função que a bolha da conversa usa, para a
           // lista e a tela do lead nunca discordarem sobre o que foi dito.
@@ -92,15 +102,17 @@ export default function ListaAtendimentos() {
           esperaEmMinutos: ultima.minutosAtras,
         };
       }),
-    [tarefas, porLead],
+    [leads, porLead],
   );
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return conversas.filter(
-      ({ tarefa }) =>
-        combinaComBusca(tarefa, termo) && combinaComFiltro(tarefa, filtro),
-    );
+    return conversas.filter(({ lead }) => {
+      const filtravel = { ...lead, clinica: lead.nomeDaClinica };
+      return (
+        combinaComBusca(filtravel, termo) && combinaComFiltro(filtravel, filtro)
+      );
+    });
   }, [conversas, busca, filtro]);
 
   /**
@@ -130,6 +142,22 @@ export default function ListaAtendimentos() {
     () => visiveis.filter((c) => c.fechado).sort((a, b) => a.quando - b.quando),
     [visiveis],
   );
+
+  /**
+   * Falha de leitura não é lista vazia. Sem esta distinção, banco fora do ar e
+   * fila realmente vazia viram a mesma tela em branco — e a primeira é um
+   * defeito que o CRC interpretaria como "não tem ninguém para atender".
+   */
+  if (falha) {
+    return (
+      <div className="rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-6">
+        <p className="text-sm font-bold text-herval-preto">
+          Não deu para carregar as conversas.
+        </p>
+        <p className="mt-1 text-sm font-medium text-black/60">{falha}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-7">
@@ -238,7 +266,7 @@ function Secao({
       ) : (
         <ul className="space-y-2">
           {conversas.map((conversa) => (
-            <LinhaDaConversa key={conversa.tarefa.id} conversa={conversa} />
+            <LinhaDaConversa key={conversa.lead.id} conversa={conversa} />
           ))}
         </ul>
       )}
@@ -247,12 +275,12 @@ function Secao({
 }
 
 function LinhaDaConversa({ conversa }: { conversa: Conversa }) {
-  const { tarefa, trecho, quando, aguardando } = conversa;
+  const { lead, trecho, quando, aguardando } = conversa;
 
   return (
     <li>
       <Link
-        href={`/atendimento/${tarefa.id}`}
+        href={`/atendimento/${lead.id}`}
         className="flex items-center gap-4 rounded-card border border-black/10 bg-herval-branco px-5 py-4 shadow-card transition-colors hover:border-herval-verde"
       >
         <span
@@ -268,9 +296,9 @@ function LinhaDaConversa({ conversa }: { conversa: Conversa }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <p className="font-bold text-herval-preto">{tarefa.lead}</p>
+            <p className="font-bold text-herval-preto">{lead.lead}</p>
             <p className="text-xs font-medium text-black/45">
-              {nomeDaClinica(tarefa.clinicaId)} · {tarefa.origem}
+              {lead.nomeDaClinica} · {lead.origem}
             </p>
           </div>
           <p className="mt-0.5 truncate text-sm font-medium text-black/60">
@@ -283,7 +311,7 @@ function LinhaDaConversa({ conversa }: { conversa: Conversa }) {
             {tempoRelativo(quando)}
           </span>
           <span className="rounded-full bg-herval-verde/15 px-2.5 py-1 text-[11px] font-bold text-herval-preto">
-            {tarefa.etapa}
+            {lead.etapa}
           </span>
         </div>
       </Link>

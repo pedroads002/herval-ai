@@ -1,6 +1,7 @@
 import MenuLateral from "@/components/MenuLateral";
 import CabecalhoTopo from "@/components/CabecalhoTopo";
 import ProvedorLeads from "@/components/ProvedorLeads";
+import Rodape from "@/components/Rodape";
 import { carregarPerfil } from "@/lib/perfil";
 
 /**
@@ -21,6 +22,7 @@ export default async function LayoutPainel({
       <MenuLateral />
       <main className="ml-56 px-6 pb-16 pt-24 md:ml-64 md:px-10">
         <ProvedorLeads usuario={perfil?.nomeCompleto}>{children}</ProvedorLeads>
+        <Rodape className="mt-12" />
       </main>
     </>
   );

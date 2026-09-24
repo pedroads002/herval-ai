@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AlertTriangle } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 import FormularioLogin from "@/components/FormularioLogin";
+import Rodape from "@/components/Rodape";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 
 export const metadata: Metadata = {
@@ -52,6 +53,8 @@ export default function PaginaLogin() {
         <p className="mt-6 text-center text-xs font-medium text-black/45">
           Acesso restrito à equipe. As contas são criadas pelo administrador.
         </p>
+
+        <Rodape className="mt-4" />
       </div>
     </main>
   );

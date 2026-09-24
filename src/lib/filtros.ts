@@ -6,8 +6,26 @@
  * Tarefas e no Atendimento. Enquanto a regra estava escrita duas vezes, nada
  * impedia as telas de discordarem sobre o mesmo lead.
  */
-import { nomeDaClinica } from "@/data/clinicas";
-import { situacaoDaEtapa, situacoesAtivas, type Tarefa } from "@/data/tarefas";
+import { situacaoDaEtapa, situacoesAtivas } from "@/data/tarefas";
+import type { EtapaFunil } from "@/data/leads";
+
+/**
+ * O mínimo que um lead precisa ter para ser buscado e filtrado.
+ *
+ * É um formato estreito de propósito: a Fila de Tarefas passa uma `Tarefa`
+ * inteira e o Atendimento passa um lead lido do banco, que não tem regra nem
+ * score. Os dois satisfazem isto, então a regra continua escrita uma vez só.
+ *
+ * `clinica` chega com o nome já resolvido, e não como id. Antes o nome era
+ * buscado aqui dentro, na lista fixa de clínicas — o que amarrava a busca ao
+ * dado de exemplo e impedia o Atendimento de buscar pela clínica real.
+ */
+export type LeadFiltravel = {
+  lead: string;
+  telefone: string;
+  clinica: string;
+  etapa: EtapaFunil;
+};
 
 export const filtrosDeSituacao = [
   "Ativos",
@@ -23,12 +41,12 @@ export const filtrosDeSituacao = [
 export type FiltroDeSituacao = (typeof filtrosDeSituacao)[number];
 
 /** Nome, telefone ou clínica. O termo já vem em minúsculas e sem espaços. */
-export function combinaComBusca(tarefa: Tarefa, termo: string) {
+export function combinaComBusca(lead: LeadFiltravel, termo: string) {
   if (termo === "") return true;
   return (
-    tarefa.lead.toLowerCase().includes(termo) ||
-    tarefa.telefone.toLowerCase().includes(termo) ||
-    nomeDaClinica(tarefa.clinicaId).toLowerCase().includes(termo)
+    lead.lead.toLowerCase().includes(termo) ||
+    lead.telefone.toLowerCase().includes(termo) ||
+    lead.clinica.toLowerCase().includes(termo)
   );
 }
 
@@ -36,10 +54,10 @@ export function combinaComBusca(tarefa: Tarefa, termo: string) {
  * A situação sai da etapa do Funil, e não de um campo próprio — por isso
  * mover um card no Funil muda o que estas listas mostram, na hora.
  */
-export function combinaComFiltro(tarefa: Tarefa, filtro: FiltroDeSituacao) {
+export function combinaComFiltro(lead: LeadFiltravel, filtro: FiltroDeSituacao) {
   if (filtro === "Todos") return true;
 
-  const situacao = situacaoDaEtapa(tarefa.etapa);
+  const situacao = situacaoDaEtapa(lead.etapa);
 
   switch (filtro) {
     case "Ativos":
