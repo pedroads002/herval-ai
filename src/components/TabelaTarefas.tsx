@@ -58,9 +58,14 @@ export default function TabelaTarefas() {
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
-    return tarefas.filter(
-      (t) => combinaComBusca(t, termo) && combinaComFiltro(t, filtro),
-    );
+    // O nome da clínica é resolvido aqui: os filtros passaram a receber o nome
+    // pronto, para servirem também ao Atendimento, que lê a clínica do banco.
+    return tarefas.filter((t) => {
+      const comClinica = { ...t, clinica: nomeDaClinica(t.clinicaId) };
+      return (
+        combinaComBusca(comClinica, termo) && combinaComFiltro(comClinica, filtro)
+      );
+    });
   }, [tarefas, busca, filtro]);
 
   // Agrupa por urgência, mantendo a ordem: atrasadas primeiro.
