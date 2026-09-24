@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ListFilter, MessageSquare, Search } from "lucide-react";
 import {
+  ehAtendimento,
   ehDoLead,
   indexarMensagens,
   textoVisivel,
@@ -21,6 +22,12 @@ import type {
   LeadEmAtendimento,
   MensagemEmAtendimento,
 } from "@/lib/dados/atendimento";
+
+/** De quem foi a última fala, dito em duas palavras na frente do trecho. */
+function prefixoDoTrecho(mensagem: MensagemEmAtendimento) {
+  if (ehDoLead(mensagem)) return "";
+  return ehAtendimento(mensagem) ? "Você: " : "Automático: ";
+}
 
 /**
  * Venda Ganha e Venda Perdida não pedem atendimento, mesmo quando a última
@@ -89,15 +96,22 @@ export default function ListaAtendimentos({
           };
         }
 
-        const doLead = ehDoLead(ultima);
+        const atendida = ehAtendimento(ultima);
         return {
           lead,
           // Mídia com legenda mostra a legenda; sem legenda, o rótulo do
           // formato. É a mesma função que a bolha da conversa usa, para a
           // lista e a tela do lead nunca discordarem sobre o que foi dito.
-          trecho: (doLead ? "" : "Você: ") + textoVisivel(ultima),
+          //
+          // O prefixo diz de quem foi a última fala. "Automático:" existe
+          // separado de "Você:" porque ninguém da equipe escreveu aquilo — ler
+          // "Você: recebi seu áudio" faria o CRC achar que já respondeu.
+          trecho: prefixoDoTrecho(ultima) + textoVisivel(ultima),
           quando: ultima.minutosAtras,
-          aguardando: doLead && !fechado,
+          // Quem espera é quem ainda não foi atendido por gente ou pela IA.
+          // Mensagem automática não tira o lead da fila: ela é o aviso de que
+          // ele continua nela.
+          aguardando: !atendida && !fechado,
           fechado,
           esperaEmMinutos: ultima.minutosAtras,
         };
@@ -204,7 +218,7 @@ export default function ListaAtendimentos({
 
       <Secao
         titulo="Aguardando resposta"
-        descricao="O lead falou por último, ou ainda não foi contatado."
+        descricao="Ninguém da equipe nem a IA respondeu ainda. Aviso automático não conta como resposta."
         conversas={aguardando}
         vazio="Nenhum lead esperando resposta agora."
         destacado

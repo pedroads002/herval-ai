@@ -365,6 +365,32 @@ export function ehDoLead(mensagem: Mensagem) {
 }
 
 /**
+ * Se esta mensagem conta como atendimento: alguém do nosso lado respondendo ao
+ * que o lead disse. Só a IA e o humano contam.
+ *
+ * **"Automática" não conta, de propósito.** Uma mensagem automática é o
+ * sistema avisando que ninguém atendeu — "primeiro contato, a IA não abre
+ * conversa", "recebi seu áudio, pode escrever em texto?". Ela responde o
+ * protocolo, não a pessoa.
+ *
+ * Enquanto o desempate era só "quem falou por último", essas mensagens tiravam
+ * o lead de "Aguardando resposta" e o jogavam em "Já respondidos" — a fila de
+ * quem um CRC ocupado olha por último. O lead que mais precisava de gente
+ * sumia justamente por causa do aviso de que precisava de gente.
+ *
+ * Ressalva para quando a régua de retomada voltar: ela também manda mensagem
+ * automática, mas para um lead que ficou em silêncio — ali quem deve a
+ * resposta é o lead, e cair em "Aguardando" encheria a seção. Hoje esse
+ * caminho está desligado (pende dos gatilhos agendados), então a regra simples
+ * está certa; no dia em que ligar, o desempate passa a precisar da `regra` da
+ * mensagem, e não só do remetente.
+ */
+export function ehAtendimento(mensagem: Pick<Mensagem, "remetente">) {
+  const tipo = mensagem.remetente.tipo;
+  return tipo === "IA" || tipo === "Humano";
+}
+
+/**
  * Agrupa a conversa por lead uma vez só. A tela abre um lead de cada vez, e
  * varrer as mensagens inteiras a cada abertura é o tipo de detalhe que só
  * incomoda quando a base cresce — o mesmo motivo de `indexarPorLead` existir
