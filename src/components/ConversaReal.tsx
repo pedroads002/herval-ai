@@ -17,6 +17,15 @@ import {
   textoVisivel,
   type FormatoDeMidia,
 } from "@/data/mensagens";
+import { useLeads } from "@/components/ProvedorLeads";
+import {
+  abasDoAtendimento,
+  AbaAgenda,
+  AbaLigacoes,
+  type AbaDoAtendimento,
+} from "@/components/AbasDoAtendimento";
+import { clinicaPorId } from "@/data/clinicas";
+import { ligacoesDoLead } from "@/data/ligacoes";
 import { tempoRelativo } from "@/lib/tempo";
 import type {
   ClinicaDoLead,
@@ -41,9 +50,11 @@ const iconeDoFormato: Record<FormatoDeMidia, typeof Mic> = {
  * plausível ao lado de uma conversa real é pior que nenhum score: o CRC não
  * teria como saber qual metade acreditar.
  *
- * O que sobrou é o que tem lastro: os dados do lead, a conversa, as notas, a
- * ficha da clínica e uma linha do tempo derivada. Ligações e Agenda aparecem
- * como ausência declarada.
+ * A coluna da conversa, as notas e o histórico leem o banco. As abas Agenda e
+ * Ligações ficam exatamente como eram, com os dados de exemplo e a mesma
+ * aparência — foi o que a operação pediu, para a tela não mudar de cara na
+ * semana da estreia. Elas não funcionam de verdade: marcar uma consulta ou
+ * registrar uma ligação ali não sai do navegador.
  */
 export default function ConversaReal({
   lead,
@@ -65,8 +76,17 @@ export default function ConversaReal({
    */
   envioConfigurado: boolean;
 }) {
+  /**
+   * As abas Agenda e Ligações seguem no provedor de exemplo, que é de onde
+   * elas sempre vieram. Nada aqui grava no banco: `definirConsulta` mexe só no
+   * estado do navegador, como já fazia.
+   */
+  const { agendamentos, ligacoes, definirConsulta } = useLeads();
+
   const [conversa, setConversa] = useState(mensagens);
   const [notas, setNotas] = useState(notasIniciais);
+  const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
+  const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [texto, setTexto] = useState("");
   const [nota, setNota] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -114,6 +134,20 @@ export default function ConversaReal({
     // acabou de acontecer, não como começou.
     return eventos.sort((a, b) => a.minutosAtras - b.minutosAtras);
   }, [lead, conversa, notas]);
+
+  /**
+   * Agenda e Ligações continuam lendo a base de exemplo, pelo id do lead. Um
+   * lead real cujo id não exista lá simplesmente aparece sem consulta e sem
+   * ligação — que é o estado verdadeiro dele, já que nada disso foi migrado.
+   */
+  const consultas = useMemo(
+    () => (lead ? agendamentos.filter((a) => a.leadId === lead.id) : []),
+    [agendamentos, lead],
+  );
+  const chamadas = useMemo(
+    () => (lead ? ligacoesDoLead(ligacoes, lead.id) : []),
+    [ligacoes, lead],
+  );
 
   if (falha) {
     return (
@@ -461,65 +495,138 @@ export default function ConversaReal({
           </div>
         </section>
 
-        {/* Coluna direita: linha do tempo e o que ainda não existe */}
+        {/* Coluna direita: as quatro abas */}
         <div className="space-y-5">
-          <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-              Histórico
-            </h2>
-            <ul className="mt-3 space-y-3">
-              {linhaDoTempo.map((evento) => (
-                <li key={evento.chave} className="border-l-2 border-black/10 pl-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-xs font-bold text-herval-preto">
-                      {evento.titulo}
-                    </p>
-                    <span className="shrink-0 text-[11px] font-medium text-black/40">
-                      {tempoRelativo(evento.minutosAtras)}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-black/60">
-                    {evento.detalhe}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 rounded-controle bg-black/[0.04] px-3 py-2 text-xs text-black/60">
-              Mudança de etapa ainda não entra aqui: nada no painel muda a etapa
-              de verdade por enquanto.
-            </p>
-          </section>
+          {/*
+            As quatro abas, iguais às de antes. Agenda e Ligações seguem com os
+            dados de exemplo e a mesma aparência; Clínica e Histórico leem o
+            banco.
+          */}
+          <section className="rounded-card border border-black/10 bg-herval-branco shadow-card">
+            <div className="flex gap-1 border-b border-black/10 px-3 pt-3">
+              {abasDoAtendimento.map((opcao) => {
+                const ativa = opcao === aba;
+                return (
+                  <button
+                    key={opcao}
+                    type="button"
+                    onClick={() => setAba(opcao)}
+                    aria-current={ativa}
+                    className={[
+                      "rounded-t-controle px-3 py-2 text-xs font-bold transition-colors",
+                      ativa
+                        ? "bg-herval-verde/15 text-herval-preto"
+                        : "text-black/50 hover:text-herval-preto",
+                    ].join(" ")}
+                  >
+                    {opcao}
+                  </button>
+                );
+              })}
+            </div>
 
-          {clinica && (
-            <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-                Clínica
-              </h2>
-              <dl className="mt-3 space-y-2.5 text-sm">
-                <Dado rotulo="Endereço" valor={clinica.endereco} />
-                <Dado rotulo="Horário" valor={clinica.horarioFuncionamento} />
-                <Dado rotulo="Pagamento" valor={clinica.formasPagamento} />
-                <Dado rotulo="Parcelamento" valor={clinica.parcelamento} />
-                <Dado rotulo="Convênios" valor={clinica.convenios} />
-              </dl>
-            </section>
-          )}
-
-          <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-              Ligações e Agenda
-            </h2>
-            <p className="mt-3 text-sm font-medium text-black/55">
-              Ainda não migrado para o banco.
-            </p>
-            <p className="mt-2 text-xs text-black/50">
-              Ficam de fora desta tela de propósito: mostrar ligação ou consulta
-              de exemplo ao lado de uma conversa real faria o CRC agir sobre
-              dado que não existe.
-            </p>
+            <div className="p-5">
+              {aba === "Agenda" && (
+                <AbaAgenda
+                  clinica={
+                    lead.clinicaId === null
+                      ? undefined
+                      : clinicaPorId(lead.clinicaId)
+                  }
+                  agendamentos={consultas}
+                  aberto={agendamentoAberto}
+                  aoAlternar={setAgendamentoAberto}
+                  aoAgendar={(dados) => definirConsulta(lead.id, dados)}
+                />
+              )}
+              {aba === "Ligações" && <AbaLigacoes ligacoes={chamadas} />}
+              {aba === "Clínica" && (
+                <FichaDaClinica clinica={clinica} nome={lead.nomeDaClinica} />
+              )}
+              {aba === "Log" && <Historico eventos={linhaDoTempo} />}
+            </div>
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A ficha da clínica, lida do banco.
+ *
+ * Não reaproveita a `AbaClinica` original porque aquela recebe a clínica da
+ * base de exemplo, com campos que a tabela `clinicas` não tem. O conteúdo aqui
+ * é o que existe de verdade.
+ */
+function FichaDaClinica({
+  clinica,
+  nome,
+}: {
+  clinica: ClinicaDoLead | null;
+  nome: string;
+}) {
+  if (!clinica) {
+    return (
+      <p className="text-sm font-medium text-black/55">
+        A clínica deste lead ({nome}) não está no cadastro.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4 text-sm">
+      <p className="text-sm font-extrabold text-herval-preto">
+        {clinica.nome}
+        {clinica.cidade ? (
+          <span className="font-medium text-black/50"> · {clinica.cidade}</span>
+        ) : null}
+      </p>
+      <dl className="space-y-2.5">
+        <Dado rotulo="Endereço" valor={clinica.endereco} />
+        <Dado rotulo="Horário" valor={clinica.horarioFuncionamento} />
+        <Dado rotulo="Pagamento" valor={clinica.formasPagamento} />
+        <Dado rotulo="Parcelamento" valor={clinica.parcelamento} />
+        <Dado rotulo="Convênios" valor={clinica.convenios} />
+      </dl>
+    </div>
+  );
+}
+
+/** A linha do tempo derivada: chegada do lead, falas e notas. */
+function Historico({
+  eventos,
+}: {
+  eventos: {
+    chave: string;
+    minutosAtras: number;
+    titulo: string;
+    detalhe: string;
+  }[];
+}) {
+  return (
+    <div>
+      <ul className="space-y-3">
+        {eventos.map((evento) => (
+          <li key={evento.chave} className="border-l-2 border-black/10 pl-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-xs font-bold text-herval-preto">
+                {evento.titulo}
+              </p>
+              <span className="shrink-0 text-[11px] font-medium text-black/40">
+                {tempoRelativo(evento.minutosAtras)}
+              </span>
+            </div>
+            <p className="mt-0.5 line-clamp-2 text-xs text-black/60">
+              {evento.detalhe}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 rounded-controle bg-black/[0.04] px-3 py-2 text-xs text-black/60">
+        Mudança de etapa ainda não entra aqui: nada no painel muda a etapa de
+        verdade por enquanto.
+      </p>
     </div>
   );
 }
