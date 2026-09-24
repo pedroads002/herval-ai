@@ -44,11 +44,12 @@ const iconeDoFormato: Record<FormatoDeMidia, typeof Mic> = {
 /**
  * A conversa de um lead, lida do banco.
  *
- * É uma tela nova em vez de uma adaptação de `PainelAtendimento` porque aquela
- * tela depende de ligação, agendamento, régua e score — nenhum deles existe no
- * banco hoje. Adaptá-la obrigaria a inventar esses campos, e um score
- * plausível ao lado de uma conversa real é pior que nenhum score: o CRC não
- * teria como saber qual metade acreditar.
+ * Substituiu a tela antiga de atendimento, que dependia de ligação,
+ * agendamento, régua e score — nenhum deles existe no banco. Aproveitá-la
+ * obrigaria a inventar esses campos, e um score plausível ao lado de uma
+ * conversa real é pior que nenhum score: o CRC não teria como saber qual
+ * metade acreditar. Ela foi removida junto com esta mudança; o Git guarda,
+ * caso Ligações e Agenda voltem a ter dado de verdade.
  *
  * A coluna da conversa, as notas e o histórico leem o banco. As abas Agenda e
  * Ligações ficam exatamente como eram, com os dados de exemplo e a mesma
