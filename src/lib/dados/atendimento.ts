@@ -316,3 +316,163 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
 
   return { leads, mensagens, notas, falha: null };
 }
+
+/** A ficha da clínica, para a coluna lateral da conversa. */
+export type ClinicaDoLead = {
+  nome: string;
+  cidade: string | null;
+  endereco: string | null;
+  horarioFuncionamento: string | null;
+  formasPagamento: string | null;
+  parcelamento: string | null;
+  convenios: string | null;
+};
+
+export type ConversaDoLead = {
+  lead: LeadEmAtendimento | null;
+  mensagens: MensagemEmAtendimento[];
+  notas: NotaEmAtendimento[];
+  clinica: ClinicaDoLead | null;
+  falha: string | null;
+};
+
+/**
+ * Carrega um lead só, com a conversa, as notas e a ficha da clínica.
+ *
+ * Existe separado de `carregarAtendimento` de propósito: a lista precisa de
+ * todos os leads e de nada além do último turno de fala, e a conversa precisa
+ * de um lead e de tudo sobre ele. Uma função que servisse às duas telas leria
+ * demais para uma e de menos para a outra.
+ *
+ * `lead: null` sem `falha` quer dizer que o id não existe no banco — o caso de
+ * quem chega aqui por um card do Funil, que ainda usa dado de exemplo. É
+ * situação normal, não defeito, e a tela explica isso em vez de dar erro.
+ */
+export async function carregarConversa(leadId: number): Promise<ConversaDoLead> {
+  const vazio: ConversaDoLead = {
+    lead: null,
+    mensagens: [],
+    notas: [],
+    clinica: null,
+    falha: null,
+  };
+
+  if (!Number.isInteger(leadId) || leadId <= 0) return vazio;
+
+  if (!supabaseConfigurado()) {
+    return { ...vazio, falha: "O Supabase não está configurado neste ambiente." };
+  }
+
+  const supabase = await criarClienteServidor();
+
+  const { data: linhaLead, error: erroLead } = await supabase
+    .from("leads")
+    .select("id, nome, telefone, clinica_id, etapa, origem, criado_em")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (erroLead) {
+    return { ...vazio, falha: `Não deu para ler o lead: ${erroLead.message}` };
+  }
+  if (!linhaLead) return vazio;
+
+  const lidoLead = linhaLead as LinhaLead;
+
+  const [respostaMensagens, respostaNotas, respostaClinica] = await Promise.all([
+    supabase
+      .from("mensagens")
+      .select(
+        "id, lead_id, remetente_tipo, remetente_nome, formato, texto, regra, status, criado_em",
+      )
+      .eq("lead_id", leadId)
+      .order("criado_em", { ascending: true }),
+    supabase
+      .from("notas")
+      .select("id, lead_id, autor_nome, texto, criado_em")
+      .eq("lead_id", leadId)
+      .order("criado_em", { ascending: false }),
+    lidoLead.clinica_id === null
+      ? Promise.resolve({ data: null, error: null })
+      : supabase
+          .from("clinicas")
+          .select(
+            "nome, cidade, endereco, horario_funcionamento, formas_pagamento, parcelamento, convenios",
+          )
+          .eq("id", lidoLead.clinica_id)
+          .maybeSingle(),
+  ]);
+
+  if (respostaMensagens.error) {
+    return {
+      ...vazio,
+      falha: `Não deu para ler a conversa: ${respostaMensagens.error.message}`,
+    };
+  }
+
+  const agora = Date.now();
+  const fichaDaClinica = respostaClinica.data as {
+    nome: string;
+    cidade: string | null;
+    endereco: string | null;
+    horario_funcionamento: string | null;
+    formas_pagamento: string | null;
+    parcelamento: string | null;
+    convenios: string | null;
+  } | null;
+
+  const bruto = lidoLead.telefone ?? "";
+
+  return {
+    lead: {
+      id: lidoLead.id,
+      lead: (lidoLead.nome ?? "").trim() || "Sem nome",
+      telefone: telefoneLegivel(bruto),
+      telefoneBruto: bruto,
+      clinicaId: lidoLead.clinica_id,
+      nomeDaClinica: fichaDaClinica?.nome ?? "Clínica não informada",
+      etapa: etapaConhecida(lidoLead.etapa),
+      origem: (lidoLead.origem ?? "").trim() || "Origem não informada",
+      minutosAtras: minutosDesde(lidoLead.criado_em, agora),
+    },
+    mensagens: ((respostaMensagens.data ?? []) as LinhaMensagem[]).map(
+      (linha) => {
+        const nome = (linha.remetente_nome ?? "").trim();
+        return {
+          id: linha.id,
+          leadId: linha.lead_id,
+          remetente: {
+            tipo: remetenteConhecido(linha.remetente_tipo),
+            ...(nome === "" ? {} : { nome }),
+          },
+          formato: formatoConhecido(linha.formato),
+          minutosAtras: minutosDesde(linha.criado_em, agora),
+          texto: linha.texto ?? "",
+          ...(linha.regra ? { regra: linha.regra } : {}),
+          ...(statusConhecido(linha.status)
+            ? { status: statusConhecido(linha.status) }
+            : {}),
+        } satisfies MensagemEmAtendimento;
+      },
+    ),
+    // Notas não seguram a tela: se a leitura falhar, a conversa continua.
+    notas: ((respostaNotas.data ?? []) as LinhaNota[]).map((linha) => ({
+      id: linha.id,
+      leadId: linha.lead_id,
+      autor: (linha.autor_nome ?? "").trim() || "Equipe",
+      minutosAtras: minutosDesde(linha.criado_em, agora),
+      texto: linha.texto,
+    })),
+    clinica: fichaDaClinica
+      ? {
+          nome: fichaDaClinica.nome,
+          cidade: fichaDaClinica.cidade,
+          endereco: fichaDaClinica.endereco,
+          horarioFuncionamento: fichaDaClinica.horario_funcionamento,
+          formasPagamento: fichaDaClinica.formas_pagamento,
+          parcelamento: fichaDaClinica.parcelamento,
+          convenios: fichaDaClinica.convenios,
+        }
+      : null,
+    falha: null,
+  };
+}
