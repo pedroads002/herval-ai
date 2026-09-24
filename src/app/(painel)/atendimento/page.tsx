@@ -1,5 +1,6 @@
 import Cabecalho from "@/components/Cabecalho";
 import ListaAtendimentos from "@/components/ListaAtendimentos";
+import AtualizacaoAutomatica from "@/components/AtualizacaoAutomatica";
 import { carregarAtendimento } from "@/lib/dados/atendimento";
 
 /**
@@ -36,6 +37,7 @@ export default async function PaginaAtendimento() {
         exemplo, então os números não vão bater entre elas.
       </p>
 
+      <AtualizacaoAutomatica />
       <ListaAtendimentos leads={leads} mensagens={mensagens} falha={falha} />
     </>
   );

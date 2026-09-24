@@ -85,6 +85,26 @@ export default function ConversaReal({
 
   const [conversa, setConversa] = useState(mensagens);
   const [notas, setNotas] = useState(notasIniciais);
+
+  /**
+   * A tela se recarrega sozinha a cada poucos segundos, e o que vem do servidor
+   * manda. Sem isto, a atualização automática traria dado novo e a conversa
+   * continuaria mostrando o estado do primeiro carregamento — o defeito exato
+   * que a atualização veio resolver.
+   *
+   * É o ajuste de estado durante a renderização, e não um efeito: assim a tela
+   * nunca chega a desenhar uma vez com o dado velho.
+   *
+   * A mensagem que acabou de ser enviada não pisca: ela só entra na lista
+   * depois que o n8n confirma que gravou, então já está no banco quando a
+   * próxima leitura acontece.
+   */
+  const [ultimaLeitura, setUltimaLeitura] = useState(mensagens);
+  if (mensagens !== ultimaLeitura) {
+    setUltimaLeitura(mensagens);
+    setConversa(mensagens);
+    setNotas(notasIniciais);
+  }
   const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [texto, setTexto] = useState("");
