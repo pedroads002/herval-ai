@@ -64,11 +64,18 @@ export function ehMidia(formato: FormatoMensagem): formato is FormatoDeMidia {
  * como veio. Inventar conteúdo no banco seria pior que uma bolha sem graça —
  * quem lê o histórico depois não teria como saber o que o lead escreveu e o
  * que o sistema preencheu por ele.
+ *
+ * Mensagem de texto que chega vazia também ganha rótulo. Ela existe de
+ * verdade: uma reação com emoji, por exemplo, chega do WhatsApp como um tipo
+ * que o fluxo ainda não traduz, e vira uma linha sem conteúdo. Uma bolha em
+ * branco na conversa parece defeito de carregamento — o rótulo pelo menos diz
+ * que algo chegou e não foi entendido, que é a verdade.
  */
 export function textoVisivel(mensagem: Pick<Mensagem, "texto" | "formato">) {
   const texto = mensagem.texto.trim();
   if (texto !== "") return texto;
-  return ehMidia(mensagem.formato) ? formatosDeMidia[mensagem.formato].semTexto : "";
+  if (ehMidia(mensagem.formato)) return formatosDeMidia[mensagem.formato].semTexto;
+  return "Mensagem sem texto";
 }
 
 /**
