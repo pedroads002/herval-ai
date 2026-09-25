@@ -492,6 +492,15 @@ export default function ConversaReal({
                         {textoVisivel(mensagem)}
                       </p>
 
+                      {ehMidia(mensagem.formato) && (
+                        <Midia
+                          mensagemId={mensagem.id}
+                          leadId={lead.id}
+                          formato={mensagem.formato}
+                          doLead={doLead}
+                        />
+                      )}
+
                       {mensagem.regra && (
                         <p className="mt-1 text-right text-[11px] font-medium text-black/40">
                           {mensagem.regra}
@@ -596,6 +605,73 @@ export default function ConversaReal({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * O arquivo de uma mensagem de mídia, dentro da bolha.
+ *
+ * A fonte é sempre a nossa rota, nunca a URL que o WhatsApp mandou: aquelas
+ * vêm criptografadas e só a Evolution sabe abrir. A rota busca na hora e
+ * devolve os bytes.
+ *
+ * Quando a mídia não está disponível — Evolution já apagou, ou a mensagem é
+ * anterior a este recurso e não tem id guardado — o elemento falha e some, e a
+ * bolha fica com o rótulo que já existia ("Áudio enviado"). É degradação
+ * silenciosa de propósito: mídia antiga sumir é o esperado, não um defeito
+ * para alarmar o CRC no meio de um atendimento.
+ */
+function Midia({
+  mensagemId,
+  leadId,
+  formato,
+  doLead,
+}: {
+  mensagemId: number;
+  leadId: number;
+  formato: FormatoDeMidia;
+  doLead: boolean;
+}) {
+  const [falhou, setFalhou] = useState(false);
+  if (falhou) return null;
+
+  const fonte = `/api/crc/midia?mensagemId=${mensagemId}&leadId=${leadId}`;
+  const alinhamento = doLead ? "" : "ml-auto";
+
+  if (formato === "imagem") {
+    return (
+      // A imagem é do WhatsApp e não tem dimensão conhecida antes de chegar;
+      // `next/image` exigiria width e height, e chutá-los distorceria a foto.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={fonte}
+        alt="Imagem enviada na conversa"
+        onError={() => setFalhou(true)}
+        className={`mt-1.5 max-h-72 rounded-controle border border-black/10 object-contain ${alinhamento}`}
+      />
+    );
+  }
+
+  if (formato === "video") {
+    return (
+      <video
+        src={fonte}
+        controls
+        preload="metadata"
+        onError={() => setFalhou(true)}
+        className={`mt-1.5 max-h-72 w-full rounded-controle border border-black/10 ${alinhamento}`}
+      />
+    );
+  }
+
+  return (
+    <audio
+      src={fonte}
+      controls
+      preload="metadata"
+      onError={() => setFalhou(true)}
+      className={`mt-1.5 w-full max-w-[17rem] ${alinhamento}`}
+    />
   );
 }
 
