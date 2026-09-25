@@ -26,7 +26,34 @@ const CABECALHO_DO_TOKEN = process.env.N8N_ENVIO_HEADER ?? "x-helo-token";
 /** Acima disso, é melhor devolver erro que deixar o CRC olhando a tela. */
 const LIMITE_DE_ESPERA = 20_000;
 
-type Pedido = { leadId?: unknown; telefone?: unknown; texto?: unknown };
+type Pedido = {
+  leadId?: unknown;
+  telefone?: unknown;
+  texto?: unknown;
+  midia?: unknown;
+};
+
+/** Os três formatos que a conversa sabe mostrar e a Evolution sabe mandar. */
+const FORMATOS_DE_MIDIA = ["imagem", "audio", "video"] as const;
+type FormatoDeMidia = (typeof FORMATOS_DE_MIDIA)[number];
+
+/**
+ * Quanto arquivo cabe num envio.
+ *
+ * A Vercel recusa corpo acima de 4,5 MB antes de esta rota sequer rodar — o
+ * CRC veria um erro sem explicação, vindo de um lugar que não controlamos. E
+ * base64 engorda o arquivo em um terço: 3 MB de foto viram 4 MB de texto.
+ *
+ * Três megabytes deixam folga para o resto do pedido e cobrem com sobra o que
+ * um celular manda pelo WhatsApp, que já comprime antes de enviar.
+ */
+const LIMITE_DO_ARQUIVO = 3 * 1024 * 1024;
+
+/** Quantos bytes um texto base64 vira, sem precisar decodificar para medir. */
+function bytesDoBase64(base64: string) {
+  const enchimento = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - enchimento;
+}
 
 function recusar(motivo: string, status: number) {
   return NextResponse.json({ enviada: false, motivo }, { status });
@@ -62,7 +89,41 @@ export async function POST(request: Request) {
   if (telefone === "") {
     return recusar("Lead sem telefone: não há para onde enviar.", 400);
   }
-  if (texto === "") {
+
+  /**
+   * A mídia é opcional. Quando vem, o texto vira legenda e pode ser vazio —
+   * mandar uma foto sem dizer nada é normal numa conversa.
+   */
+  const bruta = pedido.midia;
+  let midia: { tipo: FormatoDeMidia; base64: string } | null = null;
+
+  if (bruta !== undefined && bruta !== null) {
+    if (typeof bruta !== "object") {
+      return recusar("Mídia malformada.", 400);
+    }
+    const { tipo, base64 } = bruta as { tipo?: unknown; base64?: unknown };
+
+    if (!FORMATOS_DE_MIDIA.includes(tipo as FormatoDeMidia)) {
+      return recusar(
+        "Só dá para enviar imagem, áudio ou vídeo por aqui.",
+        415,
+      );
+    }
+    if (typeof base64 !== "string" || base64 === "") {
+      return recusar("O arquivo chegou vazio.", 400);
+    }
+    // O tamanho é conferido aqui também, e não só no navegador: a checagem de
+    // lá evita a viagem inútil, esta impede que alguém a contorne.
+    if (bytesDoBase64(base64) > LIMITE_DO_ARQUIVO) {
+      return recusar(
+        `O arquivo passa de ${LIMITE_DO_ARQUIVO / 1024 / 1024} MB. Mande um menor.`,
+        413,
+      );
+    }
+    midia = { tipo: tipo as FormatoDeMidia, base64 };
+  }
+
+  if (!midia && texto === "") {
     return recusar("A mensagem está vazia.", 400);
   }
 
@@ -79,6 +140,10 @@ export async function POST(request: Request) {
         telefone,
         texto,
         autor: perfil.nomeCompleto,
+        // O tipo vai separado do arquivo: e ele que escolhe o ramo de envio
+        // no n8n e o formato gravado na conversa.
+        tipo: midia ? midia.tipo : "texto",
+        ...(midia ? { base64: midia.base64 } : {}),
       }),
       signal: AbortSignal.timeout(LIMITE_DE_ESPERA),
     });

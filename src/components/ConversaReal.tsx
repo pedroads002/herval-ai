@@ -6,9 +6,11 @@ import {
   ArrowLeft,
   Image as ImagemIcone,
   Mic,
+  Paperclip,
   Send,
   StickyNote,
   Video,
+  X,
 } from "lucide-react";
 import {
   ehDoLead,
@@ -40,6 +42,46 @@ const iconeDoFormato: Record<FormatoDeMidia, typeof Mic> = {
   imagem: ImagemIcone,
   video: Video,
 };
+
+/**
+ * O mesmo limite que a rota aplica no servidor.
+ *
+ * Aqui ele evita a viagem: subir 4 MB para receber "grande demais" gasta o
+ * tempo do CRC e a internet da clínica. Lá ele impede que alguém contorne
+ * esta checagem. As duas existem por motivos diferentes.
+ */
+const LIMITE_DO_ARQUIVO = 3 * 1024 * 1024;
+
+/** Só o que a Evolution sabe mandar e a conversa sabe mostrar. */
+const ACEITOS = "image/*,audio/*,video/*";
+
+/**
+ * De que formato é este arquivo, pelo tipo que o navegador informou.
+ *
+ * Nulo quando não é nenhum dos três — documento, planilha, o que for. O
+ * `accept` do seletor já filtra, mas ele é só uma sugestão: dá para arrastar
+ * qualquer coisa para dentro, e o navegador aceita.
+ */
+function formatoDoArquivo(arquivo: File): FormatoDeMidia | null {
+  if (arquivo.type.startsWith("image/")) return "imagem";
+  if (arquivo.type.startsWith("audio/")) return "audio";
+  if (arquivo.type.startsWith("video/")) return "video";
+  return null;
+}
+
+/** O arquivo como base64 puro, sem o prefixo `data:` que o leitor acrescenta. */
+function lerComoBase64(arquivo: File) {
+  return new Promise<string>((resolver, recusar) => {
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const texto = String(leitor.result ?? "");
+      const virgula = texto.indexOf(",");
+      resolver(virgula >= 0 ? texto.slice(virgula + 1) : texto);
+    };
+    leitor.onerror = () => recusar(new Error("Não deu para ler o arquivo."));
+    leitor.readAsDataURL(arquivo);
+  });
+}
 
 /**
  * A conversa de um lead, lida do banco.
@@ -109,6 +151,7 @@ export default function ConversaReal({
   const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [texto, setTexto] = useState("");
+  const [arquivo, setArquivo] = useState<File | null>(null);
   const [nota, setNota] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [salvandoNota, setSalvandoNota] = useState(false);
@@ -212,12 +255,30 @@ export default function ConversaReal({
   async function enviar() {
     if (!lead) return;
     const conteudo = texto.trim();
-    if (conteudo === "") return;
+    // Com arquivo, o texto é legenda e pode ser vazio: mandar uma foto sem
+    // dizer nada é normal numa conversa.
+    if (conteudo === "" && !arquivo) return;
 
     setEnviando(true);
     setAviso(null);
 
     try {
+      let midia: { tipo: FormatoDeMidia; base64: string } | null = null;
+      if (arquivo) {
+        const tipo = formatoDoArquivo(arquivo);
+        if (!tipo) {
+          setAviso("Só dá para enviar imagem, áudio ou vídeo por aqui.");
+          return;
+        }
+        if (arquivo.size > LIMITE_DO_ARQUIVO) {
+          setAviso(
+            `O arquivo tem ${(arquivo.size / 1024 / 1024).toFixed(1)} MB e o limite é ${LIMITE_DO_ARQUIVO / 1024 / 1024} MB.`,
+          );
+          return;
+        }
+        midia = { tipo, base64: await lerComoBase64(arquivo) };
+      }
+
       const resposta = await fetch("/api/crc/enviar", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -227,6 +288,7 @@ export default function ConversaReal({
           // compara só dígitos, e o formatado perde o código do país.
           telefone: lead.telefoneBruto,
           texto: conteudo,
+          ...(midia ? { midia } : {}),
         }),
       });
       const resultado = (await resposta.json().catch(() => null)) as {
@@ -248,13 +310,14 @@ export default function ConversaReal({
           id: Date.now(),
           leadId: lead.id,
           remetente: { tipo: "Humano", nome: resultado.autor },
-          formato: "texto",
+          formato: midia ? midia.tipo : "texto",
           minutosAtras: 0,
           texto: conteudo,
           status: "enviada",
         },
       ]);
       setTexto("");
+      setArquivo(null);
     } catch {
       setAviso(
         "Não deu para falar com o servidor. Confira no WhatsApp antes de reenviar.",
@@ -526,28 +589,84 @@ export default function ConversaReal({
             </p>
           )}
 
-          <div className="flex shrink-0 items-end gap-2 border-t border-black/10 p-4">
-            <textarea
-              rows={2}
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              disabled={!envioConfigurado}
-              placeholder={
-                envioConfigurado
-                  ? "Assumir a conversa e responder como CRC"
-                  : "Envio indisponível neste ambiente"
-              }
-              className="flex-1 resize-none rounded-controle border border-black/15 bg-herval-branco px-3.5 py-2.5 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/25 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
-            />
-            <button
-              type="button"
-              disabled={texto.trim() === "" || enviando || !envioConfigurado}
-              onClick={enviar}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-herval-verde px-5 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
-            >
-              <Send className="h-4 w-4" />
-              {enviando ? "Enviando…" : "Enviar"}
-            </button>
+          <div className="shrink-0 border-t border-black/10 p-4">
+            {/* O arquivo escolhido, antes de sair. Dá para desistir. */}
+            {arquivo && (
+              <div className="mb-2 flex items-center gap-2 rounded-controle bg-herval-verde/10 px-3 py-2">
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-black/50" />
+                <span className="min-w-0 flex-1 truncate text-xs font-bold text-herval-preto">
+                  {arquivo.name}
+                </span>
+                <span className="shrink-0 text-[11px] font-medium text-black/45">
+                  {(arquivo.size / 1024 / 1024).toFixed(1)} MB
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setArquivo(null)}
+                  aria-label="Tirar o arquivo"
+                  className="shrink-0 rounded-full p-0.5 text-black/40 transition-colors hover:bg-black/10 hover:text-herval-preto"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <label
+                className={[
+                  "inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-controle border border-black/15 text-black/50 transition-colors hover:border-herval-verde hover:text-herval-preto",
+                  !envioConfigurado || enviando
+                    ? "pointer-events-none opacity-40"
+                    : "",
+                ].join(" ")}
+                title="Anexar imagem, áudio ou vídeo"
+              >
+                <Paperclip className="h-4 w-4" />
+                <input
+                  type="file"
+                  accept={ACEITOS}
+                  disabled={!envioConfigurado || enviando}
+                  onChange={(e) => {
+                    setArquivo(e.target.files?.[0] ?? null);
+                    setAviso(null);
+                    // Limpa o campo para dar para escolher o mesmo arquivo de
+                    // novo depois de removê-lo — sem isso o `change` não
+                    // dispara na segunda vez.
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+              </label>
+
+              <textarea
+                rows={2}
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                disabled={!envioConfigurado}
+                placeholder={
+                  envioConfigurado
+                    ? arquivo
+                      ? "Legenda do arquivo (opcional)"
+                      : "Assumir a conversa e responder como CRC"
+                    : "Envio indisponível neste ambiente"
+                }
+                className="flex-1 resize-none rounded-controle border border-black/15 bg-herval-branco px-3.5 py-2.5 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/25 disabled:cursor-not-allowed disabled:bg-black/[0.03]"
+              />
+
+              <button
+                type="button"
+                disabled={
+                  (texto.trim() === "" && !arquivo) ||
+                  enviando ||
+                  !envioConfigurado
+                }
+                onClick={enviar}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-herval-verde px-5 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
+              >
+                <Send className="h-4 w-4" />
+                {enviando ? "Enviando…" : "Enviar"}
+              </button>
+            </div>
           </div>
         </section>
 
