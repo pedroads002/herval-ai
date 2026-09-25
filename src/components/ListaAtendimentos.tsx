@@ -8,6 +8,7 @@ import {
   ehDoLead,
   indexarMensagens,
   textoVisivel,
+  ultimaFala,
   ultimaMensagem,
 } from "@/data/mensagens";
 import { tempoRelativo } from "@/lib/tempo";
@@ -81,14 +82,19 @@ export default function ListaAtendimentos({
     () =>
       leads.map((lead) => {
         const ultima = ultimaMensagem(porLead, lead.id);
+        // A fila se decide pela última fala de verdade. Reação aparece na
+        // conversa, mas não é turno: um ❤️ não devolve o lead para a espera,
+        // nem reinicia a contagem de quanto tempo ele está sem resposta.
+        const fala = ultimaFala(porLead, lead.id);
         const fechado = encerrado(lead);
 
-        // Lead sem mensagem nenhuma: chegou e ninguém falou com ele. É a fila
-        // mais antiga que existe, e por isso entra pelo tempo de chegada.
-        if (!ultima) {
+        // Lead sem fala nenhuma: chegou e ninguém conversou com ele — ou só
+        // reagiu a algo. É a fila mais antiga que existe, e por isso entra
+        // pelo tempo de chegada.
+        if (!fala) {
           return {
             lead,
-            trecho: "Nenhuma mensagem ainda.",
+            trecho: ultima ? textoVisivel(ultima) : "Nenhuma mensagem ainda.",
             quando: lead.minutosAtras,
             aguardando: !fechado,
             fechado,
@@ -96,7 +102,7 @@ export default function ListaAtendimentos({
           };
         }
 
-        const atendida = ehAtendimento(ultima);
+        const atendida = ehAtendimento(fala);
         return {
           lead,
           // Mídia com legenda mostra a legenda; sem legenda, o rótulo do
@@ -106,14 +112,19 @@ export default function ListaAtendimentos({
           // O prefixo diz de quem foi a última fala. "Automático:" existe
           // separado de "Você:" porque ninguém da equipe escreveu aquilo — ler
           // "Você: recebi seu áudio" faria o CRC achar que já respondeu.
-          trecho: prefixoDoTrecho(ultima) + textoVisivel(ultima),
-          quando: ultima.minutosAtras,
+          // `ultima` existe sempre que `fala` existe, mas o compilador não
+          // tem como saber: o `?? fala` é só para ele, e nunca é usado.
+          trecho: prefixoDoTrecho(ultima ?? fala) + textoVisivel(ultima ?? fala),
+          quando: (ultima ?? fala).minutosAtras,
           // Quem espera é quem ainda não foi atendido por gente ou pela IA.
           // Mensagem automática não tira o lead da fila: ela é o aviso de que
           // ele continua nela.
           aguardando: !atendida && !fechado,
           fechado,
-          esperaEmMinutos: ultima.minutosAtras,
+          // A espera se conta desde a última fala, e não desde a reação: quem
+          // perguntou há uma hora e reagiu a um emoji agora continua há uma
+          // hora sem resposta, e não pode cair para o fim da fila por isso.
+          esperaEmMinutos: fala.minutosAtras,
         };
       }),
     [leads, porLead],

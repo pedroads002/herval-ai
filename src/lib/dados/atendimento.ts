@@ -157,7 +157,13 @@ function remetenteConhecido(valor: string | null): TipoRemetente {
     : "Lead";
 }
 
-const formatos: FormatoMensagem[] = ["texto", "audio", "imagem", "video"];
+const formatos: FormatoMensagem[] = [
+  "texto",
+  "audio",
+  "imagem",
+  "video",
+  "reacao",
+];
 
 function formatoConhecido(valor: string | null): FormatoMensagem {
   const formato = (valor ?? "").trim();
