@@ -40,7 +40,12 @@ export type Remetente = {
  * aconteceu. Imagem e vídeo entraram quando o WhatsApp real passou a alimentar
  * a tabela; o CHECK de `mensagens.formato` aceita os quatro.
  */
-export type FormatoMensagem = "texto" | "audio" | "imagem" | "video";
+export type FormatoMensagem =
+  | "texto"
+  | "audio"
+  | "imagem"
+  | "video"
+  | "reacao";
 
 /** Os formatos que não são texto, com os dois rótulos que a tela usa. */
 export const formatosDeMidia = {
@@ -51,8 +56,31 @@ export const formatosDeMidia = {
 
 export type FormatoDeMidia = keyof typeof formatosDeMidia;
 
+/**
+ * Mídia é áudio, imagem ou vídeo — os formatos que têm arquivo e podem chegar
+ * sem legenda.
+ *
+ * A pergunta é por pertencimento, e não "diferente de texto", de propósito.
+ * Enquanto era negação, qualquer formato novo virava mídia por omissão: ao
+ * acrescentar "reacao" o `textoVisivel` foi procurar o rótulo de uma reação em
+ * `formatosDeMidia`, não achou, e quebrou com TypeError em cima de uma
+ * mensagem de lead. Perguntar pela lista faz o formato novo precisar se
+ * declarar em vez de ser adotado por descuido.
+ */
 export function ehMidia(formato: FormatoMensagem): formato is FormatoDeMidia {
-  return formato !== "texto";
+  return Object.prototype.hasOwnProperty.call(formatosDeMidia, formato);
+}
+
+/**
+ * Reação é o emoji que o lead põe em cima de uma mensagem já enviada.
+ *
+ * Fica gravada na conversa, mas **não conta como um turno de fala**: um ❤️ num
+ * "um abraço 😊" não é pergunta em aberto, e não deve devolver o lead para a
+ * fila de quem espera resposta. Quem decide a fila olha a última mensagem que
+ * não é reação.
+ */
+export function ehReacao(mensagem: Pick<Mensagem, "formato">) {
+  return mensagem.formato === "reacao";
 }
 
 /**
@@ -428,4 +456,28 @@ export function conversaDoLead(mensagens: Conversas, leadId: number) {
 export function ultimaMensagem(mensagens: Conversas, leadId: number) {
   const conversa = conversaDoLead(mensagens, leadId);
   return conversa[conversa.length - 1] ?? null;
+}
+
+/**
+ * A última fala de verdade: a mensagem mais recente que não é reação.
+ *
+ * Existe separada de `ultimaMensagem` porque as duas respondem perguntas
+ * diferentes. "O que apareceu por último na conversa" é o que a lista mostra
+ * no trecho — e aí a reação conta, porque ela aconteceu. "Quem falou por
+ * último" é o que decide a fila e há quanto tempo o lead espera — e aí a
+ * reação não conta.
+ *
+ * Sem essa separação, um lead que perguntou às 10h, reagiu a um emoji às
+ * 10h05 e continua sem resposta às 11h apareceria esperando cinco minutos em
+ * vez de uma hora, e cairia para o fim da fila por causa do próprio ❤️.
+ *
+ * Nulo quando só houve reação e mais nada — alguém que interagiu sem nunca ter
+ * sido atendido.
+ */
+export function ultimaFala(mensagens: Conversas, leadId: number) {
+  const conversa = conversaDoLead(mensagens, leadId);
+  for (let i = conversa.length - 1; i >= 0; i--) {
+    if (!ehReacao(conversa[i])) return conversa[i];
+  }
+  return null;
 }
