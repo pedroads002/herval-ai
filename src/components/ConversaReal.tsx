@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -169,6 +169,20 @@ export default function ConversaReal({
     () => (lead ? ligacoesDoLead(ligacoes, lead.id) : []),
     [ligacoes, lead],
   );
+
+  /**
+   * Abrir a conversa no fim, e não no começo.
+   *
+   * A mensagem que importa é a última, e a lista cresce para baixo. Sem isto,
+   * um lead com vinte e três mensagens abriria no "Oi" de dois dias atrás e o
+   * CRC teria que rolar até embaixo toda vez — inclusive a cada atualização
+   * automática, de dez em dez segundos.
+   */
+  const areaDaConversa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const area = areaDaConversa.current;
+    if (area) area.scrollTop = area.scrollHeight;
+  }, [conversa]);
 
   if (falha) {
     return (
@@ -395,13 +409,25 @@ export default function ConversaReal({
           </section>
         </div>
 
-        {/* Coluna central: a conversa */}
-        <section className="flex min-h-[32rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card">
-          <h2 className="border-b border-black/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wide text-black/45">
+        {/*
+          Coluna central: a conversa.
+
+          A altura é fixa de propósito. Enquanto era só `min-h`, o bloco crescia
+          junto com a conversa e a página inteira ia junto: num lead com vinte e
+          três mensagens, o CRC precisava rolar a página toda para achar a caixa
+          de resposta, que ficava lá embaixo. Com altura definida, quem rola é a
+          lista de mensagens, e cabeçalho e caixa de envio ficam sempre à vista —
+          como em qualquer aplicativo de mensagem.
+
+          O `min-h` continua como piso para telas baixas, onde `100vh` menos o
+          cabeçalho sobraria pouco demais para ler qualquer coisa.
+        */}
+        <section className="flex h-[calc(100vh-15rem)] min-h-[26rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card">
+          <h2 className="shrink-0 border-b border-black/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wide text-black/45">
             Conversa
           </h2>
 
-          <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          <div ref={areaDaConversa} className="flex-1 space-y-4 overflow-y-auto p-5">
             {conversa.length === 0 ? (
               <p className="text-sm font-medium text-black/55">
                 Ainda não houve nenhuma mensagem com este lead.
@@ -491,7 +517,7 @@ export default function ConversaReal({
             </p>
           )}
 
-          <div className="flex items-end gap-2 border-t border-black/10 p-4">
+          <div className="flex shrink-0 items-end gap-2 border-t border-black/10 p-4">
             <textarea
               rows={2}
               value={texto}
