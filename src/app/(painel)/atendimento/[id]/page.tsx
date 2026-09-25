@@ -16,9 +16,8 @@ export default async function PaginaDoAtendimento({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { lead, mensagens, notas, clinica, falha } = await carregarConversa(
-    Number(id),
-  );
+  const { lead, mensagens, notas, clinica, especialidades, falha } =
+    await carregarConversa(Number(id));
 
   /**
    * Se o envio está ligado é decidido aqui, no servidor: as variáveis não têm
@@ -38,6 +37,7 @@ export default async function PaginaDoAtendimento({
         mensagens={mensagens}
         notas={notas}
         clinica={clinica}
+        especialidades={especialidades}
         falha={falha}
         envioConfigurado={envioConfigurado}
       />

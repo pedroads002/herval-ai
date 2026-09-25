@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ import { ligacoesDoLead } from "@/data/ligacoes";
 import { tempoRelativo } from "@/lib/tempo";
 import type {
   ClinicaDoLead,
+  EspecialidadeDaClinica,
   LeadEmAtendimento,
   MensagemEmAtendimento,
   NotaEmAtendimento,
@@ -62,6 +63,7 @@ export default function ConversaReal({
   mensagens,
   notas: notasIniciais,
   clinica,
+  especialidades,
   falha,
   envioConfigurado,
 }: {
@@ -69,6 +71,7 @@ export default function ConversaReal({
   mensagens: MensagemEmAtendimento[];
   notas: NotaEmAtendimento[];
   clinica: ClinicaDoLead | null;
+  especialidades: EspecialidadeDaClinica[];
   falha: string | null;
   /**
    * Se este ambiente sabe enviar. Vem do servidor porque depende de variáveis
@@ -169,6 +172,20 @@ export default function ConversaReal({
     () => (lead ? ligacoesDoLead(ligacoes, lead.id) : []),
     [ligacoes, lead],
   );
+
+  /**
+   * Abrir a conversa no fim, e não no começo.
+   *
+   * A mensagem que importa é a última, e a lista cresce para baixo. Sem isto,
+   * um lead com vinte e três mensagens abriria no "Oi" de dois dias atrás e o
+   * CRC teria que rolar até embaixo toda vez — inclusive a cada atualização
+   * automática, de dez em dez segundos.
+   */
+  const areaDaConversa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const area = areaDaConversa.current;
+    if (area) area.scrollTop = area.scrollHeight;
+  }, [conversa]);
 
   if (falha) {
     return (
@@ -395,13 +412,25 @@ export default function ConversaReal({
           </section>
         </div>
 
-        {/* Coluna central: a conversa */}
-        <section className="flex min-h-[32rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card">
-          <h2 className="border-b border-black/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wide text-black/45">
+        {/*
+          Coluna central: a conversa.
+
+          A altura é fixa de propósito. Enquanto era só `min-h`, o bloco crescia
+          junto com a conversa e a página inteira ia junto: num lead com vinte e
+          três mensagens, o CRC precisava rolar a página toda para achar a caixa
+          de resposta, que ficava lá embaixo. Com altura definida, quem rola é a
+          lista de mensagens, e cabeçalho e caixa de envio ficam sempre à vista —
+          como em qualquer aplicativo de mensagem.
+
+          O `min-h` continua como piso para telas baixas, onde `100vh` menos o
+          cabeçalho sobraria pouco demais para ler qualquer coisa.
+        */}
+        <section className="flex h-[calc(100vh-15rem)] min-h-[26rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card">
+          <h2 className="shrink-0 border-b border-black/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wide text-black/45">
             Conversa
           </h2>
 
-          <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          <div ref={areaDaConversa} className="flex-1 space-y-4 overflow-y-auto p-5">
             {conversa.length === 0 ? (
               <p className="text-sm font-medium text-black/55">
                 Ainda não houve nenhuma mensagem com este lead.
@@ -491,7 +520,7 @@ export default function ConversaReal({
             </p>
           )}
 
-          <div className="flex items-end gap-2 border-t border-black/10 p-4">
+          <div className="flex shrink-0 items-end gap-2 border-t border-black/10 p-4">
             <textarea
               rows={2}
               value={texto}
@@ -548,6 +577,13 @@ export default function ConversaReal({
 
             <div className="p-5">
               {aba === "Agenda" && (
+                <FichaDoAtendimento
+                  lead={lead}
+                  clinica={clinica}
+                  especialidades={especialidades}
+                />
+              )}
+              {aba === "Agenda" && (
                 <AbaAgenda
                   clinica={
                     lead.clinicaId === null
@@ -568,6 +604,119 @@ export default function ConversaReal({
             </div>
           </section>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Valor em reais, formatado só na exibição. Nulo vira travessão. */
+function emReais(valor: number | null) {
+  if (valor === null) return null;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(valor);
+}
+
+/**
+ * Quem é este atendimento: o cliente, a clínica e o que ela atende.
+ *
+ * Fica no alto da aba Agenda, junto do botão de agendar, porque é ali que a
+ * informação é usada — na hora de marcar, o CRC precisa saber qual
+ * procedimento, quanto dura, quanto custa e onde é.
+ *
+ * O profissional não aparece, e não é esquecimento: não existe tabela de
+ * profissionais no banco. A lista que o painel mostra em Profissionais vem de
+ * arquivo fixo, e trazer aquele nome para cá seria apontar um especialista que
+ * pode não atender nesta clínica — erro que o CRC repassaria ao lead.
+ */
+function FichaDoAtendimento({
+  lead,
+  clinica,
+  especialidades,
+}: {
+  lead: LeadEmAtendimento;
+  clinica: ClinicaDoLead | null;
+  especialidades: EspecialidadeDaClinica[];
+}) {
+  return (
+    <div className="mb-4 space-y-4 border-b border-black/10 pb-4">
+      <div>
+        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Cliente
+        </h3>
+        <p className="mt-1 text-sm font-bold text-herval-preto">{lead.lead}</p>
+        <p className="text-xs font-medium text-black/55">
+          {lead.telefone} · {lead.origem}
+        </p>
+      </div>
+
+      <div>
+        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Clínica
+        </h3>
+        <p className="mt-1 text-sm font-bold text-herval-preto">
+          {clinica?.nome ?? lead.nomeDaClinica}
+        </p>
+        {clinica?.endereco ? (
+          <p className="text-xs font-medium leading-relaxed text-black/55">
+            {clinica.endereco}
+            {clinica.cidade ? ` · ${clinica.cidade}` : ""}
+          </p>
+        ) : (
+          <p className="text-xs font-medium text-black/40">
+            Endereço não cadastrado.
+          </p>
+        )}
+        {clinica?.horarioFuncionamento && (
+          <p className="mt-0.5 text-xs font-medium text-black/55">
+            {clinica.horarioFuncionamento}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Especialidades ({especialidades.length})
+        </h3>
+
+        {especialidades.length === 0 ? (
+          <p className="mt-1 text-xs font-medium text-black/40">
+            Esta clínica não tem especialidade ativa cadastrada.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {especialidades.map((e) => {
+              const preco = emReais(e.valor);
+              return (
+                <li
+                  key={e.id}
+                  className={[
+                    "rounded-controle px-2.5 py-1.5",
+                    // A que o lead procurou fica marcada: é por ela que a
+                    // conversa começou.
+                    e.doInteresseDoLead
+                      ? "bg-herval-verde/15"
+                      : "bg-black/[0.04]",
+                  ].join(" ")}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-bold text-herval-preto">
+                      {e.nome}
+                    </span>
+                    <span className="shrink-0 text-[11px] font-bold text-black/50">
+                      {preco ?? "sob consulta"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-black/45">
+                    {e.duracaoMinutos} min
+                    {e.doInteresseDoLead ? " · interesse do lead" : ""}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
