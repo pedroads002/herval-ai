@@ -29,7 +29,17 @@ export default async function LayoutPainel({
     <>
       <CabecalhoTopo />
       <MenuLateral />
-      <main className="ml-56 mt-16 h-[calc(100dvh-4rem)] overflow-y-auto px-6 py-8 md:ml-64 md:px-10">
+      {/*
+        A margem em volta é pequena de propósito: com 24px nos lados e 32px em
+        cima e embaixo, os cartões pareciam flutuar dentro de uma moldura de
+        espaço morto em vez de ocupar a tela.
+
+        Doze pixels, iguais dos quatro lados. Zero encostaria os cartões na
+        borda da janela e cortaria a sombra deles; os cartões já têm respiro
+        próprio por dentro (`p-5`), então a folga aqui só precisa separar da
+        borda, não repetir esse respiro.
+      */}
+      <main className="ml-56 mt-16 h-[calc(100dvh-4rem)] overflow-y-auto p-3 md:ml-64">
         <ProvedorLeads usuario={perfil?.nomeCompleto}>{children}</ProvedorLeads>
       </main>
     </>
