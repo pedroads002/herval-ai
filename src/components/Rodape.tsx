@@ -1,10 +1,12 @@
 /**
- * A assinatura de quem fez o sistema.
+ * A assinatura de quem fez o sistema, na tela de login.
  *
- * Fica separado do rodapé do menu lateral de propósito: aquele diz qual é o
- * produto ("Helô - Herval AI"), e este diz quem o desenvolveu. São duas
- * informações diferentes, e juntá-las na mesma linha faria o nome do produto
- * parecer parte da assinatura.
+ * Dentro do painel ela não mora mais aqui: virou uma segunda linha no rodapé
+ * do menu lateral, embaixo do nome do produto. Solta no fim da página, ficava
+ * flutuando sozinha e obrigava a página a rolar só por causa dela.
+ *
+ * O login não tem menu lateral, então continua usando este componente — é a
+ * única tela onde a assinatura ainda precisa de lugar próprio.
  */
 export default function Rodape({ className = "" }: { className?: string }) {
   return (
@@ -14,7 +16,7 @@ export default function Rodape({ className = "" }: { className?: string }) {
         className,
       ].join(" ")}
     >
-      Desenvolvido por Herval Marketing
+      Desenvolvido por Herval Marketing®
     </footer>
   );
 }

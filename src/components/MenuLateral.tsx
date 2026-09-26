@@ -76,11 +76,24 @@ export default function MenuLateral() {
         })}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-white/10 px-5 py-5">
-        <LogoHerval className="h-8 w-8 rounded-controle" />
-        <span className="text-xs font-medium text-white/50">
-          Helô - Herval AI
-        </span>
+      {/*
+        Duas linhas: o nome do produto e quem o desenvolveu. A assinatura ficava
+        solta no fim da página e obrigava a rolagem; aqui ela tem lugar fixo.
+
+        A segunda linha é menor e mais apagada que a primeira de propósito — é
+        crédito, não título, e igualar as duas faria o nome do produto competir
+        com a assinatura.
+      */}
+      <div className="flex shrink-0 items-center gap-2.5 border-t border-white/10 px-5 py-5">
+        <LogoHerval className="h-8 w-8 shrink-0 rounded-controle" />
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-white/50">Helô - Herval AI</p>
+          {/* A entrelinha apertada é porque o texto quebra em duas linhas na
+              largura do menu: solta, a quebra parecia defeito. */}
+          <p className="mt-0.5 text-[11px] font-medium leading-tight text-white/35">
+            Desenvolvido por Herval Marketing®
+          </p>
+        </div>
       </div>
     </aside>
   );
