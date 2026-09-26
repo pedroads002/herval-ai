@@ -410,10 +410,22 @@ export default function ConversaReal({
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
+      {/*
+        As três colunas dividem uma altura só.
+
+        Antes cada uma terminava onde seu conteúdo acabava, e a do meio tinha
+        altura fixa: com pouca coisa nas laterais sobrava um vazio grande ao
+        lado da conversa, e com muita nota a coluna da esquerda passava do fim
+        dela. Agora a linha inteira tem a altura da conversa e cada coluna rola
+        por dentro — o que passa do limite vira rolagem, não vira página.
+
+        Só a partir de `lg`. Abaixo disso as colunas ficam empilhadas, uma
+        embaixo da outra, e prender altura ali só esconderia conteúdo.
+      */}
+      <div className="grid gap-5 lg:h-[calc(100vh-15rem)] lg:min-h-[26rem] lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
         {/* Coluna esquerda: dados e notas */}
-        <div className="space-y-5">
-          <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
+        <div className="flex flex-col gap-5 lg:min-h-0 lg:overflow-y-auto">
+          <section className="shrink-0 rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
             <h2 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
               Dados do lead
             </h2>
@@ -436,18 +448,30 @@ export default function ConversaReal({
             </p>
           </section>
 
-          <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
-            <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
+          {/*
+            O cartão de notas é o que estica: ele fica por último na coluna e
+            cresce até o fim da linha, para a coluna terminar junto com a
+            conversa. Quem rola é a lista de notas; o campo de escrever e o
+            botão ficam presos embaixo, sempre à mão.
+          */}
+          <section className="flex flex-1 flex-col rounded-card border border-black/10 bg-herval-branco p-5 shadow-card lg:min-h-0">
+            <h2 className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
               <StickyNote className="h-3.5 w-3.5" />
               Notas internas ({notas.length})
             </h2>
 
             {notas.length === 0 ? (
-              <p className="mt-3 text-sm font-medium text-black/55">
+              <p className="mt-3 flex-1 text-sm font-medium text-black/55">
                 Nenhuma nota ainda.
               </p>
             ) : (
-              <ul className="mt-3 space-y-3">
+              /*
+                O piso de 7rem importa em tela baixa: sem ele, o campo de
+                escrever e o botão tomam o cartão inteiro e a lista fica com
+                quinze pixels — as notas somem sem nem parecer que existe algo
+                para rolar. Com o piso, quem rola passa a ser a coluna.
+              */
+              <ul className="mt-3 min-h-[7rem] flex-1 space-y-3 overflow-y-auto">
                 {notas.map((item) => (
                   <li
                     key={item.id}
@@ -459,7 +483,7 @@ export default function ConversaReal({
                       </span>
                       <span>{tempoRelativo(item.minutosAtras)}</span>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-black/70">
+                    <p className="mt-1 text-sm leading-relaxed text-black/70">
                       {item.texto}
                     </p>
                   </li>
@@ -472,11 +496,11 @@ export default function ConversaReal({
               value={nota}
               onChange={(e) => setNota(e.target.value)}
               placeholder="Escrever uma nota. O lead nunca vê isto."
-              className="mt-3 w-full rounded-controle border border-black/15 bg-herval-branco px-3 py-2 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/25"
+              className="mt-3 w-full shrink-0 resize-none rounded-controle border border-black/15 bg-herval-branco px-3 py-2 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/25"
             />
 
             {avisoDaNota && (
-              <p className="mt-2 rounded-controle bg-herval-vermelho/10 px-3 py-2 text-xs font-medium text-herval-preto">
+              <p className="mt-2 shrink-0 rounded-controle bg-herval-vermelho/10 px-3 py-2 text-xs font-medium text-herval-preto">
                 {avisoDaNota}
               </p>
             )}
@@ -485,7 +509,7 @@ export default function ConversaReal({
               type="button"
               disabled={nota.trim() === "" || salvandoNota}
               onClick={salvarNota}
-              className="mt-2 w-full rounded-full bg-herval-verde px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
+              className="mt-2 w-full shrink-0 rounded-full bg-herval-verde px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
             >
               {salvandoNota ? "Salvando…" : "Salvar nota"}
             </button>
@@ -504,8 +528,11 @@ export default function ConversaReal({
 
           O `min-h` continua como piso para telas baixas, onde `100vh` menos o
           cabeçalho sobraria pouco demais para ler qualquer coisa.
+
+          A partir de `lg` quem manda na altura é a linha das três colunas, e
+          aqui basta ocupá-la inteira.
         */}
-        <section className="flex h-[calc(100vh-15rem)] min-h-[26rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card">
+        <section className="flex h-[calc(100vh-15rem)] min-h-[26rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card lg:h-full lg:min-h-0">
           <h2 className="shrink-0 border-b border-black/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wide text-black/45">
             Conversa
           </h2>
@@ -727,14 +754,19 @@ export default function ConversaReal({
         </section>
 
         {/* Coluna direita: as quatro abas */}
-        <div className="space-y-5">
+        <div className="flex flex-col gap-5 lg:min-h-0">
           {/*
             As quatro abas, iguais às de antes. Agenda e Ligações seguem com os
             dados de exemplo e a mesma aparência; Clínica e Histórico leem o
             banco.
+
+            O cartão ocupa a coluna inteira, como o da conversa: as abas ficam
+            presas no topo e só o conteúdo rola. Assim trocar de aba não muda a
+            altura da coluna — antes, sair da Agenda para o Log fazia o cartão
+            crescer e a página inteira se mexer embaixo dele.
           */}
-          <section className="rounded-card border border-black/10 bg-herval-branco shadow-card">
-            <div className="flex gap-1 border-b border-black/10 px-3 pt-3">
+          <section className="flex flex-1 flex-col rounded-card border border-black/10 bg-herval-branco shadow-card lg:min-h-0">
+            <div className="flex shrink-0 gap-1 border-b border-black/10 px-2 pt-3">
               {abasDoAtendimento.map((opcao) => {
                 const ativa = opcao === aba;
                 return (
@@ -756,7 +788,7 @@ export default function ConversaReal({
               })}
             </div>
 
-            <div className="p-5">
+            <div className="flex-1 overflow-y-auto p-5 lg:min-h-0">
               {aba === "Agenda" && (
                 <AbaAgenda
                   clinica={
