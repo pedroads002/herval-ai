@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Image as ImagemIcone,
   Mic,
+  MicOff,
   Paperclip,
   Send,
   StickyNote,
@@ -20,6 +21,10 @@ import {
   type FormatoDeMidia,
 } from "@/data/mensagens";
 import { useLeads } from "@/components/ProvedorLeads";
+import {
+  duracaoEmMinutos,
+  useGravadorDeAudio,
+} from "@/components/useGravadorDeAudio";
 import {
   abasDoAtendimento,
   AbaAgenda,
@@ -221,6 +226,21 @@ export default function ConversaReal({
    * CRC teria que rolar até embaixo toda vez — inclusive a cada atualização
    * automática, de dez em dez segundos.
    */
+  /**
+   * O gravador entrega um `File` igual ao do clipe, e por isso cai no mesmo
+   * `arquivo`: daqui para frente nada distingue nota de voz de anexo. Um
+   * segundo caminho de envio seria outra chance de os dois divergirem.
+   */
+  const gravador = useGravadorDeAudio({
+    aoTerminar: (audio) => {
+      setArquivo(audio);
+      setAviso(null);
+    },
+    aoFalhar: setAviso,
+  });
+
+  const gravando = gravador.estado === "gravando";
+
   const areaDaConversa = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const area = areaDaConversa.current;
@@ -615,7 +635,7 @@ export default function ConversaReal({
               <label
                 className={[
                   "inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-controle border border-black/15 text-black/50 transition-colors hover:border-herval-verde hover:text-herval-preto",
-                  !envioConfigurado || enviando
+                  !envioConfigurado || enviando || gravando
                     ? "pointer-events-none opacity-40"
                     : "",
                 ].join(" ")}
@@ -625,7 +645,7 @@ export default function ConversaReal({
                 <input
                   type="file"
                   accept={ACEITOS}
-                  disabled={!envioConfigurado || enviando}
+                  disabled={!envioConfigurado || enviando || gravando}
                   onChange={(e) => {
                     setArquivo(e.target.files?.[0] ?? null);
                     setAviso(null);
@@ -637,6 +657,41 @@ export default function ConversaReal({
                   className="hidden"
                 />
               </label>
+
+              {/*
+                Gravar nota de voz. Um clique começa, outro termina — e não
+                "segurar para falar": segurar obriga a manter o mouse parado
+                enquanto se procura a informação na tela, que é justamente o
+                que o CRC faz enquanto fala com o lead.
+              */}
+              <button
+                type="button"
+                onClick={() => (gravando ? gravador.parar() : gravador.gravar())}
+                disabled={
+                  !envioConfigurado ||
+                  enviando ||
+                  gravador.estado === "indisponivel"
+                }
+                title={gravando ? "Parar a gravação" : "Gravar nota de voz"}
+                aria-label={gravando ? "Parar a gravação" : "Gravar nota de voz"}
+                className={[
+                  "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-controle border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                  gravando
+                    ? "border-herval-vermelho bg-herval-vermelho/10 text-herval-vermelho"
+                    : "w-11 border-black/15 px-0 text-black/50 hover:border-herval-verde hover:text-herval-preto",
+                ].join(" ")}
+              >
+                {gravando ? (
+                  <>
+                    <MicOff className="h-4 w-4 shrink-0" />
+                    <span className="tabular-nums">
+                      {duracaoEmMinutos(gravador.segundos)}
+                    </span>
+                  </>
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </button>
 
               <textarea
                 rows={2}
@@ -658,6 +713,7 @@ export default function ConversaReal({
                 disabled={
                   (texto.trim() === "" && !arquivo) ||
                   enviando ||
+                  gravando ||
                   !envioConfigurado
                 }
                 onClick={enviar}
