@@ -79,18 +79,14 @@ export function calcularIndicadoresFila(tarefas: Tarefa[]): Indicador[] {
       valor: String(aguardando),
       detalhe: "do lead",
     },
-    // Métricas históricas: não saem da fila de hoje, seguem como exemplo fixo.
-    {
-      id: "recuperacao",
-      rotulo: "Taxa de recuperação",
-      valor: "31%",
-      detalhe: "leads frios reativados",
-    },
-    {
-      id: "retorno-ia",
-      rotulo: "Retorno para IA",
-      valor: "68%",
-      detalhe: "voltam ao fluxo automático",
-    },
+    /*
+      Aqui havia mais dois cards, "Taxa de recuperação" e "Retorno para IA",
+      com 31% e 68% escritos à mão. Eram exemplo fixo: não saíam da fila, não
+      saíam de lugar nenhum.
+      Saíram inteiros em vez de virarem zero. Um card dizendo "Taxa de
+      recuperação: 0%" afirma um fato — que nenhum lead frio foi reativado —
+      e seria tão falso quanto os 31%. Quando existir de onde calcular, os
+      dois voltam com número de verdade.
+    */
   ];
 }
