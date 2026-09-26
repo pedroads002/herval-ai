@@ -73,8 +73,17 @@ export function AbaAgenda({
   aoAgendar: (dados: DadosDaConsulta) => void;
 }) {
 
+  /*
+    O botão fica colado no rodapé do cartão, e não logo abaixo do texto.
+
+    `min-h-full` faz este bloco ocupar a altura do cartão quando há pouca
+    coisa, e crescer normalmente quando a lista é longa — nos dois casos o
+    `mt-auto` empurra o botão para baixo. O vazio que sobra entre o texto e o
+    botão é esperado: não há o que colocar ali, e inventar conteúdo para
+    preencher seria pior que o vazio.
+  */
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-full flex-col gap-4">
       {agendamentos.length === 0 ? (
         <p className="text-sm font-medium text-black/55">
           Este lead ainda não tem consulta marcada.
@@ -111,25 +120,27 @@ export function AbaAgenda({
         </ul>
       )}
 
-      {aberto ? (
-        <FormularioDeConsulta
-          clinica={clinica}
-          aoAgendar={(dados) => {
-            aoAgendar(dados);
-            aoAlternar(false);
-          }}
-          aoCancelar={() => aoAlternar(false)}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => aoAlternar(true)}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
-        >
-          <CalendarPlus className="h-4 w-4" />
-          Agendar consulta
-        </button>
-      )}
+      <div className="mt-auto">
+        {aberto ? (
+          <FormularioDeConsulta
+            clinica={clinica}
+            aoAgendar={(dados) => {
+              aoAgendar(dados);
+              aoAlternar(false);
+            }}
+            aoCancelar={() => aoAlternar(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => aoAlternar(true)}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Agendar consulta
+          </button>
+        )}
+      </div>
     </div>
   );
 }

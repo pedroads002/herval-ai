@@ -383,9 +383,21 @@ export default function ConversaReal({
   }
 
   return (
-    <div className="space-y-5">
+    /*
+      A tela inteira cabe na altura disponível: o cabeçalho do lead fica preso
+      no topo e a linha das colunas ocupa o resto. Nada aqui faz a área de
+      conteúdo rolar — quem rola é o que está dentro de cada cartão.
+
+      `lg:h-full` e não só `min-h-full`: a altura precisa ser definida para o
+      `h-full` da conversa ter contra o que resolver. Com altura indefinida, o
+      bloco de mensagens cresce com o conteúdo em vez de rolar por dentro, e
+      volta a empurrar a área inteira — foi o que aconteceu no primeiro teste.
+
+      Abaixo de `lg` fica só o piso: as colunas empilham e a área rola.
+    */
+    <div className="flex min-h-full flex-col gap-5 lg:h-full">
       {/* Cabeçalho */}
-      <div className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
+      <div className="shrink-0 rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
         <Link
           href="/atendimento"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 transition-colors hover:text-herval-preto"
@@ -419,10 +431,13 @@ export default function ConversaReal({
         dela. Agora a linha inteira tem a altura da conversa e cada coluna rola
         por dentro — o que passa do limite vira rolagem, não vira página.
 
+        A altura vem do espaço que sobra, e não de uma conta com `100vh`: a
+        moldura já não rola, então basta ocupar o que restou.
+
         Só a partir de `lg`. Abaixo disso as colunas ficam empilhadas, uma
         embaixo da outra, e prender altura ali só esconderia conteúdo.
       */}
-      <div className="grid gap-5 lg:h-[calc(100vh-15rem)] lg:min-h-[26rem] lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
+      <div className="grid gap-5 lg:min-h-[26rem] lg:flex-1 lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
         {/* Coluna esquerda: dados e notas */}
         <div className="flex flex-col gap-5 lg:min-h-0 lg:overflow-y-auto">
           <section className="shrink-0 rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
