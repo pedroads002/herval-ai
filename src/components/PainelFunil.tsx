@@ -74,9 +74,9 @@ export default function PainelFunil() {
   }
 
   return (
-    <div className="space-y-7">
+    <div className="flex min-h-0 flex-1 flex-col gap-7">
       {/* Busca e período */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+      <div className="flex shrink-0 flex-col gap-4 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
           <input
@@ -111,7 +111,7 @@ export default function PainelFunil() {
         </div>
       </div>
 
-      <p className="text-sm font-medium text-black/55">
+      <p className="shrink-0 text-sm font-medium text-black/55">
         <span className="font-extrabold text-herval-preto">
           {visiveis.length}
         </span>{" "}
@@ -122,54 +122,65 @@ export default function PainelFunil() {
         na base · {etapasFunil.length} etapas. É normal etapa ficar vazia.
       </p>
 
-      {/* Quadro */}
-      <div className="-mx-6 overflow-x-auto px-6 pb-4 md:-mx-10 md:px-10">
-        <div className="flex gap-4">
-          {colunas.map(({ etapa, cards }) => (
-            <section
-              key={etapa}
-              className="flex w-64 shrink-0 flex-col rounded-card border border-black/10 bg-black/[0.03]"
-            >
-              <header className="flex items-center justify-between gap-2 border-b border-black/10 px-4 py-3.5">
-                <h2 className="text-sm font-extrabold tracking-tight text-herval-preto">
-                  {etapa}
-                </h2>
-                <span
-                  className={[
-                    "rounded-full px-2 py-0.5 text-xs font-extrabold tabular-nums",
-                    cards.length > 0
-                      ? "bg-herval-verde text-herval-preto"
-                      : "border border-black/15 text-black/40",
-                  ].join(" ")}
-                >
-                  {cards.length}
-                </span>
-              </header>
+      {/*
+        Quadro.
 
-              <div className="flex-1 space-y-3 p-3">
-                {cards.length === 0 && (
-                  <p className="px-1 py-6 text-center text-xs font-medium text-black/35">
-                    Nenhum lead nesta etapa.
-                  </p>
-                )}
+        `items-start` é o que faz a coluna curta parar onde os leads dela
+        acabam. Sem isso todas as colunas esticam até a altura da mais cheia,
+        e uma etapa com seis leads vira uma caixa quase toda vazia.
 
-                {cards.map((tarefa) => (
-                  <Cartao
-                    key={tarefa.id}
-                    tarefa={tarefa}
-                    menuAberto={movendo === tarefa.id}
-                    passo={passo}
-                    aoAbrirMenu={() => abrirMenu(tarefa.id)}
-                    aoPedirPasso={setPasso}
-                    aoMover={(destino, dados) =>
-                      mover(tarefa.id, destino, dados)
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+        `max-h-full` dá o teto; quem passa dele rola dentro da própria coluna,
+        sem arrastar as outras junto.
+
+        As margens negativas anulam a folga da área de conteúdo para o quadro
+        poder correr de ponta a ponta. Precisam bater com ela: enquanto a folga
+        era `px-6`/`md:px-10`, eram `-mx-6`/`md:-mx-10`; agora que é `p-3`,
+        passam a `-mx-3`. Fora de sincronia, o quadro sangra para debaixo do
+        menu lateral.
+      */}
+      <div className="-mx-3 flex min-h-0 flex-1 items-start gap-4 overflow-x-auto px-3 pb-2">
+        {colunas.map(({ etapa, cards }) => (
+          <section
+            key={etapa}
+            className="flex max-h-full w-64 shrink-0 flex-col rounded-card border border-black/10 bg-black/[0.03]"
+          >
+            <header className="flex shrink-0 items-center justify-between gap-2 border-b border-black/10 px-4 py-3.5">
+              <h2 className="text-sm font-extrabold tracking-tight text-herval-preto">
+                {etapa}
+              </h2>
+              <span
+                className={[
+                  "rounded-full px-2 py-0.5 text-xs font-extrabold tabular-nums",
+                  cards.length > 0
+                    ? "bg-herval-verde text-herval-preto"
+                    : "border border-black/15 text-black/40",
+                ].join(" ")}
+              >
+                {cards.length}
+              </span>
+            </header>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+              {cards.length === 0 && (
+                <p className="px-1 py-6 text-center text-xs font-medium text-black/35">
+                  Nenhum lead nesta etapa.
+                </p>
+              )}
+
+              {cards.map((tarefa) => (
+                <Cartao
+                  key={tarefa.id}
+                  tarefa={tarefa}
+                  menuAberto={movendo === tarefa.id}
+                  passo={passo}
+                  aoAbrirMenu={() => abrirMenu(tarefa.id)}
+                  aoPedirPasso={setPasso}
+                  aoMover={(destino, dados) => mover(tarefa.id, destino, dados)}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );
