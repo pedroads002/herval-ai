@@ -51,14 +51,7 @@ export type Intervalo = {
  * Intervalo de cada profissional, por id da tela de Profissionais. Vale de
  * segunda a sexta: no fim de semana a clínica não tem escala fixa.
  */
-export const intervalosPorProfissional: Record<number, Intervalo> = {
-  1: { rotulo: "Almoço", inicio: "12:00", fim: "13:00" },
-  2: { rotulo: "Almoço", inicio: "12:00", fim: "13:00" },
-  3: { rotulo: "Almoço", inicio: "13:00", fim: "14:00" },
-  4: { rotulo: "Almoço", inicio: "12:00", fim: "13:00" },
-  5: { rotulo: "Almoço", inicio: "11:00", fim: "12:00" },
-  6: { rotulo: "Almoço", inicio: "13:00", fim: "14:00" },
-};
+export const intervalosPorProfissional: Record<number, Intervalo> = {};
 
 /** Verdadeiro quando a linha da grade cai dentro do intervalo do profissional. */
 export function horaEmIntervalo(hora: string, intervalo: Intervalo) {
