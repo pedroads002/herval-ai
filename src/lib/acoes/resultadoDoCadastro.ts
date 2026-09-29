@@ -7,6 +7,20 @@
  * tempo de execução, e o `build` não avisa.
  */
 
+/**
+ * O cliente que acabou de ser criado, com a unidade que o gatilho criou junto.
+ *
+ * Vai de volta para a tela porque o cadastro continua ali mesmo: quem cadastrou
+ * a clínica vai cadastrar quem atende nela na sequência, e o formulário precisa
+ * saber em qual unidade marcar. Esperar a página recarregar para descobrir isso
+ * deixaria o passo seguinte com a lista de lugares vazia.
+ */
+export type ClienteCriado = {
+  id: number;
+  nome: string;
+  unidades: { id: number; nome: string }[];
+};
+
 export type ResultadoDoCadastro = {
   ok: boolean;
   /** Vazio antes do primeiro envio. Erro sempre vem com motivo em português. */
@@ -17,6 +31,8 @@ export type ResultadoDoCadastro = {
    * campo duas vezes veria a tela parada e acharia que o botão não funcionou.
    */
   envio: number;
+  /** Só vem preenchido quando a gravação criou um cliente. */
+  cliente?: ClienteCriado;
 };
 
 export const RESULTADO_INICIAL: ResultadoDoCadastro = {

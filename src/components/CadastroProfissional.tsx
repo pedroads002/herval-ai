@@ -1,29 +1,49 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { AlertCircle, Building2, Check, Plus, UserPlus, X } from "lucide-react";
 import {
+  AlertCircle,
+  ArrowLeft,
+  Building2,
+  Check,
+  Plus,
+  User,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  cadastrarAutonomo,
   cadastrarCliente,
   cadastrarProfissional,
 } from "@/lib/acoes/profissionais";
 import { RESULTADO_INICIAL } from "@/lib/acoes/resultadoDoCadastro";
 import { tiposDeProfissional } from "@/lib/dados/tiposDeProfissional";
+import type { ResultadoDoCadastro } from "@/lib/acoes/resultadoDoCadastro";
 import type {
   ClienteDoCadastro,
   EspecialidadeDoCadastro,
 } from "@/lib/dados/profissionais";
 
 /**
- * Os dois cadastros da seção: cliente novo e profissional novo.
+ * O cadastro da seção — **uma porta de entrada só.**
  *
- * Ficam no mesmo lugar de propósito. Não existe tela de cliente separada — na
- * prática, esta é a tela de cadastro de cliente também. E não existe tela de
- * "Unidades": a primeira unidade nasce junto com o cliente, e as outras
- * aparecem aqui como lugares onde marcar.
+ * Antes eram dois botões, "Cadastrar cliente" e "Cadastrar profissional", e
+ * quem chegava tinha que saber de antemão que existe uma tabela de clínicas
+ * atrás da tela e que ela precisa vir primeiro. Agora a tela pergunta o que
+ * ela precisa saber — a pessoa atende sozinha ou tem equipe? — e conduz o
+ * resto.
  *
- * Só um formulário fica aberto por vez. Dois cartões abertos lado a lado,
- * ambos começando com um campo "nome", é o tipo de tela em que se digita o
- * nome da pessoa no lugar do nome da clínica.
+ * Os dois caminhos:
+ *
+ *   ATENDE SOZINHO  um formulário só. O nome serve ao cliente e à pessoa, que
+ *                   são a mesma. Uma gravação, um passo.
+ *   TEM EQUIPE      o nome da clínica primeiro, e na sequência, sem sair da
+ *                   tela, quantas pessoas atendem nela.
+ *
+ * O banco não mudou: continuam sendo `clinicas`, `unidades`, `profissionais` e
+ * os vínculos. O que mudou é quem monta esse desenho — antes era quem cadastra,
+ * agora é a tela.
  */
 
 const campoBase =
@@ -35,9 +55,37 @@ const botaoPrincipal =
 const botaoSecundario =
   "inline-flex items-center gap-2 rounded-full border border-black/15 px-5 py-3 text-sm font-bold text-black/70 transition-colors hover:border-black/30 disabled:cursor-not-allowed disabled:opacity-40";
 
-const rotulo = "mb-2 block text-xs font-bold uppercase tracking-wide text-black/50";
+const rotulo =
+  "mb-2 block text-xs font-bold uppercase tracking-wide text-black/50";
 
-type Aberto = "nenhum" | "cliente" | "profissional";
+/** Um cliente já existente no banco, do jeito que o passo da equipe precisa. */
+type ClienteEmFoco = {
+  id: number;
+  nome: string;
+  unidades: { id: number; nome: string }[];
+};
+
+/**
+ * Onde o fluxo está.
+ *
+ * É um passo de cada vez de propósito: a pergunta da entrada só tem valor se a
+ * resposta levar a um caminho, e dois formulários abertos ao mesmo tempo,
+ * ambos começando por um campo "nome", é o tipo de tela em que se digita o nome
+ * da pessoa no lugar do nome da clínica.
+ */
+type Passo =
+  | { etapa: "fechado" }
+  | { etapa: "pergunta" }
+  | { etapa: "autonomo" }
+  | { etapa: "cliente" }
+  | {
+      etapa: "equipe";
+      cliente: ClienteEmFoco;
+      /** Falso quando a clínica já estava cadastrada antes deste fluxo. */
+      novo: boolean;
+      /** Quem já foi cadastrado nesta passagem, para a tela ir mostrando. */
+      cadastrados: string[];
+    };
 
 export default function CadastroProfissional({
   clientes,
@@ -46,7 +94,7 @@ export default function CadastroProfissional({
   clientes: ClienteDoCadastro[];
   especialidades: EspecialidadeDoCadastro[];
 }) {
-  const [aberto, setAberto] = useState<Aberto>("nenhum");
+  const [passo, setPasso] = useState<Passo>({ etapa: "fechado" });
   /**
    * A confirmação vive aqui, fora do cartão, porque o cartão fecha quando a
    * gravação dá certo — e uma mensagem de sucesso que some junto com o
@@ -54,59 +102,34 @@ export default function CadastroProfissional({
    */
   const [sucesso, setSucesso] = useState("");
 
-  const temCliente = clientes.length > 0;
-
   function concluir(mensagem: string) {
     setSucesso(mensagem);
-    setAberto("nenhum");
+    setPasso({ etapa: "fechado" });
   }
 
-  function alternar(qual: Exclude<Aberto, "nenhum">) {
+  function abrir() {
     setSucesso("");
-    setAberto((a) => (a === qual ? "nenhum" : qual));
+    setPasso((atual) =>
+      atual.etapa === "fechado" ? { etapa: "pergunta" } : { etapa: "fechado" },
+    );
   }
+
+  const fechado = passo.etapa === "fechado";
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => alternar("profissional")}
-          disabled={!temCliente}
-          className={botaoPrincipal}
-        >
-          {aberto === "profissional" ? (
-            <X className="h-4 w-4" />
-          ) : (
+        <button type="button" onClick={abrir} className={botaoPrincipal}>
+          {fechado ? (
             <UserPlus className="h-4 w-4" />
-          )}
-          {aberto === "profissional" ? "Fechar" : "Cadastrar profissional"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => alternar("cliente")}
-          className={botaoSecundario}
-        >
-          {aberto === "cliente" ? (
-            <X className="h-4 w-4" />
           ) : (
-            <Building2 className="h-4 w-4" />
+            <X className="h-4 w-4" />
           )}
-          {aberto === "cliente" ? "Fechar" : "Cadastrar cliente"}
+          {fechado ? "Cadastrar profissionais" : "Fechar"}
         </button>
-
-        {/* Sem cliente não há onde encaixar ninguém: o botão desabilitado
-            sozinho não explica isso, e quem lê "Cadastrar profissional"
-            apagado fica sem saber o que fazer antes. */}
-        {!temCliente && (
-          <span className="text-xs font-medium text-black/45">
-            Cadastre um cliente primeiro — é a clínica em que a pessoa trabalha.
-          </span>
-        )}
       </div>
 
-      {sucesso !== "" && aberto === "nenhum" && (
+      {sucesso !== "" && fechado && (
         <p
           role="status"
           className="inline-flex items-center gap-2 rounded-card bg-herval-verde/15 px-5 py-3 text-sm font-bold text-herval-preto"
@@ -116,23 +139,151 @@ export default function CadastroProfissional({
         </p>
       )}
 
-      {aberto === "cliente" && <FormularioCliente aoConcluir={concluir} />}
+      {passo.etapa === "pergunta" && (
+        <Pergunta
+          aoEscolherSozinho={() => setPasso({ etapa: "autonomo" })}
+          aoEscolherEquipe={() => setPasso({ etapa: "cliente" })}
+        />
+      )}
 
-      {aberto === "profissional" && (
-        <FormularioProfissional
-          clientes={clientes}
+      {passo.etapa === "autonomo" && (
+        <FormularioPessoa
+          titulo="Quem atende"
+          acao={cadastrarAutonomo}
           especialidades={especialidades}
-          aoConcluir={concluir}
+          unidades={null}
+          aoVoltar={() => setPasso({ etapa: "pergunta" })}
+          aoConcluir={(estado) => concluir(estado.mensagem)}
+        />
+      )}
+
+      {passo.etapa === "cliente" && (
+        <FormularioCliente
+          clientes={clientes}
+          aoVoltar={() => setPasso({ etapa: "pergunta" })}
+          aoEscolherExistente={(cliente) =>
+            setPasso({ etapa: "equipe", cliente, novo: false, cadastrados: [] })
+          }
+          aoCriar={(cliente) =>
+            setPasso({ etapa: "equipe", cliente, novo: true, cadastrados: [] })
+          }
+        />
+      )}
+
+      {passo.etapa === "equipe" && (
+        <Equipe
+          passo={passo}
+          especialidades={especialidades}
+          aoCadastrar={(nome) =>
+            setPasso({ ...passo, cadastrados: [...passo.cadastrados, nome] })
+          }
+          aoEncerrar={() => concluir(resumoDaEquipe(passo))}
         />
       )}
     </div>
   );
 }
 
-function FormularioCliente({
-  aoConcluir,
+/** A frase que fica na tela depois de fechar o cadastro da equipe. */
+function resumoDaEquipe(passo: Extract<Passo, { etapa: "equipe" }>) {
+  const quantos = passo.cadastrados.length;
+  const pessoas = quantos === 1 ? "1 profissional" : `${quantos} profissionais`;
+
+  if (passo.novo) {
+    return quantos === 0
+      ? `Cliente "${passo.cliente.nome}" cadastrado. Ninguém atendendo ainda — dá para cadastrar depois.`
+      : `Cliente "${passo.cliente.nome}" cadastrado com ${pessoas}.`;
+  }
+
+  return quantos === 0
+    ? `Nada mudou em "${passo.cliente.nome}".`
+    : `${pessoas} cadastrado${quantos === 1 ? "" : "s"} em "${passo.cliente.nome}".`;
+}
+
+/**
+ * A primeira pergunta do fluxo, e a única que não é um campo.
+ *
+ * Ela existe porque a resposta muda o cadastro inteiro, não um campo dele: quem
+ * atende sozinho não tem clínica para nomear nem unidade para escolher, e
+ * mostrar esses campos com a instrução de repetir o próprio nome neles é o que
+ * a tela fazia antes.
+ */
+function Pergunta({
+  aoEscolherSozinho,
+  aoEscolherEquipe,
 }: {
-  aoConcluir: (mensagem: string) => void;
+  aoEscolherSozinho: () => void;
+  aoEscolherEquipe: () => void;
+}) {
+  return (
+    <Cartao titulo="Como é o atendimento?">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Escolha
+          icone={<User className="h-5 w-5" />}
+          titulo="Atende sozinho"
+          texto="Uma pessoa só. Não há outros profissionais no mesmo lugar."
+          aoClicar={aoEscolherSozinho}
+        />
+        <Escolha
+          icone={<Users className="h-5 w-5" />}
+          titulo="Tem clínica ou equipe"
+          texto="Mais de uma pessoa atendendo. Cadastramos a clínica e depois quem atende nela."
+          aoClicar={aoEscolherEquipe}
+        />
+      </div>
+    </Cartao>
+  );
+}
+
+function Escolha({
+  icone,
+  titulo,
+  texto,
+  aoClicar,
+}: {
+  icone: React.ReactNode;
+  titulo: string;
+  texto: string;
+  aoClicar: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={aoClicar}
+      className="rounded-card border border-black/15 p-6 text-left transition-colors hover:border-herval-verde hover:bg-herval-verde/5"
+    >
+      <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-herval-verde/15 text-herval-preto">
+        {icone}
+      </span>
+      <span className="block text-sm font-extrabold text-herval-preto">
+        {titulo}
+      </span>
+      <span className="mt-1.5 block text-xs font-medium leading-relaxed text-black/50">
+        {texto}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * O primeiro passo do caminho "tem equipe": o nome da clínica.
+ *
+ * A lista de clientes já cadastrados fica aqui embaixo, e não num terceiro
+ * caminho na pergunta da entrada: quem volta para adicionar mais gente numa
+ * clínica que já existe está no mesmo caminho de quem acabou de criá-la — a
+ * diferença é só se o nome precisa ser digitado ou já está no banco. Sem isso,
+ * o único jeito de cadastrar alguém seria criar uma clínica nova toda vez.
+ */
+function FormularioCliente({
+  clientes,
+  aoVoltar,
+  aoEscolherExistente,
+  aoCriar,
+}: {
+  clientes: ClienteDoCadastro[];
+  aoVoltar: () => void;
+  aoEscolherExistente: (cliente: ClienteEmFoco) => void;
+  aoCriar: (cliente: ClienteEmFoco) => void;
 }) {
   const [estado, acao, enviando] = useActionState(
     cadastrarCliente,
@@ -142,10 +293,15 @@ function FormularioCliente({
       campos quando a ação termina, inclusive quando ela recusou. */
   const [nome, setNome] = useState("");
 
-  useFecharQuandoDerCerto(estado, aoConcluir);
+  useQuandoDerCerto(estado, (resultado) => {
+    // A ação devolve o cliente com a unidade que o gatilho criou. É o que
+    // permite ir direto ao passo seguinte: esperar a página recarregar para
+    // descobrir a unidade deixaria a lista de lugares vazia.
+    if (resultado.cliente) aoCriar(resultado.cliente);
+  });
 
   return (
-    <Cartao titulo="Cliente novo">
+    <Cartao titulo="A clínica" aoVoltar={aoVoltar}>
       {/* O `key` muda a cada resposta do servidor, o que redesenha o
           formulário a partir do estado guardado acima. Sem isso, o React
           esvazia os campos quando a ação termina — inclusive quando ela
@@ -153,7 +309,7 @@ function FormularioCliente({
       <form key={estado.envio} action={acao} className="space-y-6">
         <div className="max-w-xl">
           <label htmlFor="cliente-nome" className={rotulo}>
-            Nome do cliente
+            Nome da clínica
           </label>
           <input
             id="cliente-nome"
@@ -168,37 +324,150 @@ function FormularioCliente({
           />
           <p className="mt-2 text-xs font-medium text-black/45">
             A primeira unidade é criada junto, com este mesmo nome. Só é preciso
-            dar nome às unidades quando o cliente tiver mais de uma.
+            dar nome às unidades quando a clínica tiver mais de uma.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
           <button type="submit" disabled={enviando} className={botaoPrincipal}>
             <Plus className="h-4 w-4" />
-            {enviando ? "Cadastrando…" : "Cadastrar cliente"}
+            {enviando ? "Cadastrando…" : "Cadastrar e continuar"}
           </button>
           <Aviso estado={estado} />
         </div>
       </form>
+
+      {clientes.length > 0 && (
+        <div className="mt-8 border-t border-black/10 pt-6">
+          <p className={rotulo}>Ou continue num cliente já cadastrado</p>
+          <div className="flex flex-wrap gap-2">
+            {clientes.map((cliente) => {
+              const unidades = cliente.unidades.filter((u) => u.ativa);
+
+              return (
+                <button
+                  key={cliente.id}
+                  type="button"
+                  disabled={unidades.length === 0}
+                  onClick={() =>
+                    aoEscolherExistente({
+                      id: cliente.id,
+                      nome: cliente.nome,
+                      unidades: unidades.map((u) => ({
+                        id: u.id,
+                        nome: u.nome,
+                      })),
+                    })
+                  }
+                  className="inline-flex items-center gap-2 rounded-full border border-black/15 px-4 py-2.5 text-xs font-bold text-black/70 transition-colors hover:border-herval-verde hover:text-herval-preto disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  {cliente.nome}
+                  {/* Sem unidade ativa não há onde encaixar ninguém. Dizer o
+                      motivo evita que o botão apagado pareça defeito. */}
+                  {unidades.length === 0 && " (sem unidade ativa)"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </Cartao>
   );
 }
 
-function FormularioProfissional({
-  clientes,
+/**
+ * O segundo passo do caminho "tem equipe": quem atende, um de cada vez.
+ *
+ * O formulário é o mesmo depois de cada gravação, e não um cartão novo por
+ * pessoa: cadastrar equipe é digitar a mesma sequência de campos várias vezes,
+ * e obrigar a clicar em "adicionar outro" antes de cada uma seria um clique a
+ * mais por pessoa sem nada em troca. Quem já entrou fica listado acima.
+ */
+function Equipe({
+  passo,
   especialidades,
-  aoConcluir,
+  aoCadastrar,
+  aoEncerrar,
 }: {
-  clientes: ClienteDoCadastro[];
+  passo: Extract<Passo, { etapa: "equipe" }>;
   especialidades: EspecialidadeDoCadastro[];
-  aoConcluir: (mensagem: string) => void;
+  aoCadastrar: (nome: string) => void;
+  aoEncerrar: () => void;
 }) {
-  const [estado, acao, enviando] = useActionState(
-    cadastrarProfissional,
-    RESULTADO_INICIAL,
-  );
+  return (
+    <div className="space-y-5">
+      <Cartao titulo={`Quem atende em ${passo.cliente.nome}`}>
+        {passo.cadastrados.length > 0 && (
+          <ul className="mb-7 flex flex-wrap gap-2">
+            {passo.cadastrados.map((nome, indice) => (
+              <li
+                key={`${nome}-${indice}`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde/15 px-3.5 py-2 text-xs font-bold text-herval-preto"
+              >
+                <Check className="h-3.5 w-3.5" />
+                {nome}
+              </li>
+            ))}
+          </ul>
+        )}
 
-  useFecharQuandoDerCerto(estado, aoConcluir);
+        {/* O `key` troca a cada pessoa gravada, o que devolve um formulário
+            limpo para a próxima. Sem isso, o nome de quem acabou de entrar
+            ficaria no campo, à espera de ser cadastrado duas vezes. */}
+        <FormularioPessoa
+          key={passo.cadastrados.length}
+          acao={cadastrarProfissional}
+          especialidades={especialidades}
+          unidades={passo.cliente.unidades}
+          aoConcluir={(_estado, nome) => aoCadastrar(nome)}
+          semCartao
+        />
+      </Cartao>
+
+      <div className="flex flex-wrap items-center gap-4">
+        <button type="button" onClick={aoEncerrar} className={botaoSecundario}>
+          <Check className="h-4 w-4" />
+          {passo.cadastrados.length === 0
+            ? "Concluir sem cadastrar ninguém"
+            : "Concluir"}
+        </button>
+        <span className="text-xs font-medium text-black/45">
+          Dá para voltar e adicionar mais gente depois.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Os campos da pessoa. Serve aos dois caminhos.
+ *
+ * `unidades` nulo é o caminho "atende sozinho": não há onde escolher, porque a
+ * única unidade é a que nasce junto com o cliente na mesma gravação.
+ */
+function FormularioPessoa({
+  titulo,
+  acao,
+  especialidades,
+  unidades,
+  aoVoltar,
+  aoConcluir,
+  semCartao,
+}: {
+  titulo?: string;
+  acao: (
+    anterior: ResultadoDoCadastro,
+    formData: FormData,
+  ) => Promise<ResultadoDoCadastro>;
+  especialidades: EspecialidadeDoCadastro[];
+  unidades: { id: number; nome: string }[] | null;
+  aoVoltar?: () => void;
+  /** O nome vem junto porque quem chama monta a etiqueta de "já cadastrados". */
+  aoConcluir: (estado: ResultadoDoCadastro, nome: string) => void;
+  semCartao?: boolean;
+}) {
+  const [estado, executar, enviando] = useActionState(acao, RESULTADO_INICIAL);
 
   /**
    * Os campos são controlados pela tela, e não deixados por conta do
@@ -211,6 +480,12 @@ function FormularioProfissional({
   const [registro, setRegistro] = useState("");
   const [marcados, setMarcados] = useState<Record<string, boolean>>({});
 
+  // O nome sai do estado da tela, e não da frase que o servidor devolveu: o
+  // campo continua preenchido no instante em que a gravação dá certo, e ler
+  // dali é exato — garimpar o nome de dentro de uma frase quebraria calado no
+  // dia em que a frase mudasse.
+  useQuandoDerCerto(estado, (resultado) => aoConcluir(resultado, nome));
+
   /**
    * Especialidade inativa não entra na lista de marcar. Ela continua aparecendo
    * riscada em quem já a tinha — o histórico não se apaga —, mas oferecê-la num
@@ -218,144 +493,174 @@ function FormularioProfissional({
    */
   const disponiveis = especialidades.filter((e) => e.ativa);
 
-  return (
-    <Cartao titulo="Profissional novo">
-      {/* Mesmo motivo do outro formulário: redesenhar a partir do estado
-          depois de cada resposta. Aqui importa ainda mais, porque as caixas
-          marcadas somem no esvaziamento e o texto digitado não. */}
-      <form key={estado.envio} action={acao} className="space-y-7">
-        <div className="grid gap-5 md:grid-cols-3">
-          <div>
-            <label htmlFor="prof-nome" className={rotulo}>
-              Nome
-            </label>
-            <input
-              id="prof-nome"
-              name="nome"
-              type="text"
-              maxLength={120}
-              autoComplete="off"
-              placeholder="Ex.: Dra. Ana Martins"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              className={campoBase}
-            />
-          </div>
+  const corpo = (
+    /* Mesmo motivo do outro formulário: redesenhar a partir do estado
+       depois de cada resposta. Aqui importa ainda mais, porque as caixas
+       marcadas somem no esvaziamento e o texto digitado não. */
+    <form key={estado.envio} action={executar} className="space-y-7">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div>
+          <label htmlFor="prof-nome" className={rotulo}>
+            Nome
+          </label>
+          <input
+            id="prof-nome"
+            name="nome"
+            type="text"
+            maxLength={120}
+            autoComplete="off"
+            placeholder="Ex.: Dra. Ana Martins"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            className={campoBase}
+          />
+        </div>
 
-          <div>
-            <label htmlFor="prof-tipo" className={rotulo}>
-              Tipo
-            </label>
-            <select
-              id="prof-tipo"
-              name="tipo"
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className={campoBase}
-            >
-              <option value="" disabled>
-                Escolha o tipo
+        <div>
+          <label htmlFor="prof-tipo" className={rotulo}>
+            Tipo
+          </label>
+          <select
+            id="prof-tipo"
+            name="tipo"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            className={campoBase}
+          >
+            <option value="" disabled>
+              Escolha o tipo
+            </option>
+            {tiposDeProfissional.map((cargo) => (
+              <option key={cargo} value={cargo}>
+                {cargo}
               </option>
-              {tiposDeProfissional.map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {tipo}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="prof-registro" className={rotulo}>
-              Registro <span className="normal-case">(opcional)</span>
-            </label>
-            <input
-              id="prof-registro"
-              name="registro"
-              type="text"
-              maxLength={60}
-              autoComplete="off"
-              placeholder="Ex.: CRM 12345"
-              value={registro}
-              onChange={(e) => setRegistro(e.target.value)}
-              className={campoBase}
-            />
-            <p className="mt-2 text-xs font-medium text-black/45">
-              Nem todo cargo tem conselho de classe.
-            </p>
-          </div>
+            ))}
+          </select>
         </div>
 
-        <fieldset>
-          <legend className={rotulo}>Especialidades que atende</legend>
-          {disponiveis.length === 0 ? (
-            <p className="text-sm font-medium text-black/45">
-              Nenhuma especialidade ativa cadastrada ainda. Dá para cadastrar a
-              pessoa assim e marcar depois.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {disponiveis.map((especialidade) => (
-                <Marcador
-                  key={especialidade.id}
-                  campo="especialidades"
-                  valor={especialidade.id}
-                  texto={especialidade.nome}
-                  marcados={marcados}
-                  aoMarcar={setMarcados}
-                />
-              ))}
-            </div>
-          )}
-        </fieldset>
-
-        <fieldset>
-          <legend className={rotulo}>Onde atende</legend>
-          <div className="space-y-4">
-            {clientes.map((cliente) => {
-              /* Cliente de uma unidade só mostra uma caixa com o nome dele —
-                 quem tem um lugar só nunca precisa saber que "unidade" existe.
-                 O agrupamento aparece mesmo com um cliente só, porque é o que
-                 deixa claro a qual cliente o lugar pertence. */
-              const unidades = cliente.unidades.filter((u) => u.ativa);
-
-              return (
-                <div key={cliente.id}>
-                  <p className="mb-2 text-sm font-bold text-herval-preto">
-                    {cliente.nome}
-                  </p>
-                  {unidades.length === 0 ? (
-                    <p className="text-xs font-medium text-black/45">
-                      Nenhuma unidade ativa.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {unidades.map((unidade) => (
-                        <Marcador
-                          key={unidade.id}
-                          campo="unidades"
-                          valor={unidade.id}
-                          texto={unidade.nome}
-                          marcados={marcados}
-                          aoMarcar={setMarcados}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <button type="submit" disabled={enviando} className={botaoPrincipal}>
-            <Plus className="h-4 w-4" />
-            {enviando ? "Cadastrando…" : "Cadastrar profissional"}
-          </button>
-          <Aviso estado={estado} />
+        <div>
+          <label htmlFor="prof-registro" className={rotulo}>
+            Registro <span className="normal-case">(opcional)</span>
+          </label>
+          <input
+            id="prof-registro"
+            name="registro"
+            type="text"
+            maxLength={60}
+            autoComplete="off"
+            placeholder="Ex.: CRM 12345"
+            value={registro}
+            onChange={(e) => setRegistro(e.target.value)}
+            className={campoBase}
+          />
+          <p className="mt-2 text-xs font-medium text-black/45">
+            Nem todo cargo tem conselho de classe.
+          </p>
         </div>
-      </form>
+      </div>
+
+      <fieldset>
+        <legend className={rotulo}>Especialidades que atende</legend>
+        {disponiveis.length === 0 ? (
+          <p className="text-sm font-medium text-black/45">
+            Nenhuma especialidade ativa cadastrada ainda. Dá para cadastrar a
+            pessoa assim e marcar depois.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {disponiveis.map((especialidade) => (
+              <Marcador
+                key={especialidade.id}
+                campo="especialidades"
+                valor={especialidade.id}
+                texto={especialidade.nome}
+                marcados={marcados}
+                aoMarcar={setMarcados}
+              />
+            ))}
+          </div>
+        )}
+      </fieldset>
+
+      <Unidades
+        unidades={unidades}
+        marcados={marcados}
+        aoMarcar={setMarcados}
+      />
+
+      <div className="flex flex-wrap items-center gap-4">
+        <button type="submit" disabled={enviando} className={botaoPrincipal}>
+          <Plus className="h-4 w-4" />
+          {enviando ? "Cadastrando…" : "Cadastrar profissional"}
+        </button>
+        <Aviso estado={estado} />
+      </div>
+    </form>
+  );
+
+  if (semCartao) return corpo;
+
+  return (
+    <Cartao titulo={titulo ?? "Quem atende"} aoVoltar={aoVoltar}>
+      {corpo}
     </Cartao>
+  );
+}
+
+/**
+ * Onde a pessoa atende.
+ *
+ * Três casos, e a diferença entre eles não é enfeite:
+ *
+ *   sem lista       caminho "atende sozinho". A unidade nasce na mesma
+ *                   gravação, então não existe nada para escolher ainda.
+ *   uma unidade só  a escolha seria entre uma opção e nenhuma. Vira uma frase
+ *                   e um campo escondido — quem tem um lugar só nunca precisa
+ *                   saber que "unidade" existe.
+ *   mais de uma     aí sim é uma escolha, e aparece como escolha.
+ */
+function Unidades({
+  unidades,
+  marcados,
+  aoMarcar,
+}: {
+  unidades: { id: number; nome: string }[] | null;
+  marcados: Record<string, boolean>;
+  aoMarcar: (
+    mudar: (atual: Record<string, boolean>) => Record<string, boolean>,
+  ) => void;
+}) {
+  if (unidades === null) return null;
+
+  if (unidades.length === 1) {
+    return (
+      <div>
+        <p className={rotulo}>Onde atende</p>
+        <input type="hidden" name="unidades" value={unidades[0].id} />
+        <p className="text-sm font-medium text-black/60">{unidades[0].nome}</p>
+      </div>
+    );
+  }
+
+  return (
+    <fieldset>
+      <legend className={rotulo}>Em qual unidade atende</legend>
+      <div className="flex flex-wrap gap-2">
+        {unidades.map((unidade) => (
+          <Marcador
+            key={unidade.id}
+            campo="unidades"
+            valor={unidade.id}
+            texto={unidade.nome}
+            marcados={marcados}
+            aoMarcar={aoMarcar}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-xs font-medium text-black/45">
+        Dá para marcar mais de uma, se a pessoa atende em mais de um lugar.
+      </p>
+    </fieldset>
   );
 }
 
@@ -375,7 +680,9 @@ function Marcador({
   valor: number;
   texto: string;
   marcados: Record<string, boolean>;
-  aoMarcar: (mudar: (atual: Record<string, boolean>) => Record<string, boolean>) => void;
+  aoMarcar: (
+    mudar: (atual: Record<string, boolean>) => Record<string, boolean>,
+  ) => void;
 }) {
   const chave = `${campo}-${valor}`;
 
@@ -398,28 +705,38 @@ function Marcador({
 
 function Cartao({
   titulo,
+  aoVoltar,
   children,
 }: {
   titulo: string;
+  aoVoltar?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
-      <h2 className="mb-6 flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
-        <span className="h-4 w-1 rounded-full bg-herval-verde" />
-        {titulo}
-      </h2>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
+          <span className="h-4 w-1 rounded-full bg-herval-verde" />
+          {titulo}
+        </h2>
+        {aoVoltar && (
+          <button
+            type="button"
+            onClick={aoVoltar}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 transition-colors hover:text-herval-preto"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Voltar
+          </button>
+        )}
+      </div>
       {children}
     </div>
   );
 }
 
 /** A resposta do servidor, do lado do botão. Erro e acerto não se parecem. */
-function Aviso({
-  estado,
-}: {
-  estado: { ok: boolean; mensagem: string; envio: number };
-}) {
+function Aviso({ estado }: { estado: ResultadoDoCadastro }) {
   if (estado.mensagem === "") return null;
 
   return (
@@ -443,22 +760,25 @@ function Aviso({
 }
 
 /**
- * Fecha o formulário quando a gravação dá certo.
+ * Avisa o passo seguinte quando a gravação dá certo.
  *
  * Compara o número do envio, e não o `ok`: sem isso, um segundo cadastro
- * bem-sucedido não fecharia nada, porque o estado já estaria em `ok` desde o
+ * bem-sucedido não avisaria nada, porque o estado já estaria em `ok` desde o
  * primeiro e o efeito não voltaria a rodar.
  */
-function useFecharQuandoDerCerto(
-  estado: { ok: boolean; mensagem: string; envio: number },
-  aoConcluir: (mensagem: string) => void,
+function useQuandoDerCerto(
+  estado: ResultadoDoCadastro,
+  aoConcluir: (estado: ResultadoDoCadastro) => void,
 ) {
   const ultimoEnvio = useRef(0);
+  /** O aviso muda de identidade a cada desenho; a referência não. */
+  const guardado = useRef(aoConcluir);
+  guardado.current = aoConcluir;
 
   useEffect(() => {
     if (estado.ok && estado.envio !== ultimoEnvio.current) {
       ultimoEnvio.current = estado.envio;
-      aoConcluir(estado.mensagem);
+      guardado.current(estado);
     }
-  }, [estado, aoConcluir]);
+  }, [estado]);
 }
