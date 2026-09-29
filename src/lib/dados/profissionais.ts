@@ -20,34 +20,13 @@
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 
-/**
- * Os dezessete cargos, na ordem em que a Herval os usa.
- *
- * Esta lista é a do formulário. A do banco é um CHECK na coluna `tipo`, e as
- * duas precisam concordar — se um cargo for incluído no banco, é para ser
- * incluído aqui também.
- */
-export const tiposDeProfissional = [
-  "Dentista",
-  "Cirurgião Dentista",
-  "Dermatologista",
-  "Médico",
-  "Médico Cirurgião",
-  "Médico Esteta",
-  "Biomédico",
-  "Biomédico Esteticista",
-  "Enfermeiro",
-  "Enfermeiro Esteta",
-  "Nutricionista",
-  "Fisioterapeuta",
-  "Farmacêutico",
-  "Psicólogo",
-  "Psiquiatra",
-  "Esteticista",
-  "Avaliador",
-] as const;
-
-export type TipoDeProfissional = (typeof tiposDeProfissional)[number];
+// A lista de cargos mora em arquivo próprio, porque o formulário (que roda no
+// navegador) precisa dela e não pode arrastar este módulo junto. Fica
+// reexportada aqui para quem já a importava daqui.
+export {
+  tiposDeProfissional,
+  type TipoDeProfissional,
+} from "@/lib/dados/tiposDeProfissional";
 
 /** Uma especialidade, do jeito que a tela precisa mostrar. */
 export type EspecialidadeDoCadastro = {
