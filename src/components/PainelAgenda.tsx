@@ -1,56 +1,61 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { clinicaPorId, nomeDaClinica, oferece } from "@/data/clinicas";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
-  Coffee,
   Info,
   RefreshCw,
   X,
 } from "lucide-react";
-import { useLeads, type DadosDaConsulta } from "@/components/ProvedorLeads";
 import {
   dataCompleta,
-  dataDaConsulta,
+  dataDoDia,
   diaEMes,
-  etapaTemAgenda,
-  horaEmIntervalo,
+  horaDentroDoHorario,
   horariosGrade,
   inicioDaSemana,
   inicioDoDia,
   intervaloDaSemana,
-  intervalosPorProfissional,
   mesmaData,
   nomesCurtosDosDias,
   nomesDosDias,
+  rotuloDaConsulta,
   somarDias,
-  statusDaConsulta,
-  diasAteAData,
-  type StatusConsulta,
+  textoDoDia,
+  type RotuloDaConsulta,
 } from "@/data/agenda";
-import { especialidadesIniciais, especialidadePorId } from "@/data/especialidades";
+import type { Consulta, DadosDaAgenda, LeadDaAgenda } from "@/lib/dados/agenda";
+import type {
+  ClienteDoCadastro,
+  EspecialidadeDoCadastro,
+  HorarioNaUnidade,
+  ProfissionalCadastrado,
+  UnidadeDoCadastro,
+} from "@/lib/dados/profissionais";
+import { definirDesfechoDaConsulta, marcarConsulta } from "@/lib/acoes/agenda";
 import {
-  profissionaisDisponiveis,
-  profissionaisIniciais,
-} from "@/data/profissionais";
-import type { Agendamento } from "@/data/agendamentos";
-import type { Tarefa } from "@/data/tarefas";
+  Aviso,
+  botaoPrincipal,
+  campoBase,
+  rotulo as estiloRotulo,
+  useQuandoDerCerto,
+} from "@/components/cadastro/comuns";
+import { RESULTADO_INICIAL } from "@/lib/acoes/resultadoDoCadastro";
 import { formatarDuracao } from "@/lib/formato";
 
 type Modo = "Dia" | "Semana";
 
-/** Consulta pronta para a grade: o lead junto do agendamento dele. */
+/** Consulta pronta para a grade: o lead junto da consulta dele. */
 type ItemAgenda = {
-  tarefa: Tarefa;
-  agendamento: Agendamento;
+  consulta: Consulta;
+  lead: LeadDaAgenda;
   data: Date;
-  status: StatusConsulta;
+  rotulo: RotuloDaConsulta;
 };
 
-const estiloStatus: Record<StatusConsulta, string> = {
+const estiloRotuloDaConsulta: Record<RotuloDaConsulta, string> = {
   Agendado: "border border-black/25 text-black/70",
   Confirmado: "bg-herval-verde text-herval-preto",
   Compareceu: "bg-herval-preto text-herval-branco",
@@ -58,10 +63,17 @@ const estiloStatus: Record<StatusConsulta, string> = {
   Cancelada: "border border-black/25 text-black/40 line-through",
 };
 
-export default function PainelAgenda() {
-  const { tarefas, agendamentos, definirConsulta, definirStatusDoAgendamento } =
-    useLeads();
+type Props = Omit<DadosDaAgenda, "aviso">;
 
+export default function PainelAgenda({
+  consultas,
+  leads,
+  candidatos,
+  pessoas,
+  clientes,
+  procedimentos,
+  falha,
+}: Props) {
   // A data só é lida depois que a tela monta, para o servidor e o navegador
   // nunca renderizarem dias diferentes.
   const [hoje, setHoje] = useState<Date | null>(null);
@@ -74,76 +86,101 @@ export default function PainelAgenda() {
   }, []);
 
   const [modo, setModo] = useState<Modo>("Semana");
-  const [filtroProfissional, setFiltroProfissional] = useState<"todos" | number>(
-    "todos",
-  );
+  const [filtroUnidade, setFiltroUnidade] = useState<"todas" | number>("todas");
+  const [filtroPessoa, setFiltroPessoa] = useState<"todos" | number>("todos");
   const [formAberto, setFormAberto] = useState(false);
   const [avisoSincronizar, setAvisoSincronizar] = useState(false);
 
-  /** Leads que estão nas etapas de agenda do Funil. */
-  const leadsDaAgenda = useMemo(
-    () => tarefas.filter((t) => etapaTemAgenda(t.etapa)),
-    [tarefas],
+  const unidades = useMemo(() => unidadesDosClientes(clientes), [clientes]);
+  const unidadePorId = useMemo(
+    () => new Map(unidades.map((u) => [u.id, u])),
+    [unidades],
+  );
+  const leadPorId = useMemo(
+    () => new Map(leads.map((l) => [l.id, l])),
+    [leads],
+  );
+  const pessoaPorId = useMemo(
+    () => new Map(pessoas.map((p) => [p.id, p])),
+    [pessoas],
+  );
+  const procedimentoPorId = useMemo(
+    () => new Map(procedimentos.map((p) => [p.id, p])),
+    [procedimentos],
+  );
+
+  /** Só gente ativa pode receber consulta nova. */
+  const equipeAtiva = useMemo(() => pessoas.filter((p) => p.ativo), [pessoas]);
+
+  /** As unidades que a grade está olhando agora. */
+  const unidadesVisiveis = useMemo(
+    () =>
+      filtroUnidade === "todas"
+        ? unidades.map((u) => u.id)
+        : [filtroUnidade as number],
+    [filtroUnidade, unidades],
+  );
+
+  /** Quem atende em alguma das unidades visíveis. */
+  const pessoasVisiveis = useMemo(() => {
+    const naUnidade = equipeAtiva.filter((p) =>
+      p.unidades.some((u) => unidadesVisiveis.includes(u.id)),
+    );
+    return filtroPessoa === "todos"
+      ? naUnidade
+      : naUnidade.filter((p) => p.id === filtroPessoa);
+  }, [equipeAtiva, unidadesVisiveis, filtroPessoa]);
+
+  const itens = useMemo<ItemAgenda[]>(
+    () =>
+      consultas
+        .filter((c) => c.status !== "Cancelada" && c.hora !== null)
+        .filter((c) => unidadesVisiveis.includes(c.unidadeId))
+        .filter(
+          (c) => filtroPessoa === "todos" || c.profissionalId === filtroPessoa,
+        )
+        .map((consulta) => {
+          const lead = leadPorId.get(consulta.leadId);
+          if (!lead) return null;
+          return {
+            consulta,
+            lead,
+            data: dataDoDia(consulta.dia),
+            rotulo: rotuloDaConsulta(consulta),
+          };
+        })
+        .filter((item): item is ItemAgenda => item !== null),
+    [consultas, unidadesVisiveis, filtroPessoa, leadPorId],
   );
 
   /**
-   * A grade só desenha agendamento com horário montado. O resto do histórico
-   * tem só o dia, e aparece em "Aguardando horário" em vez de ganhar um
-   * horário inventado.
-   */
-  const comHorario = useMemo(
-    () => agendamentos.filter((a) => a.hora !== null && a.status !== "Cancelada"),
-    [agendamentos],
-  );
-
-  /**
-   * Quem está sem data marcada. Inclui quem faltou: o agendamento dele existe,
-   * mas está encerrado, então ele precisa de horário novo. Quem já compareceu
-   * não entra — a consulta dele acabou.
+   * Quem está sem data marcada. Inclui quem faltou: a consulta dele existe, mas
+   * está encerrada, então ele precisa de horário novo. Quem já compareceu não
+   * entra — a consulta dele acabou.
    */
   const semHorario = useMemo(() => {
-    const comDataAberta = new Set(
-      agendamentos.filter((a) => a.status === "Agendada").map((a) => a.leadId),
+    const comConsultaAberta = new Set(
+      consultas.filter((c) => c.status === "Agendada").map((c) => c.leadId),
     );
-    return leadsDaAgenda.filter(
-      (t) => t.etapa !== "Comparecimento" && !comDataAberta.has(t.id),
+    return leads.filter(
+      (lead) =>
+        lead.etapa !== "Comparecimento" && !comConsultaAberta.has(lead.id),
     );
-  }, [leadsDaAgenda, agendamentos]);
+  }, [leads, consultas]);
 
-  const itens = useMemo<ItemAgenda[]>(() => {
-    if (!hoje) return [];
-    const porId = new Map(tarefas.map((t) => [t.id, t]));
-
-    return comHorario
-      .map((agendamento) => {
-        const tarefa = porId.get(agendamento.leadId);
-        if (!tarefa) return null;
-        return {
-          tarefa,
-          agendamento,
-          data: dataDaConsulta(agendamento, hoje),
-          status: statusDaConsulta(agendamento),
-        };
-      })
-      .filter((item): item is ItemAgenda => item !== null)
-      .filter(
-        (item) =>
-          filtroProfissional === "todos" ||
-          item.agendamento.profissionalId === filtroProfissional,
-      );
-  }, [comHorario, tarefas, hoje, filtroProfissional]);
-
-  const profissionaisVisiveis = useMemo(
-    () =>
-      filtroProfissional === "todos"
-        ? profissionaisIniciais
-        : profissionaisIniciais.filter((p) => p.id === filtroProfissional),
-    [filtroProfissional],
-  );
+  if (falha) {
+    return (
+      <div className="rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-6">
+        <p className="text-sm font-medium text-black/60">{falha}</p>
+      </div>
+    );
+  }
 
   if (!hoje || !referencia) {
     return (
-      <p className="text-sm font-medium text-black/45">Carregando a agenda...</p>
+      <p className="text-sm font-medium text-black/45">
+        Carregando a agenda...
+      </p>
     );
   }
 
@@ -156,6 +193,8 @@ export default function PainelAgenda() {
   const itensVisiveis = itens.filter((item) =>
     diasVisiveis.some((dia) => mesmaData(dia, item.data)),
   );
+
+  const horasDaGrade = linhasDaGrade(itensVisiveis);
 
   function navegar(passo: number) {
     setReferencia((atual) =>
@@ -194,7 +233,9 @@ export default function PainelAgenda() {
             <button
               type="button"
               onClick={() => navegar(-1)}
-              aria-label={modo === "Semana" ? "Semana anterior" : "Dia anterior"}
+              aria-label={
+                modo === "Semana" ? "Semana anterior" : "Dia anterior"
+              }
               className="rounded-full p-2 text-black/60 transition-colors hover:bg-black/5 hover:text-herval-preto"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -217,22 +258,49 @@ export default function PainelAgenda() {
           </div>
 
           <label className="inline-flex items-center gap-2">
+            <span className="sr-only">Unidade</span>
+            <select
+              value={filtroUnidade}
+              onChange={(e) => {
+                setFiltroUnidade(
+                  e.target.value === "todas" ? "todas" : Number(e.target.value),
+                );
+                // Trocar de unidade pode deixar de fora a pessoa filtrada, e a
+                // grade ficaria vazia sem explicação nenhuma na tela.
+                setFiltroPessoa("todos");
+              }}
+              className={estiloFiltro}
+            >
+              <option value="todas">Todas as unidades</option>
+              {unidades.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.clienteNome} · {u.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="inline-flex items-center gap-2">
             <span className="sr-only">Profissional</span>
             <select
-              value={filtroProfissional}
+              value={filtroPessoa}
               onChange={(e) =>
-                setFiltroProfissional(
+                setFiltroPessoa(
                   e.target.value === "todos" ? "todos" : Number(e.target.value),
                 )
               }
-              className="rounded-full border border-black/15 bg-herval-branco px-4 py-2.5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
+              className={estiloFiltro}
             >
               <option value="todos">Todos os profissionais</option>
-              {profissionaisIniciais.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome}
-                </option>
-              ))}
+              {equipeAtiva
+                .filter((p) =>
+                  p.unidades.some((u) => unidadesVisiveis.includes(u.id)),
+                )
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
             </select>
           </label>
         </div>
@@ -242,7 +310,6 @@ export default function PainelAgenda() {
             type="button"
             onClick={() => setAvisoSincronizar((v) => !v)}
             aria-expanded={avisoSincronizar}
-            title="Sincronização real disponível quando a integração for conectada"
             className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-herval-branco px-4 py-2.5 text-sm font-bold text-black/65 transition-colors hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto"
           >
             <RefreshCw className="h-4 w-4" />
@@ -269,13 +336,13 @@ export default function PainelAgenda() {
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-black/45" />
           <div className="text-sm font-medium text-black/65">
             <p className="font-bold text-herval-preto">
-              Nada foi sincronizado: este é um ambiente de demonstração.
+              Nada foi sincronizado com sistema de fora.
             </p>
             <p className="mt-1.5">
-              A sincronização real com Clinicorp, Simples Dental ou Dental Office
-              fica disponível quando a integração for conectada na tela de
-              Integrações. Enquanto isso, a Agenda mostra apenas os leads que já
-              estão em Agendamento, Reagendamento ou Comparecimento no Funil.
+              As consultas desta tela são as que a equipe e a Helô marcam aqui,
+              e ficam gravadas. A sincronização com Clinicorp, Simples Dental ou
+              Dental Office fica disponível quando a integração for conectada na
+              tela de Integrações.
             </p>
           </div>
           <button
@@ -291,13 +358,15 @@ export default function PainelAgenda() {
 
       {formAberto && (
         <FormularioNovaConsulta
-          semHorario={semHorario}
-          diasDaSemana={Array.from({ length: 7 }, (_, i) => somarDias(domingo, i))}
-          hoje={hoje}
-          aoMarcar={(leadId, dados) => {
-            definirConsulta(leadId, dados);
-            setFormAberto(false);
-          }}
+          candidatos={candidatos}
+          aguardando={semHorario}
+          consultas={consultas}
+          clientes={clientes}
+          unidades={unidades}
+          equipe={equipeAtiva}
+          procedimentos={procedimentos}
+          diaSugerido={textoDoDia(referencia)}
+          aoMarcar={() => setFormAberto(false)}
           aoFechar={() => setFormAberto(false)}
         />
       )}
@@ -314,8 +383,8 @@ export default function PainelAgenda() {
             {itensVisiveis.length}
           </span>{" "}
           {itensVisiveis.length === 1 ? "consulta" : "consultas"} no período ·{" "}
-          {leadsDaAgenda.length} leads em Agendamento, Reagendamento ou
-          Comparecimento no Funil
+          {leads.length} leads em Agendamento, Reagendamento ou Comparecimento
+          no Funil
           {semHorario.length > 0 && ` · ${semHorario.length} sem horário`}
         </p>
       </div>
@@ -331,16 +400,16 @@ export default function PainelAgenda() {
             Consulta&quot; para dar uma data.
           </p>
           <ul className="mt-4 flex flex-wrap gap-2.5">
-            {semHorario.map((tarefa) => (
+            {semHorario.map((lead) => (
               <li
-                key={tarefa.id}
+                key={lead.id}
                 className="rounded-controle border border-black/10 bg-black/[0.03] px-3.5 py-2.5"
               >
                 <p className="text-sm font-bold text-herval-preto">
-                  {tarefa.lead}
+                  {lead.nome}
                 </p>
                 <p className="text-xs font-medium text-black/45">
-                  {tarefa.telefone} · {tarefa.etapa}
+                  {[lead.telefone, lead.etapa].filter(Boolean).join(" · ")}
                 </p>
               </li>
             ))}
@@ -351,33 +420,193 @@ export default function PainelAgenda() {
       {modo === "Semana" ? (
         <GradeSemana
           dias={diasVisiveis}
+          horas={horasDaGrade}
           hoje={hoje}
           itens={itens}
-          profissionais={profissionaisVisiveis}
+          pessoaPorId={pessoaPorId}
+          unidadePorId={unidadePorId}
+          procedimentoPorId={procedimentoPorId}
         />
       ) : (
         <GradeDia
           dia={referencia}
+          horas={horasDaGrade}
           itens={itens}
-          profissionais={profissionaisVisiveis}
+          pessoas={pessoasVisiveis}
+          unidadesVisiveis={unidadesVisiveis}
+          pessoaPorId={pessoaPorId}
+          unidadePorId={unidadePorId}
+          procedimentoPorId={procedimentoPorId}
         />
       )}
     </div>
   );
 }
 
+const estiloFiltro =
+  "rounded-full border border-black/15 bg-herval-branco px-4 py-2.5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
+
+/**
+ * Todas as unidades, de todos os clientes. Cada uma já sabe de quem é — o nome
+ * do cliente vem junto da leitura do cadastro.
+ */
+function unidadesDosClientes(clientes: ClienteDoCadastro[]) {
+  return clientes.flatMap((cliente) => cliente.unidades);
+}
+
+/**
+ * As linhas de hora que a grade desenha.
+ *
+ * Começa na faixa de funcionamento e cresce para caber consulta fora dela: a
+ * Helô pode marcar 19:30 se a clínica combinar assim, e uma linha que não existe
+ * na grade seria uma consulta invisível na tela.
+ */
+function linhasDaGrade(itens: ItemAgenda[]) {
+  const horas = new Set(horariosGrade);
+  for (const item of itens) {
+    if (item.consulta.hora) horas.add(`${item.consulta.hora.slice(0, 2)}:00`);
+  }
+  return [...horas].sort();
+}
+
+/**
+ * A consulta cai nesta linha da grade.
+ *
+ * Compara só a hora cheia porque a linha é de uma hora e a consulta pode estar
+ * em qualquer minuto: quem marca 09:30 aparece na faixa das 9, com o horário
+ * exato escrito no cartão.
+ */
+function naLinha(consulta: Consulta, hora: string) {
+  return (consulta.hora ?? "").slice(0, 2) === hora.slice(0, 2);
+}
+
+/**
+ * Verdadeiro quando a pessoa atende naquele dia e naquela hora, em alguma das
+ * unidades que a grade está olhando.
+ *
+ * Sem horário cadastrado devolve verdadeiro: quem não informou não tem hora
+ * proibida. É o que faz a grade escurecer apenas o que a agência de fato
+ * cadastrou, em vez de escurecer tudo de quem ainda não preencheu.
+ */
+function atendeNaHora(
+  pessoa: ProfissionalCadastrado,
+  dia: Date,
+  hora: string,
+  unidadesVisiveis: number[],
+) {
+  const horarios = pessoa.horarios.filter((h) =>
+    unidadesVisiveis.includes(h.unidadeId),
+  );
+  if (horarios.length === 0) return true;
+
+  return horarios.some((horario) => atendeNesteHorario(horario, dia, hora));
+}
+
+/** 1 é segunda e 7 é domingo, como o cadastro guarda. */
+function diaDaSemanaDoCadastro(dia: Date) {
+  const doJavascript = dia.getDay();
+  return doJavascript === 0 ? 7 : doJavascript;
+}
+
+function atendeNesteHorario(
+  horario: HorarioNaUnidade,
+  dia: Date,
+  hora: string,
+) {
+  const noDia =
+    horario.dias.length === 0 ||
+    horario.dias.includes(diaDaSemanaDoCadastro(dia));
+  return noDia && horaDentroDoHorario(hora, horario.inicio, horario.fim);
+}
+
+/**
+ * O que impede de marcar naquele dia e hora, em uma frase — ou nulo quando não
+ * impede nada.
+ *
+ * São as duas conferências que o servidor repete em `conferirCombinacao` e em
+ * `marcarConsulta`: horário já ocupado pela mesma pessoa, e horário fora do
+ * expediente dela. Aqui é só para a equipe ver antes de clicar; quem recusa de
+ * verdade é o servidor, que é o único que vê o banco no momento da gravação.
+ */
+function conferirHorarioNaTela({
+  pessoa,
+  unidadeId,
+  dia,
+  hora,
+  leadId,
+  consultas,
+}: {
+  pessoa: ProfissionalCadastrado | undefined;
+  unidadeId: number | undefined;
+  dia: string;
+  hora: string;
+  leadId: number | "";
+  consultas: Consulta[];
+}): string | null {
+  if (!pessoa || dia === "") return null;
+
+  // A consulta em aberto do próprio lead não é choque: ela é a que vai ser
+  // remarcada para este horário.
+  if (
+    hora !== "" &&
+    consultas.some(
+      (c) =>
+        c.status === "Agendada" &&
+        c.profissionalId === pessoa.id &&
+        c.dia === dia &&
+        c.hora === hora &&
+        c.leadId !== leadId,
+    )
+  ) {
+    return `${primeiroNome(pessoa.nome)} já tem consulta marcada nesse dia às ${hora}. Escolha outro horário ou outro profissional.`;
+  }
+
+  if (unidadeId === undefined) return null;
+
+  const horarios = pessoa.horarios.filter((h) => h.unidadeId === unidadeId);
+  if (horarios.length === 0) return null;
+
+  const data = dataDoDia(dia);
+  const doDia = horarios.filter(
+    (h) => h.dias.length === 0 || h.dias.includes(diaDaSemanaDoCadastro(data)),
+  );
+
+  if (doDia.length === 0) {
+    return `${primeiroNome(pessoa.nome)} não atende ${nomesDosDias[data.getDay()].toLowerCase()} nessa unidade. Escolha outro dia ou outro profissional.`;
+  }
+
+  if (hora === "") return null;
+
+  if (!doDia.some((h) => horaDentroDoHorario(hora, h.inicio, h.fim))) {
+    const faixas = doDia
+      .map((h) => (h.inicio && h.fim ? `${h.inicio} às ${h.fim}` : null))
+      .filter((f): f is string => f !== null)
+      .join(", ");
+    return `${primeiroNome(pessoa.nome)} atende ${faixas} nessa unidade. Escolha um horário dentro do expediente.`;
+  }
+
+  return null;
+}
+
+type Buscadores = {
+  pessoaPorId: Map<number, ProfissionalCadastrado>;
+  unidadePorId: Map<number, UnidadeDoCadastro>;
+  procedimentoPorId: Map<number, EspecialidadeDoCadastro>;
+};
+
 /** Grade semanal: linhas de hora, colunas de dia. */
 function GradeSemana({
   dias,
+  horas,
   hoje,
   itens,
-  profissionais,
+  ...buscadores
 }: {
   dias: Date[];
+  horas: string[];
   hoje: Date;
   itens: ItemAgenda[];
-  profissionais: typeof profissionaisIniciais;
-}) {
+} & Buscadores) {
   return (
     <div className="-mx-6 overflow-x-auto px-6 pb-2 md:-mx-10 md:px-10">
       <div className="min-w-[64rem] overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
@@ -405,7 +634,7 @@ function GradeSemana({
           })}
         </div>
 
-        {horariosGrade.map((hora) => (
+        {horas.map((hora) => (
           <div
             key={hora}
             className="grid grid-cols-[5rem_repeat(7,minmax(0,1fr))] border-b border-black/[0.07] last:border-b-0"
@@ -417,39 +646,21 @@ function GradeSemana({
             {dias.map((dia) => {
               const doDia = itens.filter(
                 (item) =>
-                  mesmaData(item.data, dia) && item.agendamento.hora === hora,
+                  mesmaData(item.data, dia) && naLinha(item.consulta, hora),
               );
-
-              // Intervalos valem de segunda a sexta.
-              const diaUtil = dia.getDay() >= 1 && dia.getDay() <= 5;
-              const emIntervalo = diaUtil
-                ? profissionais.filter((p) => {
-                    const intervalo = intervalosPorProfissional[p.id];
-                    return intervalo && horaEmIntervalo(hora, intervalo);
-                  })
-                : [];
 
               return (
                 <div
                   key={dia.toISOString()}
                   className="min-h-[3.5rem] space-y-1.5 border-l border-black/10 p-1.5"
                 >
-                  {/* Com vários profissionais em intervalo na mesma hora, um
-                      único bloco resumido mantém a grade legível. */}
-                  {emIntervalo.length > 0 && (
-                    <p
-                      title={`Intervalo: ${emIntervalo.map((p) => p.nome).join(", ")}`}
-                      className="flex items-center gap-1 rounded bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.05)_0px,rgba(0,0,0,0.05)_6px,transparent_6px,transparent_12px)] px-2 py-1 text-[10px] font-bold text-black/40"
-                    >
-                      <Coffee className="h-3 w-3 shrink-0" />
-                      {emIntervalo.length === 1
-                        ? `Intervalo · ${primeiroNome(emIntervalo[0].nome)}`
-                        : `Intervalo · ${emIntervalo.length} profissionais`}
-                    </p>
-                  )}
-
                   {doDia.map((item) => (
-                    <CartaoConsulta key={item.tarefa.id} item={item} compacto />
+                    <CartaoConsulta
+                      key={item.consulta.id}
+                      item={item}
+                      compacto
+                      {...buscadores}
+                    />
                   ))}
                 </div>
               );
@@ -464,72 +675,108 @@ function GradeSemana({
 /** Grade do dia: linhas de hora, colunas de profissional. */
 function GradeDia({
   dia,
+  horas,
   itens,
-  profissionais,
+  pessoas,
+  unidadesVisiveis,
+  ...buscadores
 }: {
   dia: Date;
+  horas: string[];
   itens: ItemAgenda[];
-  profissionais: typeof profissionaisIniciais;
-}) {
+  pessoas: ProfissionalCadastrado[];
+  unidadesVisiveis: number[];
+} & Buscadores) {
   const doDia = itens.filter((item) => mesmaData(item.data, dia));
-  const diaUtil = dia.getDay() >= 1 && dia.getDay() <= 5;
+
+  /**
+   * Consulta sem profissional definido não cabe em coluna de ninguém, e some da
+   * vista do dia se a gente não contar. A coluna "A definir" só aparece quando
+   * existe alguma.
+   */
+  const semPessoa = doDia.filter(
+    (item) => item.consulta.profissionalId === null,
+  );
+  const colunas: (ProfissionalCadastrado | null)[] = [
+    ...pessoas,
+    ...(semPessoa.length > 0 ? [null] : []),
+  ];
+
+  if (colunas.length === 0) {
+    return (
+      <p className="rounded-card border border-black/10 bg-herval-branco px-5 py-6 text-sm font-medium text-black/55 shadow-card">
+        Nenhum profissional ativo atende nas unidades filtradas. Cadastre quem
+        atende em Clientes, ou troque o filtro de unidade.
+      </p>
+    );
+  }
+
+  const gradeDeColunas = `5rem repeat(${colunas.length}, minmax(0,1fr))`;
 
   return (
     <div className="-mx-6 overflow-x-auto px-6 pb-2 md:-mx-10 md:px-10">
       <div className="min-w-[64rem] overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
         <div
           className="grid border-b border-black/10 bg-black/[0.03]"
-          style={{
-            gridTemplateColumns: `5rem repeat(${profissionais.length}, minmax(0,1fr))`,
-          }}
+          style={{ gridTemplateColumns: gradeDeColunas }}
         >
           <div className="px-3 py-3" />
-          {profissionais.map((p) => (
-            <div key={p.id} className="border-l border-black/10 px-3 py-3">
+          {colunas.map((pessoa) => (
+            <div
+              key={pessoa?.id ?? "a-definir"}
+              className="border-l border-black/10 px-3 py-3"
+            >
               <p className="text-sm font-extrabold text-herval-preto">
-                {p.nome}
+                {pessoa ? pessoa.nome : "A definir"}
               </p>
-              <p className="text-xs font-medium text-black/45">{p.tipo}</p>
+              <p className="text-xs font-medium text-black/45">
+                {pessoa ? pessoa.tipo : "Consultas sem profissional"}
+              </p>
             </div>
           ))}
         </div>
 
-        {horariosGrade.map((hora) => (
+        {horas.map((hora) => (
           <div
             key={hora}
             className="grid border-b border-black/[0.07] last:border-b-0"
-            style={{
-              gridTemplateColumns: `5rem repeat(${profissionais.length}, minmax(0,1fr))`,
-            }}
+            style={{ gridTemplateColumns: gradeDeColunas }}
           >
             <div className="px-3 py-3 text-xs font-bold tabular-nums text-black/40">
               {hora}
             </div>
 
-            {profissionais.map((p) => {
-              const intervalo = intervalosPorProfissional[p.id];
-              const bloqueado =
-                diaUtil && intervalo && horaEmIntervalo(hora, intervalo);
+            {colunas.map((pessoa) => {
               const consultas = doDia.filter(
                 (item) =>
-                  item.agendamento.profissionalId === p.id &&
-                  item.agendamento.hora === hora,
+                  (item.consulta.profissionalId ?? null) ===
+                    (pessoa?.id ?? null) && naLinha(item.consulta, hora),
               );
+              const foraDoHorario =
+                pessoa !== null &&
+                !atendeNaHora(pessoa, dia, hora, unidadesVisiveis)
+                  ? pessoa
+                  : null;
 
               return (
                 <div
-                  key={p.id}
-                  className="min-h-[3.5rem] space-y-1.5 border-l border-black/10 p-1.5"
+                  key={pessoa?.id ?? "a-definir"}
+                  title={
+                    foraDoHorario
+                      ? `${foraDoHorario.nome} não atende neste horário`
+                      : undefined
+                  }
+                  className={[
+                    "min-h-[3.5rem] space-y-1.5 border-l border-black/10 p-1.5",
+                    foraDoHorario ? "bg-black/[0.04]" : "",
+                  ].join(" ")}
                 >
-                  {bloqueado && (
-                    <p className="flex items-center gap-1.5 rounded bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.05)_0px,rgba(0,0,0,0.05)_6px,transparent_6px,transparent_12px)] px-2 py-2 text-[11px] font-bold text-black/40">
-                      <Coffee className="h-3 w-3 shrink-0" />
-                      {intervalo.rotulo}
-                    </p>
-                  )}
-
                   {consultas.map((item) => (
-                    <CartaoConsulta key={item.tarefa.id} item={item} />
+                    <CartaoConsulta
+                      key={item.consulta.id}
+                      item={item}
+                      {...buscadores}
+                    />
                   ))}
                 </div>
               );
@@ -544,84 +791,116 @@ function GradeDia({
 function CartaoConsulta({
   item,
   compacto = false,
+  pessoaPorId,
+  unidadePorId,
+  procedimentoPorId,
 }: {
   item: ItemAgenda;
   compacto?: boolean;
-}) {
-  // Pega a ação direto do contexto: passar por duas grades só para repassar
-  // uma função deixaria as duas com um parâmetro que elas não usam.
-  const { definirStatusDoAgendamento } = useLeads();
-  const especialidade = especialidadePorId(item.agendamento.especialidadeId ?? 0);
-  // Consulta que já passou da data e ainda está sem desfecho.
-  const aguardaDesfecho =
-    item.agendamento.status === "Agendada" && item.agendamento.consultaEmDias >= 0;
-  const profissional = profissionaisIniciais.find(
-    (p) => p.id === item.agendamento.profissionalId,
-  );
+} & Buscadores) {
+  const { consulta, lead } = item;
+  const procedimento =
+    consulta.especialidadeId === null
+      ? undefined
+      : procedimentoPorId.get(consulta.especialidadeId);
+  const pessoa =
+    consulta.profissionalId === null
+      ? undefined
+      : pessoaPorId.get(consulta.profissionalId);
+  const unidade = unidadePorId.get(consulta.unidadeId);
 
   return (
     <article className="rounded-controle border border-black/10 bg-herval-branco p-2.5 shadow-card">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-extrabold tabular-nums text-herval-preto">
-          {item.agendamento.hora}
+          {consulta.hora}
         </p>
         <span
           className={[
             "rounded-full px-2 py-0.5 text-[10px] font-bold",
-            estiloStatus[item.status],
+            estiloRotuloDaConsulta[item.rotulo],
           ].join(" ")}
         >
-          {item.status}
+          {item.rotulo}
         </span>
       </div>
 
       <p className="mt-1 text-xs font-bold leading-tight text-herval-preto">
-        {item.tarefa.lead}
+        {lead.nome}
       </p>
 
-      {especialidade && (
+      {procedimento && (
         <p className="mt-0.5 text-[11px] font-medium leading-tight text-black/50">
-          {especialidade.nome} · {formatarDuracao(especialidade.duracaoMinutos)}
+          {procedimento.nome} ·{" "}
+          {formatarDuracao(procedimento.duracaoMinutos ?? 0)}
         </p>
       )}
 
-      {compacto && profissional && (
+      {compacto && pessoa && (
         <p className="mt-0.5 text-[11px] font-medium leading-tight text-black/45">
-          {primeiroNome(profissional.nome)}
+          {primeiroNome(pessoa.nome)}
         </p>
       )}
 
       {!compacto && (
         <p className="mt-0.5 text-[11px] font-medium leading-tight text-black/45">
-          {item.tarefa.telefone} · {nomeDaClinica(item.tarefa.clinicaId)}
+          {[lead.telefone, unidade?.nome].filter(Boolean).join(" · ")}
         </p>
       )}
 
-      {aguardaDesfecho && (
-        // Marcar o desfecho move o lead de etapa sozinho: quem comparece vai
-        // para "Comparecimento", quem falta cai em "Reagendamento".
-        <div className="mt-2 flex gap-1.5 border-t border-black/10 pt-2">
-          <button
-            type="button"
-            onClick={() =>
-              definirStatusDoAgendamento(item.agendamento.id, "Compareceu")
-            }
-            className="flex-1 rounded bg-herval-verde px-2 py-1 text-[10px] font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
-          >
-            Compareceu
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              definirStatusDoAgendamento(item.agendamento.id, "Faltou")
-            }
-            className="flex-1 rounded border border-black/20 px-2 py-1 text-[10px] font-extrabold text-black/65 transition-colors hover:border-herval-vermelho hover:text-herval-vermelho"
-          >
-            Faltou
-          </button>
-        </div>
+      {consulta.observacao && (
+        <p className="mt-1 text-[11px] font-medium leading-snug text-black/55">
+          {consulta.observacao}
+        </p>
       )}
+
+      {consulta.status === "Agendada" && <Desfecho consulta={consulta} />}
     </article>
+  );
+}
+
+/**
+ * Os dois botões de desfecho. Marcar move o lead de etapa sozinho: quem
+ * comparece vai para "Comparecimento", quem falta cai em "Reagendamento".
+ */
+function Desfecho({ consulta }: { consulta: Consulta }) {
+  const [estado, executar, enviando] = useActionState(
+    definirDesfechoDaConsulta,
+    RESULTADO_INICIAL,
+  );
+
+  return (
+    <form action={executar} className="mt-2 border-t border-black/10 pt-2">
+      <input type="hidden" name="id" value={consulta.id} />
+      <div className="flex gap-1.5">
+        <button
+          type="submit"
+          name="status"
+          value="Compareceu"
+          disabled={enviando}
+          className="flex-1 rounded bg-herval-verde px-2 py-1 text-[10px] font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:opacity-60"
+        >
+          Compareceu
+        </button>
+        <button
+          type="submit"
+          name="status"
+          value="Faltou"
+          disabled={enviando}
+          className="flex-1 rounded border border-black/20 px-2 py-1 text-[10px] font-extrabold text-black/65 transition-colors hover:border-herval-vermelho hover:text-herval-vermelho disabled:opacity-60"
+        >
+          Faltou
+        </button>
+      </div>
+      {!estado.ok && estado.mensagem !== "" && (
+        <p
+          role="alert"
+          className="mt-1.5 text-[10px] font-bold leading-snug text-herval-vermelho"
+        >
+          {estado.mensagem}
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -632,69 +911,105 @@ function primeiroNome(nome: string) {
 }
 
 function FormularioNovaConsulta({
-  semHorario,
-  diasDaSemana,
-  hoje,
+  candidatos,
+  aguardando,
+  consultas,
+  clientes,
+  unidades,
+  equipe,
+  procedimentos,
+  diaSugerido,
   aoMarcar,
   aoFechar,
 }: {
-  semHorario: Tarefa[];
-  diasDaSemana: Date[];
-  hoje: Date;
-  aoMarcar: (leadId: number, dados: DadosDaConsulta) => void;
+  candidatos: LeadDaAgenda[];
+  /** Quem está em etapa de agenda e sem consulta aberta: vai primeiro na lista. */
+  aguardando: LeadDaAgenda[];
+  consultas: Consulta[];
+  clientes: ClienteDoCadastro[];
+  unidades: UnidadeDoCadastro[];
+  equipe: ProfissionalCadastrado[];
+  procedimentos: EspecialidadeDoCadastro[];
+  diaSugerido: string;
+  aoMarcar: () => void;
   aoFechar: () => void;
 }) {
-  const [leadId, setLeadId] = useState<number | "">(semHorario[0]?.id ?? "");
-  const [especialidadeId, setEspecialidadeId] = useState<number>(1);
-  const [diaIndice, setDiaIndice] = useState(1);
-  const [hora, setHora] = useState("09:00");
-  const [erro, setErro] = useState<string | null>(null);
-
-  // A consulta acontece na clínica do lead, então é ela que decide o que dá
-  // para oferecer: nem toda clínica faz todo procedimento, e nenhum
-  // profissional atende em todas.
-  const clinicaId = semHorario.find((t) => t.id === leadId)?.clinicaId ?? 0;
-  const clinica = clinicaPorId(clinicaId);
-
-  const ativas = especialidadesIniciais.filter(
-    (e) => e.ativa && clinica !== undefined && oferece(clinica, e.id),
+  const [estado, executar, enviando] = useActionState(
+    marcarConsulta,
+    RESULTADO_INICIAL,
   );
-  const especialidadeValida = ativas.some((e) => e.id === especialidadeId)
-    ? especialidadeId
-    : (ativas[0]?.id ?? 1);
 
-  // Só aparecem os profissionais que atendem essa especialidade nessa clínica.
-  const habilitados = profissionaisDisponiveis(clinicaId, especialidadeValida);
-  const [profissionalId, setProfissionalId] = useState<number>(
-    habilitados[0]?.id ?? 1,
+  // Quem está esperando horário aparece primeiro, e é a escolha inicial: é o
+  // caso comum. Os outros continuam na lista porque o lead real entra pelo
+  // WhatsApp em "Leads Recebidos", e marcar daqui é o que o move.
+  const idsAguardando = new Set(aguardando.map((l) => l.id));
+  const outros = candidatos.filter((l) => !idsAguardando.has(l.id));
+
+  const [leadId, setLeadId] = useState<number | "">(
+    aguardando[0]?.id ?? candidatos[0]?.id ?? "",
   );
-  const profissionalValido = habilitados.some((p) => p.id === profissionalId)
-    ? profissionalId
-    : (habilitados[0]?.id ?? 1);
+  const [unidadeId, setUnidadeId] = useState<number | "">("");
+  const [procedimentoId, setProcedimentoId] = useState<number | "">("");
+  const [pessoaId, setPessoaId] = useState<number | "">("");
+  const [dia, setDia] = useState(diaSugerido);
+  const [hora, setHora] = useState("");
 
-  function marcar() {
-    if (leadId === "") {
-      setErro("Escolha o lead que vai ocupar o horário.");
-      return;
-    }
+  useQuandoDerCerto(estado, aoMarcar);
 
-    const intervalo = intervalosPorProfissional[profissionalValido];
-    if (intervalo && horaEmIntervalo(hora, intervalo)) {
-      setErro(
-        `Esse horário cai no ${intervalo.rotulo.toLowerCase()} do profissional. Escolha outro.`,
-      );
-      return;
-    }
+  const lead = candidatos.find((c) => c.id === leadId);
+  const cliente = clientes.find((c) => c.id === lead?.clienteId);
 
-    const data = diasDaSemana[diaIndice];
-    setErro(null);
-    aoMarcar(Number(leadId), {
-      profissionalId: profissionalValido,
-      especialidadeId: especialidadeValida,
-      consultaEmDias: diasAteAData(data, hoje),
-      hora,
-    });
-  }
+  /**
+   * A consulta acontece em uma unidade do cliente do lead. Lead sem cliente
+   * ainda não tem onde ser atendido, e a lista fica vazia de propósito: melhor
+   * do que oferecer a unidade de outra clínica.
+   */
+  const unidadesDoCliente = cliente
+    ? unidades.filter((u) => u.clienteId === cliente.id)
+    : [];
+  const unidadeEscolhida =
+    unidadesDoCliente.find((u) => u.id === unidadeId) ?? unidadesDoCliente[0];
+
+  /** Quem atende naquele lugar. */
+  const naUnidade = unidadeEscolhida
+    ? equipe.filter((p) => p.unidades.some((u) => u.id === unidadeEscolhida.id))
+    : [];
+
+  /**
+   * O que dá para marcar ali é o que a equipe daquele lugar realiza — a mesma
+   * regra da tela de Atendimento: o que uma clínica atende sai da equipe dela, e
+   * não de uma lista à parte que alguém teria de manter igual.
+   */
+  const idsQueAEquipeRealiza = new Set(
+    naUnidade.flatMap((p) => p.especialidades.map((e) => e.id)),
+  );
+  const oferecidos = procedimentos.filter(
+    (p) => p.ativa && idsQueAEquipeRealiza.has(p.id),
+  );
+  const procedimentoEscolhido =
+    oferecidos.find((p) => p.id === procedimentoId) ??
+    oferecidos.find((p) => p.id === lead?.especialidadeInteresseId);
+
+  /** Só quem realiza o procedimento escolhido, naquele lugar. */
+  const habilitados = procedimentoEscolhido
+    ? naUnidade.filter((p) =>
+        p.especialidades.some((e) => e.id === procedimentoEscolhido.id),
+      )
+    : naUnidade;
+  const pessoaEscolhida = habilitados.find((p) => p.id === pessoaId);
+
+  /**
+   * O mesmo que o servidor vai conferir na hora de gravar, dito antes de a pessoa
+   * clicar. A recusa de verdade é a de lá — esta aqui só evita o clique inútil.
+   */
+  const impedimento = conferirHorarioNaTela({
+    pessoa: pessoaEscolhida,
+    unidadeId: unidadeEscolhida?.id,
+    dia,
+    hora,
+    leadId,
+    consultas,
+  });
 
   return (
     <section className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
@@ -704,9 +1019,9 @@ function FormularioNovaConsulta({
             Nova consulta
           </h3>
           <p className="mt-1 text-xs font-medium text-black/50">
-            Marca um horário para um lead que já está em etapa de agenda no
-            Funil. Vale só nesta sessão: recarregar a página volta ao estado
-            inicial.
+            Marca um horário para qualquer lead do Funil, em qualquer etapa —
+            marcar aqui é o que move o lead para &quot;Agendamento&quot;. Se ele
+            já tiver uma consulta em aberto, ela é remarcada.
           </p>
         </div>
         <button
@@ -719,122 +1034,189 @@ function FormularioNovaConsulta({
         </button>
       </div>
 
-      {semHorario.length === 0 ? (
+      {candidatos.length === 0 ? (
         <p className="mt-5 rounded-controle bg-black/[0.03] px-4 py-4 text-sm font-medium text-black/60">
-          Todos os leads em etapa de agenda já têm horário. Para marcar uma nova
-          consulta, mova um lead para Agendamento no Funil.
+          Não há nenhum lead cadastrado ainda. A consulta é marcada para um
+          lead, e o lead chega pelo WhatsApp ou é cadastrado no Atendimento.
         </p>
       ) : (
-        <>
-          <div className="mt-5 grid gap-4 lg:grid-cols-5">
-            <Campo rotulo="Lead">
+        <form action={executar} className="mt-5 space-y-5">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Escolha rotulo="Lead" obrigatorio>
               <select
+                name="lead"
                 value={leadId}
-                onChange={(e) => setLeadId(Number(e.target.value))}
-                className={estiloCampo}
+                onChange={(e) => {
+                  setLeadId(Number(e.target.value));
+                  // O cliente muda, e com ele as unidades e a equipe.
+                  setUnidadeId("");
+                  setProcedimentoId("");
+                  setPessoaId("");
+                }}
+                className={campoBase}
               >
-                {semHorario.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.lead}
+                {aguardando.length > 0 && (
+                  <optgroup label="Esperando horário">
+                    {aguardando.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {outros.length > 0 && (
+                  <optgroup label="Outros leads do Funil">
+                    {outros.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} · {c.etapa}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </Escolha>
+
+            <Escolha rotulo="Unidade" obrigatorio>
+              <select
+                name="unidade"
+                value={unidadeEscolhida?.id ?? ""}
+                onChange={(e) => setUnidadeId(Number(e.target.value))}
+                disabled={unidadesDoCliente.length === 0}
+                className={campoBase}
+              >
+                {unidadesDoCliente.length === 0 && (
+                  <option value="">Este lead não tem cliente definido</option>
+                )}
+                {unidadesDoCliente.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nome}
                   </option>
                 ))}
               </select>
-            </Campo>
+            </Escolha>
 
-            <Campo rotulo="Especialidade">
+            <Escolha rotulo="Procedimento">
               <select
-                value={especialidadeValida}
-                onChange={(e) => setEspecialidadeId(Number(e.target.value))}
-                className={estiloCampo}
+                name="procedimento"
+                value={procedimentoEscolhido?.id ?? ""}
+                onChange={(e) => {
+                  setProcedimentoId(
+                    e.target.value === "" ? "" : Number(e.target.value),
+                  );
+                  setPessoaId("");
+                }}
+                className={campoBase}
               >
-                {ativas.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nome}
+                <option value="">A definir</option>
+                {oferecidos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
                   </option>
                 ))}
               </select>
-            </Campo>
+            </Escolha>
 
-            <Campo rotulo="Profissional">
+            <Escolha rotulo="Profissional">
               <select
-                value={profissionalValido}
-                onChange={(e) => setProfissionalId(Number(e.target.value))}
-                className={estiloCampo}
+                name="profissional"
+                value={pessoaEscolhida?.id ?? ""}
+                onChange={(e) =>
+                  setPessoaId(
+                    e.target.value === "" ? "" : Number(e.target.value),
+                  )
+                }
+                className={campoBase}
               >
+                <option value="">A definir</option>
                 {habilitados.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nome}
                   </option>
                 ))}
               </select>
-            </Campo>
+            </Escolha>
 
-            <Campo rotulo="Dia">
-              <select
-                value={diaIndice}
-                onChange={(e) => setDiaIndice(Number(e.target.value))}
-                className={estiloCampo}
-              >
-                {diasDaSemana.map((dia, indice) => (
-                  <option key={dia.toISOString()} value={indice}>
-                    {nomesDosDias[dia.getDay()]} · {diaEMes(dia)}
-                  </option>
-                ))}
-              </select>
-            </Campo>
+            <Escolha rotulo="Dia" obrigatorio>
+              <input
+                type="date"
+                name="dia"
+                value={dia}
+                onChange={(e) => setDia(e.target.value)}
+                required
+                className={campoBase}
+              />
+            </Escolha>
 
-            <Campo rotulo="Hora">
-              <select
+            <Escolha rotulo="Hora">
+              <input
+                type="time"
+                name="hora"
                 value={hora}
                 onChange={(e) => setHora(e.target.value)}
-                className={estiloCampo}
-              >
-                {horariosGrade.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
-            </Campo>
+                className={campoBase}
+              />
+            </Escolha>
           </div>
 
-          {erro && (
+          {impedimento && (
             <p
-              role="alert"
-              className="mt-4 rounded-controle bg-herval-vermelho/10 px-4 py-3 text-sm font-bold text-herval-vermelho"
+              role="status"
+              className="rounded-controle border border-herval-vermelho/30 bg-herval-vermelho/5 px-4 py-3 text-xs font-bold leading-snug text-herval-vermelho"
             >
-              {erro}
+              {impedimento}
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={marcar}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-herval-verde px-5 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            Marcar consulta
-          </button>
-        </>
+          <label className="block">
+            <span className={estiloRotulo}>Observação</span>
+            <textarea
+              name="observacao"
+              rows={2}
+              maxLength={500}
+              placeholder="O que o paciente pediu, o que a clínica precisa lembrar."
+              className={campoBase}
+            />
+          </label>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              type="submit"
+              disabled={
+                enviando ||
+                unidadesDoCliente.length === 0 ||
+                impedimento !== null
+              }
+              className={botaoPrincipal}
+            >
+              <CalendarPlus className="h-4 w-4" />
+              {enviando ? "Marcando…" : "Marcar consulta"}
+            </button>
+            <Aviso estado={estado} />
+          </div>
+        </form>
       )}
     </section>
   );
 }
 
-const estiloCampo =
-  "w-full rounded-controle border border-black/15 bg-herval-branco px-3.5 py-2.5 text-sm font-medium text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
-
-function Campo({
-  rotulo,
+function Escolha({
+  rotulo: texto,
+  obrigatorio = false,
   children,
 }: {
   rotulo: string;
+  obrigatorio?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-black/45">
-        {rotulo}
+      <span className={estiloRotulo}>
+        {texto}
+        {!obrigatorio && (
+          <span className="ml-1 font-medium normal-case text-black/35">
+            opcional
+          </span>
+        )}
       </span>
       {children}
     </label>
