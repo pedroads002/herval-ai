@@ -342,16 +342,14 @@ export type ClinicaDoLead = {
 /**
  * Uma especialidade que a clínica deste lead atende.
  *
- * `valor` vem de `clinica_especialidades` e é por clínica: o mesmo
- * procedimento custa diferente em lugares diferentes, então não existe preço
- * "da especialidade" — só preço daquela especialidade naquela clínica. Nulo
- * quando a clínica não cadastrou valor.
+ * Sem preço. A tabela `clinica_especialidades` tem uma coluna `valor`, mas o
+ * sistema não guarda nem mostra valor de nada — nem aqui, nem em nenhuma outra
+ * tela. Esta consulta ignora a coluna de propósito.
  */
 export type EspecialidadeDaClinica = {
   id: number;
   nome: string;
   duracaoMinutos: number;
-  valor: number | null;
   /** Se é a que o lead disse ter interesse. */
   doInteresseDoLead: boolean;
 };
@@ -443,16 +441,15 @@ export async function carregarConversa(
           .eq("id", lidoLead.clinica_id)
           .maybeSingle(),
     // As especialidades saem de `clinica_especialidades`, e não da lista geral:
-    // o que importa aqui é o que ESTA clínica atende e por quanto. Só as
-    // ativas, porque oferecer procedimento desativado é o que a trava 3 existe
-    // para impedir na conversa — a tela não deve contradizer a trava.
+    // o que importa aqui é o que ESTA clínica atende. Só as ativas, porque
+    // oferecer procedimento desativado é o que a trava 3 existe para impedir na
+    // conversa — a tela não deve contradizer a trava. A coluna `valor` da
+    // tabela não é lida: o sistema não exibe preço.
     lidoLead.clinica_id === null
       ? Promise.resolve({ data: null, error: null })
       : supabase
           .from("clinica_especialidades")
-          .select(
-            "valor, especialidades!inner(id, nome, duracao_minutos, ativa)",
-          )
+          .select("especialidades!inner(id, nome, duracao_minutos, ativa)")
           .eq("clinica_id", lidoLead.clinica_id)
           .eq("especialidades.ativa", true),
   ]);
@@ -476,13 +473,12 @@ export async function carregarConversa(
   } | null;
 
   /**
-   * O join volta como `{ valor, especialidades: {...} }`. A biblioteca tipa o
-   * lado do join de forma larga, e a alternativa seria descrever o formato do
-   * PostgREST aqui dentro — o que ficaria desatualizado na primeira mudança da
-   * consulta. Os campos são conferidos um a um logo abaixo.
+   * O join volta como `{ especialidades: {...} }`. A biblioteca tipa o lado do
+   * join de forma larga, e a alternativa seria descrever o formato do PostgREST
+   * aqui dentro — o que ficaria desatualizado na primeira mudança da consulta.
+   * Os campos são conferidos um a um logo abaixo.
    */
   type LinhaEspecialidade = {
-    valor: number | null;
     especialidades: {
       id: number;
       nome: string;
@@ -502,7 +498,6 @@ export async function carregarConversa(
         id: e.id,
         nome: e.nome,
         duracaoMinutos: e.duracao_minutos,
-        valor: linha.valor,
         doInteresseDoLead:
           lidoLead.especialidade_interesse_id != null &&
           lidoLead.especialidade_interesse_id === e.id,

@@ -847,21 +847,15 @@ export default function ConversaReal({
   );
 }
 
-/** Valor em reais, formatado só na exibição. Nulo vira travessão. */
-function emReais(valor: number | null) {
-  if (valor === null) return null;
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(valor);
-}
-
 /**
  * Quem é este atendimento: o cliente, a clínica e o que ela atende.
  *
  * Fica no alto da aba Agenda, junto do botão de agendar, porque é ali que a
  * informação é usada — na hora de marcar, o CRC precisa saber qual
- * procedimento, quanto dura, quanto custa e onde é.
+ * procedimento, quanto dura e onde é.
+ *
+ * Preço não aparece, aqui nem em lugar nenhum: o sistema não guarda nem exibe
+ * valor de nada. Quanto custa é assunto da clínica, fora deste painel.
  *
  * O profissional não aparece aqui. Quando esta ficha foi escrita era porque não
  * havia onde buscá-lo; hoje há — `profissionais`, ligado à unidade por
@@ -927,35 +921,27 @@ function FichaDoAtendimento({
           </p>
         ) : (
           <ul className="mt-2 space-y-1.5">
-            {especialidades.map((e) => {
-              const preco = emReais(e.valor);
-              return (
-                <li
-                  key={e.id}
-                  className={[
-                    "rounded-controle px-2.5 py-1.5",
-                    // A que o lead procurou fica marcada: é por ela que a
-                    // conversa começou.
-                    e.doInteresseDoLead
-                      ? "bg-herval-verde/15"
-                      : "bg-black/[0.04]",
-                  ].join(" ")}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-bold text-herval-preto">
-                      {e.nome}
-                    </span>
-                    <span className="shrink-0 text-[11px] font-bold text-black/50">
-                      {preco ?? "sob consulta"}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-medium text-black/45">
-                    {e.duracaoMinutos} min
-                    {e.doInteresseDoLead ? " · interesse do lead" : ""}
-                  </p>
-                </li>
-              );
-            })}
+            {especialidades.map((e) => (
+              <li
+                key={e.id}
+                className={[
+                  "rounded-controle px-2.5 py-1.5",
+                  // A que o lead procurou fica marcada: é por ela que a
+                  // conversa começou.
+                  e.doInteresseDoLead
+                    ? "bg-herval-verde/15"
+                    : "bg-black/[0.04]",
+                ].join(" ")}
+              >
+                <span className="text-xs font-bold text-herval-preto">
+                  {e.nome}
+                </span>
+                <p className="text-[11px] font-medium text-black/45">
+                  {e.duracaoMinutos} min
+                  {e.doInteresseDoLead ? " · interesse do lead" : ""}
+                </p>
+              </li>
+            ))}
           </ul>
         )}
       </div>
