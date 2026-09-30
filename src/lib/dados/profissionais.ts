@@ -98,6 +98,35 @@ export type ClienteDoCadastro = {
   profissionais: ProfissionalCadastrado[];
 };
 
+/**
+ * Quando a pessoa atende num lugar.
+ *
+ * É propriedade do vínculo, e não da pessoa nem da unidade: quem atende em dois
+ * lugares tem um horário em cada um, e é justamente essa a informação que a
+ * Agenda vai precisar para saber se dá para marcar às terças de manhã naquele
+ * endereço. Por isso vem numa lista à parte, indexada pela unidade, em vez de
+ * virar campo dentro de `UnidadeDoCadastro` — a unidade é a mesma para todo
+ * mundo que atende nela, o horário não.
+ *
+ * Tudo aqui é opcional. Cliente que ainda não organizou a agenda fica sem nada
+ * disso preenchido, e isso não é cadastro pela metade: é o normal de quem
+ * combina horário por WhatsApp, caso a caso.
+ */
+export type HorarioNaUnidade = {
+  unidadeId: number;
+  /**
+   * Os dias em que atende. `1` é segunda e `7` é domingo — a mesma numeração
+   * que o CHECK da tabela aceita, e a mesma do `isodow` do Postgres, para que
+   * uma consulta por dia da semana não precise traduzir nada.
+   *
+   * Vazio quando ninguém informou.
+   */
+  dias: number[];
+  /** "HH:MM". Nulo quando ninguém informou — ou os dois cheios, ou os dois nulos. */
+  inicio: string | null;
+  fim: string | null;
+};
+
 export type ProfissionalCadastrado = {
   id: number;
   nome: string;
@@ -138,6 +167,12 @@ export type ProfissionalCadastrado = {
   ativo: boolean;
   especialidades: EspecialidadeDoCadastro[];
   unidades: UnidadeDoCadastro[];
+  /**
+   * Um item por unidade onde a pessoa atende, na mesma ordem de `unidades`.
+   * Quem não informou horário nenhum aparece aqui com a lista de dias vazia e
+   * as duas horas nulas — a linha do vínculo existe de todo jeito.
+   */
+  horarios: HorarioNaUnidade[];
 };
 
 export type DadosDosProfissionais = {
@@ -151,6 +186,13 @@ export type DadosDosProfissionais = {
    * em branco, e a segunda é defeito.
    */
   falha: string | null;
+  /**
+   * Quando a leitura bateu no teto e a tela não está mostrando tudo.
+   *
+   * Separado de `falha` de propósito: `falha` apaga a tela, e aqui os dados que
+   * vieram estão certos — só não são todos. Nulo é o normal.
+   */
+  aviso: string | null;
 };
 
 const SEM_DADOS: DadosDosProfissionais = {
@@ -158,7 +200,39 @@ const SEM_DADOS: DadosDosProfissionais = {
   clientes: [],
   especialidades: [],
   falha: null,
+  aviso: null,
 };
+
+/**
+ * O teto de linhas de cada leitura.
+ *
+ * Existe porque leitura sem teto não é leitura sem limite: o PostgREST tem um
+ * máximo configurado no servidor, e quando ele corta, corta calado — a tela
+ * mostra uma lista a menos e ninguém fica sabendo. Pedir um teto nosso troca um
+ * corte invisível por um corte que a gente conhece e consegue avisar.
+ *
+ * Mil é o padrão documentado do Supabase, e é folgado: a agência tem dezenas de
+ * clientes, não milhares. Se um dia bater, a tela diz, e aí paginação vira
+ * trabalho com motivo em vez de trabalho por precaução.
+ */
+const TETO_DE_LINHAS = 1000;
+
+/**
+ * Avisa quando alguma leitura veio cheia até o teto.
+ *
+ * Contar o que voltou é o jeito honesto de descobrir: uma resposta com
+ * exatamente mil linhas ou é coincidência exata ou é corte, e tratar as duas
+ * como corte erra para o lado de avisar à toa, não para o lado de esconder.
+ */
+function avisoDoTeto(contagens: Record<string, number>) {
+  const cheias = Object.entries(contagens)
+    .filter(([, quantas]) => quantas >= TETO_DE_LINHAS)
+    .map(([nome]) => nome);
+
+  if (cheias.length === 0) return null;
+
+  return `A tela está mostrando no máximo ${TETO_DE_LINHAS} linhas de ${cheias.join(", ")}. Nada foi perdido no banco, mas esta lista não está completa.`;
+}
 
 type LinhaProfissional = {
   id: number;
@@ -213,6 +287,10 @@ type LinhaVinculo = {
   profissional_id: number;
   especialidade_id?: number;
   unidade_id?: number;
+  /** Só no vínculo de unidade, e só quando alguém preencheu. */
+  dias_semana?: number[] | null;
+  hora_inicio?: string | null;
+  hora_fim?: string | null;
 };
 
 /**
@@ -251,28 +329,34 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     supabase
       .from("profissionais")
       .select(COLUNAS_DO_PROFISSIONAL)
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("clinicas")
       .select(COLUNAS_DO_CLIENTE)
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("unidades")
       .select("id, clinica_id, nome, endereco, cidade, ativa")
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("especialidades")
       .select("id, nome, ativa")
-      .order("nome", { ascending: true }),
-    // As colunas de dia e horário existem em `profissional_unidades`, mas não
-    // são lidas aqui: nenhuma tela mostra horário ainda, e campo carregado sem
-    // ninguém usar é peso morto. Entram quando a Agenda precisar.
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
+    // As duas listas de ligação são mais longas que as de cima: uma pessoa que
+    // realiza dez procedimentos são dez linhas. O teto aqui é o mesmo, e é
+    // justamente aqui que ele seria atingido primeiro.
     supabase
       .from("profissional_especialidades")
-      .select("profissional_id, especialidade_id"),
+      .select("profissional_id, especialidade_id")
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("profissional_unidades")
-      .select("profissional_id, unidade_id"),
+      .select("profissional_id, unidade_id, dias_semana, hora_inicio, hora_fim")
+      .limit(TETO_DE_LINHAS),
   ]);
 
   const erro =
@@ -336,7 +420,12 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
   const profissionais: ProfissionalCadastrado[] = (
     (respostaProfissionais.data ?? []) as LinhaProfissional[]
   ).map((linha) => {
-    const unidadesDele = (unidadesPorProfissional.get(linha.id) ?? [])
+    // Os vínculos de unidade desta pessoa, guardados antes de virarem unidades:
+    // o horário mora no vínculo, e a unidade sozinha não o carrega.
+    const vinculosDele = (unidadesPorProfissional.get(linha.id) ?? []).filter(
+      (v) => unidadePorId.has(v.unidade_id as number),
+    );
+    const unidadesDele = vinculosDele
       .map((v) => unidadePorId.get(v.unidade_id as number))
       .filter((u): u is UnidadeDoCadastro => u !== undefined);
 
@@ -357,6 +446,12 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
         .map((v) => especialidadePorId.get(v.especialidade_id as number))
         .filter((e): e is EspecialidadeDoCadastro => e !== undefined),
       unidades: unidadesDele,
+      horarios: vinculosDele.map((v) => ({
+        unidadeId: v.unidade_id as number,
+        dias: [...(v.dias_semana ?? [])].sort((a, b) => a - b),
+        inicio: horaCurta(v.hora_inicio),
+        fim: horaCurta(v.hora_fim),
+      })),
     };
   });
 
@@ -380,13 +475,30 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     profissionais: profissionais.filter((p) => p.clienteId === linha.id),
   }));
 
-  return { profissionais, clientes, especialidades, falha: null };
+  return {
+    profissionais,
+    clientes,
+    especialidades,
+    falha: null,
+    aviso: avisoDoTeto({
+      profissionais: (respostaProfissionais.data ?? []).length,
+      clientes: clientesCrus.length,
+      unidades: unidades.length,
+      procedimentos: especialidades.length,
+      "procedimentos por pessoa": (
+        respostaEspecialidadesDoProfissional.data ?? []
+      ).length,
+      "unidades por pessoa": (respostaUnidadesDoProfissional.data ?? []).length,
+    }),
+  };
 }
 
 export type DadosDeUmCliente = {
   cliente: ClienteDoCadastro | null;
   especialidades: EspecialidadeDoCadastro[];
   falha: string | null;
+  /** Ver `aviso` em `DadosDosProfissionais`: leitura cortada no teto. */
+  aviso: string | null;
 };
 
 /**
@@ -398,15 +510,31 @@ export type DadosDeUmCliente = {
  * telas começariam a discordar sobre o que um cliente é.
  */
 export async function carregarCliente(id: number): Promise<DadosDeUmCliente> {
-  const { clientes, especialidades, falha } = await carregarProfissionais();
+  const { clientes, especialidades, falha, aviso } =
+    await carregarProfissionais();
 
-  if (falha) return { cliente: null, especialidades: [], falha };
+  if (falha) {
+    return { cliente: null, especialidades: [], falha, aviso: null };
+  }
 
   return {
     cliente: clientes.find((c) => c.id === id) ?? null,
     especialidades,
     falha: null,
+    aviso,
   };
+}
+
+/**
+ * A hora do jeito que a tela usa.
+ *
+ * O banco guarda `time`, e o PostgREST devolve "09:00:00". O `<input type=time>`
+ * e a etiqueta da tela querem "09:00" — os segundos aqui seriam sempre zero e
+ * só ocupariam espaço.
+ */
+function horaCurta(valor: string | null | undefined) {
+  if (!valor) return null;
+  return valor.slice(0, 5);
 }
 
 /** Junta uma lista de ligações por profissional, numa passada. */

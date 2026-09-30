@@ -30,9 +30,15 @@ const itens = [
   { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
   { href: "/regua-automacao", rotulo: "Régua de Automação", Icone: Workflow },
   { href: "/clientes", rotulo: "Clientes", Icone: Stethoscope },
-  { href: "/especialidades", rotulo: "Especialidades", Icone: ClipboardList },
+  // O endereço segue "/especialidades" porque é o nome da tabela no banco e
+  // mudá-lo quebraria qualquer link já salvo. O rótulo é a palavra da agência.
+  { href: "/especialidades", rotulo: "Procedimentos", Icone: ClipboardList },
   { href: "/estrategia", rotulo: "Estratégia da Clínica", Icone: Building2 },
-  { href: "/objecoes", rotulo: "Quebra de Objeções", Icone: MessageSquareWarning },
+  {
+    href: "/objecoes",
+    rotulo: "Quebra de Objeções",
+    Icone: MessageSquareWarning,
+  },
   {
     href: "/templates-whatsapp",
     rotulo: "Templates de WhatsApp",

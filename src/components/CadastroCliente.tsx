@@ -22,6 +22,7 @@ import {
   CamposDoCliente,
   CamposDoIndividual,
   Cartao,
+  HorariosNasUnidades,
   Unidades,
   useMarcados,
   useQuandoDerCerto,
@@ -494,6 +495,14 @@ function FormularioDaPessoa({
         unidades={cliente.unidades}
         marcados={marcados}
         aoMarcar={setMarcados}
+      />
+
+      <HorariosNasUnidades
+        unidades={cliente.unidades}
+        marcados={marcados}
+        aoMarcar={setMarcados}
+        valores={valores}
+        aoMudar={mudar}
       />
 
       <div className="flex flex-wrap items-center gap-4">

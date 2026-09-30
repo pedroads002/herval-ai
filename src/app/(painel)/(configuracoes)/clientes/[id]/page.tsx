@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
+import AvisoDeCorte from "@/components/AvisoDeCorte";
 import DetalheCliente, { ResumoDoCliente } from "@/components/DetalheCliente";
 import { carregarCliente } from "@/lib/dados/profissionais";
 
@@ -19,9 +20,9 @@ export default async function PaginaDoCliente({
   const { id } = await params;
   const numero = Number(id);
 
-  const { cliente, especialidades, falha } = Number.isInteger(numero)
+  const { cliente, especialidades, falha, aviso } = Number.isInteger(numero)
     ? await carregarCliente(numero)
-    : { cliente: null, especialidades: [], falha: null };
+    : { cliente: null, especialidades: [], falha: null, aviso: null };
 
   if (falha) {
     return (
@@ -61,6 +62,11 @@ export default async function PaginaDoCliente({
       <div className="-mt-6 mb-8">
         <ResumoDoCliente cliente={cliente} />
       </div>
+
+      {/* O aviso é da leitura inteira, e não deste cliente: a ficha reaproveita
+          a leitura da seção. Se a lista foi cortada, a equipe mostrada aqui pode
+          estar incompleta, e é aqui que isso importa. */}
+      <AvisoDeCorte aviso={aviso} />
 
       <DetalheCliente cliente={cliente} especialidades={especialidades} />
     </>

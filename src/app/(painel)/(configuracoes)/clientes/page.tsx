@@ -1,4 +1,5 @@
 import Cabecalho from "@/components/Cabecalho";
+import AvisoDeCorte from "@/components/AvisoDeCorte";
 import CadastroCliente from "@/components/CadastroCliente";
 import TabelaClientes from "@/components/TabelaClientes";
 import { carregarProfissionais } from "@/lib/dados/profissionais";
@@ -16,7 +17,8 @@ import { carregarProfissionais } from "@/lib/dados/profissionais";
  * já torna a página dinâmica. A opção `dynamic` está em via de saída no Next.
  */
 export default async function PaginaClientes() {
-  const { clientes, especialidades, falha } = await carregarProfissionais();
+  const { clientes, especialidades, falha, aviso } =
+    await carregarProfissionais();
 
   return (
     <>
@@ -36,6 +38,7 @@ export default async function PaginaClientes() {
         </div>
       )}
 
+      <AvisoDeCorte aviso={aviso} />
       <TabelaClientes clientes={clientes} falha={falha} />
     </>
   );

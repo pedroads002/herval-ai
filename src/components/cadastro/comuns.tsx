@@ -5,7 +5,10 @@ import { AlertCircle, ArrowLeft, Check } from "lucide-react";
 import { tiposDeProfissional } from "@/lib/dados/tiposDeProfissional";
 import { estados } from "@/lib/dados/estados";
 import type { ResultadoDoCadastro } from "@/lib/acoes/resultadoDoCadastro";
-import type { EspecialidadeDoCadastro } from "@/lib/dados/profissionais";
+import type {
+  EspecialidadeDoCadastro,
+  HorarioNaUnidade,
+} from "@/lib/dados/profissionais";
 
 /**
  * As peças que as telas do cadastro de clientes dividem entre si.
@@ -755,6 +758,181 @@ export function Unidades({
         Dá para marcar mais de uma, se a pessoa atende em mais de um lugar.
       </p>
     </fieldset>
+  );
+}
+
+/**
+ * Os dias da semana, na ordem em que se fala e com o número que o banco guarda.
+ *
+ * `1` é segunda e `7` é domingo — a numeração do CHECK da tabela, que é a mesma
+ * do `isodow` do Postgres. Começar na segunda e não no domingo é o que a agência
+ * usa: fim de semana fica no fim, onde a exceção deve ficar.
+ */
+const DIAS_DA_SEMANA = [
+  { valor: 1, nome: "Seg" },
+  { valor: 2, nome: "Ter" },
+  { valor: 3, nome: "Qua" },
+  { valor: 4, nome: "Qui" },
+  { valor: 5, nome: "Sex" },
+  { valor: 6, nome: "Sáb" },
+  { valor: 7, nome: "Dom" },
+] as const;
+
+/**
+ * O horário em uma linha, para quem só está olhando a lista.
+ *
+ * Devolve texto vazio quando não há nada informado — a tela usa isso para não
+ * desenhar uma linha que diria "—". Dia sem hora e hora sem dia são dois casos
+ * possíveis e cada um aparece sozinho: quem informou só os dias informou uma
+ * coisa verdadeira, e inventar o resto seria pior.
+ */
+export function textoDoHorario(horario: HorarioNaUnidade) {
+  const dias = DIAS_DA_SEMANA.filter((d) => horario.dias.includes(d.valor))
+    .map((d) => d.nome)
+    .join(", ");
+  const horas =
+    horario.inicio && horario.fim ? `${horario.inicio}–${horario.fim}` : "";
+
+  return [dias, horas].filter(Boolean).join(" · ");
+}
+
+/** O estado inicial das caixas de dia, a partir do que já está gravado. */
+export function marcadosDoHorario(horarios: HorarioNaUnidade[]): Marcados {
+  return Object.fromEntries(
+    horarios.flatMap((h) =>
+      h.dias.map((dia) => [`horario-${h.unidadeId}-dias-${dia}`, true]),
+    ),
+  );
+}
+
+/** O texto inicial dos campos de hora, a partir do que já está gravado. */
+export function valoresDoHorario(horarios: HorarioNaUnidade[]): Valores {
+  return Object.fromEntries(
+    horarios.flatMap((h) => [
+      [`horario-${h.unidadeId}-inicio`, h.inicio ?? ""],
+      [`horario-${h.unidadeId}-fim`, h.fim ?? ""],
+    ]),
+  );
+}
+
+/**
+ * Quando a pessoa atende em cada lugar.
+ *
+ * Um bloco por unidade marcada, porque o horário é de um par pessoa-lugar: quem
+ * atende na matriz às segundas e na filial às quintas não tem "um" horário. O
+ * bloco aparece e desaparece junto com a marca da unidade — sem isso, alguém
+ * preencheria o horário de um lugar onde a pessoa não atende e a gravação
+ * jogaria fora o que foi digitado, sem dizer nada.
+ *
+ * Tudo opcional, de propósito. A maior parte dos clientes combina horário por
+ * WhatsApp, caso a caso, e obrigar a preencher uma agenda que não existe só
+ * produziria horário inventado — que é pior que campo vazio, porque o sistema
+ * passaria a acreditar nele.
+ */
+export function HorariosNasUnidades({
+  unidades,
+  marcados,
+  aoMarcar,
+  valores,
+  aoMudar,
+}: {
+  unidades: { id: number; nome: string }[] | null;
+  marcados: Marcados;
+  aoMarcar: (mudar: (atual: Marcados) => Marcados) => void;
+  valores: Valores;
+  aoMudar: (campo: string, valor: string) => void;
+}) {
+  if (unidades === null || unidades.length === 0) return null;
+
+  // Com uma unidade só não existe o que marcar: a tela manda o lugar num campo
+  // escondido, e o horário é o horário dela.
+  const escolhidas =
+    unidades.length === 1
+      ? unidades
+      : unidades.filter((u) => marcados[`unidades-${u.id}`]);
+
+  if (escolhidas.length === 0) return null;
+
+  return (
+    <fieldset>
+      <legend className={rotulo}>Dias e horário de atendimento</legend>
+      <div className="space-y-4">
+        {escolhidas.map((unidade) => (
+          <div
+            key={unidade.id}
+            className="rounded-card border border-black/10 px-5 py-4"
+          >
+            {unidades.length > 1 && (
+              <p className="mb-3 text-xs font-bold text-herval-preto">
+                {unidade.nome}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {DIAS_DA_SEMANA.map((dia) => (
+                <Marcador
+                  key={dia.valor}
+                  campo={`horario-${unidade.id}-dias`}
+                  valor={dia.valor}
+                  texto={dia.nome}
+                  marcados={marcados}
+                  aoMarcar={aoMarcar}
+                />
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-black/50">
+              <span>das</span>
+              <Hora
+                nome={`horario-${unidade.id}-inicio`}
+                etiqueta={`Hora de início em ${unidade.nome}`}
+                valores={valores}
+                aoMudar={aoMudar}
+              />
+              <span>às</span>
+              <Hora
+                nome={`horario-${unidade.id}-fim`}
+                etiqueta={`Hora de fim em ${unidade.nome}`}
+                valores={valores}
+                aoMudar={aoMudar}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs font-medium text-black/45">
+        Pode deixar em branco. A Helô só usa isso quando estiver informado.
+      </p>
+    </fieldset>
+  );
+}
+
+/**
+ * Um campo de hora.
+ *
+ * `type="time"` em vez de texto com máscara: o navegador já sabe recusar
+ * "25:70", e no celular ele abre o seletor de hora em vez do teclado inteiro.
+ * A etiqueta fica escondida porque a frase "das __ às __" ao lado já diz o que
+ * o campo é — para quem lê a tela com leitor de tela, ela não diria nada.
+ */
+function Hora({
+  nome,
+  etiqueta,
+  valores,
+  aoMudar,
+}: {
+  nome: string;
+  etiqueta: string;
+  valores: Valores;
+  aoMudar: (campo: string, valor: string) => void;
+}) {
+  return (
+    <input
+      type="time"
+      name={nome}
+      aria-label={etiqueta}
+      value={valores[nome] ?? ""}
+      onChange={(e) => aoMudar(nome, e.target.value)}
+      className="rounded-controle border border-black/15 bg-herval-branco px-3 py-2 text-sm font-medium text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
+    />
   );
 }
 
