@@ -41,7 +41,24 @@ export type DadosDoCatalogo = {
    * segunda é defeito.
    */
   falha: string | null;
+  /**
+   * Quando a leitura bateu no teto e a tela não está mostrando tudo.
+   *
+   * Separado de `falha`: aqui o que veio está certo, só não é tudo. Ver
+   * `TETO_DE_LINHAS`.
+   */
+  aviso: string | null;
 };
+
+/**
+ * O teto de linhas de cada leitura.
+ *
+ * Leitura sem teto não é leitura sem limite: o PostgREST tem um máximo no
+ * servidor, e quando ele corta, corta calado. Pedir um teto nosso troca um corte
+ * invisível por um que a gente conhece e consegue avisar. Ver o mesmo raciocínio
+ * em `dados/profissionais.ts`.
+ */
+const TETO_DE_LINHAS = 1000;
 
 type LinhaProcedimento = {
   id: number;
@@ -64,6 +81,7 @@ export async function carregarProcedimentos(): Promise<DadosDoCatalogo> {
     return {
       procedimentos: [],
       falha: "O Supabase não está configurado neste ambiente.",
+      aviso: null,
     };
   }
 
@@ -73,11 +91,13 @@ export async function carregarProcedimentos(): Promise<DadosDoCatalogo> {
     supabase
       .from("especialidades")
       .select("id, nome, duracao_minutos, ativa")
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("profissional_especialidades")
       .select("especialidade_id, profissionais!inner(id, nome, nome_exibicao)")
-      .eq("profissionais.ativo", true),
+      .eq("profissionais.ativo", true)
+      .limit(TETO_DE_LINHAS),
   ]);
 
   // As duas leituras são obrigatórias. Deixar a segunda falhar em silêncio
@@ -90,6 +110,7 @@ export async function carregarProcedimentos(): Promise<DadosDoCatalogo> {
     return {
       procedimentos: [],
       falha: `Não deu para ler o catálogo: ${erro.message}`,
+      aviso: null,
     };
   }
 
@@ -124,5 +145,18 @@ export async function carregarProcedimentos(): Promise<DadosDoCatalogo> {
     ),
   }));
 
-  return { procedimentos, falha: null };
+  const quemAtendeVeio = (respostaQuemAtende.data ?? []).length;
+  const cortadas = [
+    procedimentos.length >= TETO_DE_LINHAS ? "procedimentos" : null,
+    quemAtendeVeio >= TETO_DE_LINHAS ? "quem realiza cada um" : null,
+  ].filter((nome): nome is string => nome !== null);
+
+  return {
+    procedimentos,
+    falha: null,
+    aviso:
+      cortadas.length === 0
+        ? null
+        : `A tela está mostrando no máximo ${TETO_DE_LINHAS} linhas de ${cortadas.join(" e ")}. Nada foi perdido no banco, mas esta lista não está completa.`,
+  };
 }

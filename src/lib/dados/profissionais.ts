@@ -186,6 +186,13 @@ export type DadosDosProfissionais = {
    * em branco, e a segunda é defeito.
    */
   falha: string | null;
+  /**
+   * Quando a leitura bateu no teto e a tela não está mostrando tudo.
+   *
+   * Separado de `falha` de propósito: `falha` apaga a tela, e aqui os dados que
+   * vieram estão certos — só não são todos. Nulo é o normal.
+   */
+  aviso: string | null;
 };
 
 const SEM_DADOS: DadosDosProfissionais = {
@@ -193,7 +200,39 @@ const SEM_DADOS: DadosDosProfissionais = {
   clientes: [],
   especialidades: [],
   falha: null,
+  aviso: null,
 };
+
+/**
+ * O teto de linhas de cada leitura.
+ *
+ * Existe porque leitura sem teto não é leitura sem limite: o PostgREST tem um
+ * máximo configurado no servidor, e quando ele corta, corta calado — a tela
+ * mostra uma lista a menos e ninguém fica sabendo. Pedir um teto nosso troca um
+ * corte invisível por um corte que a gente conhece e consegue avisar.
+ *
+ * Mil é o padrão documentado do Supabase, e é folgado: a agência tem dezenas de
+ * clientes, não milhares. Se um dia bater, a tela diz, e aí paginação vira
+ * trabalho com motivo em vez de trabalho por precaução.
+ */
+const TETO_DE_LINHAS = 1000;
+
+/**
+ * Avisa quando alguma leitura veio cheia até o teto.
+ *
+ * Contar o que voltou é o jeito honesto de descobrir: uma resposta com
+ * exatamente mil linhas ou é coincidência exata ou é corte, e tratar as duas
+ * como corte erra para o lado de avisar à toa, não para o lado de esconder.
+ */
+function avisoDoTeto(contagens: Record<string, number>) {
+  const cheias = Object.entries(contagens)
+    .filter(([, quantas]) => quantas >= TETO_DE_LINHAS)
+    .map(([nome]) => nome);
+
+  if (cheias.length === 0) return null;
+
+  return `A tela está mostrando no máximo ${TETO_DE_LINHAS} linhas de ${cheias.join(", ")}. Nada foi perdido no banco, mas esta lista não está completa.`;
+}
 
 type LinhaProfissional = {
   id: number;
@@ -290,27 +329,34 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     supabase
       .from("profissionais")
       .select(COLUNAS_DO_PROFISSIONAL)
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("clinicas")
       .select(COLUNAS_DO_CLIENTE)
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("unidades")
       .select("id, clinica_id, nome, endereco, cidade, ativa")
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("especialidades")
       .select("id, nome, ativa")
-      .order("nome", { ascending: true }),
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
+    // As duas listas de ligação são mais longas que as de cima: uma pessoa que
+    // realiza dez procedimentos são dez linhas. O teto aqui é o mesmo, e é
+    // justamente aqui que ele seria atingido primeiro.
     supabase
       .from("profissional_especialidades")
-      .select("profissional_id, especialidade_id"),
+      .select("profissional_id, especialidade_id")
+      .limit(TETO_DE_LINHAS),
     supabase
       .from("profissional_unidades")
-      .select(
-        "profissional_id, unidade_id, dias_semana, hora_inicio, hora_fim",
-      ),
+      .select("profissional_id, unidade_id, dias_semana, hora_inicio, hora_fim")
+      .limit(TETO_DE_LINHAS),
   ]);
 
   const erro =
@@ -429,13 +475,30 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     profissionais: profissionais.filter((p) => p.clienteId === linha.id),
   }));
 
-  return { profissionais, clientes, especialidades, falha: null };
+  return {
+    profissionais,
+    clientes,
+    especialidades,
+    falha: null,
+    aviso: avisoDoTeto({
+      profissionais: (respostaProfissionais.data ?? []).length,
+      clientes: clientesCrus.length,
+      unidades: unidades.length,
+      procedimentos: especialidades.length,
+      "procedimentos por pessoa": (
+        respostaEspecialidadesDoProfissional.data ?? []
+      ).length,
+      "unidades por pessoa": (respostaUnidadesDoProfissional.data ?? []).length,
+    }),
+  };
 }
 
 export type DadosDeUmCliente = {
   cliente: ClienteDoCadastro | null;
   especialidades: EspecialidadeDoCadastro[];
   falha: string | null;
+  /** Ver `aviso` em `DadosDosProfissionais`: leitura cortada no teto. */
+  aviso: string | null;
 };
 
 /**
@@ -447,14 +510,18 @@ export type DadosDeUmCliente = {
  * telas começariam a discordar sobre o que um cliente é.
  */
 export async function carregarCliente(id: number): Promise<DadosDeUmCliente> {
-  const { clientes, especialidades, falha } = await carregarProfissionais();
+  const { clientes, especialidades, falha, aviso } =
+    await carregarProfissionais();
 
-  if (falha) return { cliente: null, especialidades: [], falha };
+  if (falha) {
+    return { cliente: null, especialidades: [], falha, aviso: null };
+  }
 
   return {
     cliente: clientes.find((c) => c.id === id) ?? null,
     especialidades,
     falha: null,
+    aviso,
   };
 }
 

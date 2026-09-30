@@ -1,4 +1,5 @@
 import Cabecalho from "@/components/Cabecalho";
+import AvisoDeCorte from "@/components/AvisoDeCorte";
 import ListaEspecialidades from "@/components/ListaEspecialidades";
 import { carregarProcedimentos } from "@/lib/dados/procedimentos";
 
@@ -14,7 +15,7 @@ import { carregarProcedimentos } from "@/lib/dados/procedimentos";
  * torna a página dinâmica.
  */
 export default async function PaginaEspecialidades() {
-  const { procedimentos, falha } = await carregarProcedimentos();
+  const { procedimentos, falha, aviso } = await carregarProcedimentos();
 
   return (
     <>
@@ -22,6 +23,7 @@ export default async function PaginaEspecialidades() {
         titulo="Procedimentos"
         descricao="O catálogo da agência: nome, duração e quem realiza cada procedimento."
       />
+      <AvisoDeCorte aviso={aviso} />
       <ListaEspecialidades procedimentos={procedimentos} falha={falha} />
     </>
   );
