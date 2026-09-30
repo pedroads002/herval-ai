@@ -36,6 +36,7 @@ import { ligacoesDoLead } from "@/data/ligacoes";
 import { tempoRelativo } from "@/lib/tempo";
 import type {
   ClinicaDoLead,
+  EspecialidadeDaClinica,
   LeadEmAtendimento,
   MensagemEmAtendimento,
   NotaEmAtendimento,
@@ -109,6 +110,7 @@ export default function ConversaReal({
   mensagens,
   notas: notasIniciais,
   clinica,
+  especialidades,
   falha,
   envioConfigurado,
 }: {
@@ -116,6 +118,7 @@ export default function ConversaReal({
   mensagens: MensagemEmAtendimento[];
   notas: NotaEmAtendimento[];
   clinica: ClinicaDoLead | null;
+  especialidades: EspecialidadeDaClinica[];
   falha: string | null;
   /**
    * Se este ambiente sabe enviar. Vem do servidor porque depende de variáveis
@@ -552,7 +555,10 @@ export default function ConversaReal({
             Conversa
           </h2>
 
-          <div ref={areaDaConversa} className="flex-1 space-y-4 overflow-y-auto p-5">
+          <div
+            ref={areaDaConversa}
+            className="flex-1 space-y-4 overflow-y-auto p-5"
+          >
             {conversa.length === 0 ? (
               <p className="text-sm font-medium text-black/55">
                 Ainda não houve nenhuma mensagem com este lead.
@@ -708,14 +714,18 @@ export default function ConversaReal({
               */}
               <button
                 type="button"
-                onClick={() => (gravando ? gravador.parar() : gravador.gravar())}
+                onClick={() =>
+                  gravando ? gravador.parar() : gravador.gravar()
+                }
                 disabled={
                   !envioConfigurado ||
                   enviando ||
                   gravador.estado === "indisponivel"
                 }
                 title={gravando ? "Parar a gravação" : "Gravar nota de voz"}
-                aria-label={gravando ? "Parar a gravação" : "Gravar nota de voz"}
+                aria-label={
+                  gravando ? "Parar a gravação" : "Gravar nota de voz"
+                }
                 className={[
                   "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-controle border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                   gravando
@@ -805,17 +815,24 @@ export default function ConversaReal({
 
             <div className="flex-1 overflow-y-auto p-5 lg:min-h-0">
               {aba === "Agenda" && (
-                <AbaAgenda
-                  clinica={
-                    lead.clinicaId === null
-                      ? undefined
-                      : clinicaPorId(lead.clinicaId)
-                  }
-                  agendamentos={consultas}
-                  aberto={agendamentoAberto}
-                  aoAlternar={setAgendamentoAberto}
-                  aoAgendar={(dados) => definirConsulta(lead.id, dados)}
-                />
+                <>
+                  <FichaDoAtendimento
+                    lead={lead}
+                    clinica={clinica}
+                    especialidades={especialidades}
+                  />
+                  <AbaAgenda
+                    clinica={
+                      lead.clinicaId === null
+                        ? undefined
+                        : clinicaPorId(lead.clinicaId)
+                    }
+                    agendamentos={consultas}
+                    aberto={agendamentoAberto}
+                    aoAlternar={setAgendamentoAberto}
+                    aoAgendar={(dados) => definirConsulta(lead.id, dados)}
+                  />
+                </>
               )}
               {aba === "Ligações" && <AbaLigacoes ligacoes={chamadas} />}
               {aba === "Clínica" && (
@@ -825,6 +842,122 @@ export default function ConversaReal({
             </div>
           </section>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Valor em reais, formatado só na exibição. Nulo vira travessão. */
+function emReais(valor: number | null) {
+  if (valor === null) return null;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(valor);
+}
+
+/**
+ * Quem é este atendimento: o cliente, a clínica e o que ela atende.
+ *
+ * Fica no alto da aba Agenda, junto do botão de agendar, porque é ali que a
+ * informação é usada — na hora de marcar, o CRC precisa saber qual
+ * procedimento, quanto dura, quanto custa e onde é.
+ *
+ * O profissional não aparece aqui. Quando esta ficha foi escrita era porque não
+ * havia onde buscá-lo; hoje há — `profissionais`, ligado à unidade por
+ * `profissional_unidades` — e o motivo passou a ser outro: um lead chega para a
+ * clínica, não para a unidade, e uma clínica pode ter várias. Mostrar todo mundo
+ * que atende em qualquer unidade dela faria o CRC oferecer um profissional que
+ * não está no endereço que ele acabou de informar ao lead. Enquanto o
+ * agendamento não escolher a unidade, não há resposta certa para exibir.
+ */
+function FichaDoAtendimento({
+  lead,
+  clinica,
+  especialidades,
+}: {
+  lead: LeadEmAtendimento;
+  clinica: ClinicaDoLead | null;
+  especialidades: EspecialidadeDaClinica[];
+}) {
+  return (
+    <div className="mb-4 space-y-4 border-b border-black/10 pb-4">
+      <div>
+        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Cliente
+        </h3>
+        <p className="mt-1 text-sm font-bold text-herval-preto">{lead.lead}</p>
+        <p className="text-xs font-medium text-black/55">
+          {lead.telefone} · {lead.origem}
+        </p>
+      </div>
+
+      <div>
+        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Clínica
+        </h3>
+        <p className="mt-1 text-sm font-bold text-herval-preto">
+          {clinica?.nome ?? lead.nomeDaClinica}
+        </p>
+        {clinica?.endereco ? (
+          <p className="text-xs font-medium leading-relaxed text-black/55">
+            {clinica.endereco}
+            {clinica.cidade ? ` · ${clinica.cidade}` : ""}
+          </p>
+        ) : (
+          <p className="text-xs font-medium text-black/40">
+            Endereço não cadastrado.
+          </p>
+        )}
+        {clinica?.horarioFuncionamento && (
+          <p className="mt-0.5 text-xs font-medium text-black/55">
+            {clinica.horarioFuncionamento}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Especialidades ({especialidades.length})
+        </h3>
+
+        {especialidades.length === 0 ? (
+          <p className="mt-1 text-xs font-medium text-black/40">
+            Esta clínica não tem especialidade ativa cadastrada.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {especialidades.map((e) => {
+              const preco = emReais(e.valor);
+              return (
+                <li
+                  key={e.id}
+                  className={[
+                    "rounded-controle px-2.5 py-1.5",
+                    // A que o lead procurou fica marcada: é por ela que a
+                    // conversa começou.
+                    e.doInteresseDoLead
+                      ? "bg-herval-verde/15"
+                      : "bg-black/[0.04]",
+                  ].join(" ")}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-bold text-herval-preto">
+                      {e.nome}
+                    </span>
+                    <span className="shrink-0 text-[11px] font-bold text-black/50">
+                      {preco ?? "sob consulta"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-black/45">
+                    {e.duracaoMinutos} min
+                    {e.doInteresseDoLead ? " · interesse do lead" : ""}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -979,7 +1112,9 @@ function Historico({
 function Dado({ rotulo, valor }: { rotulo: string; valor: string | null }) {
   return (
     <div className="flex gap-2">
-      <dt className="w-24 shrink-0 text-xs font-bold text-black/45">{rotulo}</dt>
+      <dt className="w-24 shrink-0 text-xs font-bold text-black/45">
+        {rotulo}
+      </dt>
       <dd className="min-w-0 flex-1 text-sm text-black/70">
         {valor?.trim() ? valor : "—"}
       </dd>

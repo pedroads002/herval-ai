@@ -186,6 +186,7 @@ type LinhaLead = {
   nome: string | null;
   telefone: string | null;
   clinica_id: number | null;
+  especialidade_interesse_id?: number | null;
   etapa: string | null;
   origem: string | null;
   criado_em: string;
@@ -229,7 +230,10 @@ type LinhaNota = {
  */
 export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
   if (!supabaseConfigurado()) {
-    return { ...SEM_DADOS, falha: "O Supabase não está configurado neste ambiente." };
+    return {
+      ...SEM_DADOS,
+      falha: "O Supabase não está configurado neste ambiente.",
+    };
   }
 
   const supabase = await criarClienteServidor();
@@ -281,8 +285,9 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
       telefoneBruto: bruto,
       clinicaId: linha.clinica_id,
       nomeDaClinica:
-        (linha.clinica_id !== null ? nomesDeClinica.get(linha.clinica_id) : null) ??
-        "Clínica não informada",
+        (linha.clinica_id !== null
+          ? nomesDeClinica.get(linha.clinica_id)
+          : null) ?? "Clínica não informada",
       etapa: etapaConhecida(linha.etapa),
       origem: (linha.origem ?? "").trim() || "Origem não informada",
       minutosAtras: minutosDesde(linha.criado_em, agora),
@@ -334,11 +339,29 @@ export type ClinicaDoLead = {
   convenios: string | null;
 };
 
+/**
+ * Uma especialidade que a clínica deste lead atende.
+ *
+ * `valor` vem de `clinica_especialidades` e é por clínica: o mesmo
+ * procedimento custa diferente em lugares diferentes, então não existe preço
+ * "da especialidade" — só preço daquela especialidade naquela clínica. Nulo
+ * quando a clínica não cadastrou valor.
+ */
+export type EspecialidadeDaClinica = {
+  id: number;
+  nome: string;
+  duracaoMinutos: number;
+  valor: number | null;
+  /** Se é a que o lead disse ter interesse. */
+  doInteresseDoLead: boolean;
+};
+
 export type ConversaDoLead = {
   lead: LeadEmAtendimento | null;
   mensagens: MensagemEmAtendimento[];
   notas: NotaEmAtendimento[];
   clinica: ClinicaDoLead | null;
+  especialidades: EspecialidadeDaClinica[];
   falha: string | null;
 };
 
@@ -354,26 +377,34 @@ export type ConversaDoLead = {
  * quem chega aqui por um card do Funil, que ainda usa dado de exemplo. É
  * situação normal, não defeito, e a tela explica isso em vez de dar erro.
  */
-export async function carregarConversa(leadId: number): Promise<ConversaDoLead> {
+export async function carregarConversa(
+  leadId: number,
+): Promise<ConversaDoLead> {
   const vazio: ConversaDoLead = {
     lead: null,
     mensagens: [],
     notas: [],
     clinica: null,
+    especialidades: [],
     falha: null,
   };
 
   if (!Number.isInteger(leadId) || leadId <= 0) return vazio;
 
   if (!supabaseConfigurado()) {
-    return { ...vazio, falha: "O Supabase não está configurado neste ambiente." };
+    return {
+      ...vazio,
+      falha: "O Supabase não está configurado neste ambiente.",
+    };
   }
 
   const supabase = await criarClienteServidor();
 
   const { data: linhaLead, error: erroLead } = await supabase
     .from("leads")
-    .select("id, nome, telefone, clinica_id, etapa, origem, criado_em")
+    .select(
+      "id, nome, telefone, clinica_id, especialidade_interesse_id, etapa, origem, criado_em",
+    )
     .eq("id", leadId)
     .maybeSingle();
 
@@ -384,7 +415,12 @@ export async function carregarConversa(leadId: number): Promise<ConversaDoLead> 
 
   const lidoLead = linhaLead as LinhaLead;
 
-  const [respostaMensagens, respostaNotas, respostaClinica] = await Promise.all([
+  const [
+    respostaMensagens,
+    respostaNotas,
+    respostaClinica,
+    respostaEspecialidades,
+  ] = await Promise.all([
     supabase
       .from("mensagens")
       .select(
@@ -406,6 +442,19 @@ export async function carregarConversa(leadId: number): Promise<ConversaDoLead> 
           )
           .eq("id", lidoLead.clinica_id)
           .maybeSingle(),
+    // As especialidades saem de `clinica_especialidades`, e não da lista geral:
+    // o que importa aqui é o que ESTA clínica atende e por quanto. Só as
+    // ativas, porque oferecer procedimento desativado é o que a trava 3 existe
+    // para impedir na conversa — a tela não deve contradizer a trava.
+    lidoLead.clinica_id === null
+      ? Promise.resolve({ data: null, error: null })
+      : supabase
+          .from("clinica_especialidades")
+          .select(
+            "valor, especialidades!inner(id, nome, duracao_minutos, ativa)",
+          )
+          .eq("clinica_id", lidoLead.clinica_id)
+          .eq("especialidades.ativa", true),
   ]);
 
   if (respostaMensagens.error) {
@@ -426,9 +475,52 @@ export async function carregarConversa(leadId: number): Promise<ConversaDoLead> 
     convenios: string | null;
   } | null;
 
+  /**
+   * O join volta como `{ valor, especialidades: {...} }`. A biblioteca tipa o
+   * lado do join de forma larga, e a alternativa seria descrever o formato do
+   * PostgREST aqui dentro — o que ficaria desatualizado na primeira mudança da
+   * consulta. Os campos são conferidos um a um logo abaixo.
+   */
+  type LinhaEspecialidade = {
+    valor: number | null;
+    especialidades: {
+      id: number;
+      nome: string;
+      duracao_minutos: number;
+    } | null;
+  };
+
+  const especialidades = (
+    (respostaEspecialidades.data ?? []) as unknown as LinhaEspecialidade[]
+  )
+    .filter((linha) => linha.especialidades !== null)
+    .map((linha) => {
+      const e = linha.especialidades as NonNullable<
+        LinhaEspecialidade["especialidades"]
+      >;
+      return {
+        id: e.id,
+        nome: e.nome,
+        duracaoMinutos: e.duracao_minutos,
+        valor: linha.valor,
+        doInteresseDoLead:
+          lidoLead.especialidade_interesse_id != null &&
+          lidoLead.especialidade_interesse_id === e.id,
+      } satisfies EspecialidadeDaClinica;
+    })
+    // A de interesse do lead primeiro: é a que o CRC vai querer ver antes de
+    // qualquer outra ao abrir o atendimento.
+    .sort((a, b) => {
+      if (a.doInteresseDoLead !== b.doInteresseDoLead) {
+        return a.doInteresseDoLead ? -1 : 1;
+      }
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+
   const bruto = lidoLead.telefone ?? "";
 
   return {
+    especialidades,
     lead: {
       id: lidoLead.id,
       lead: (lidoLead.nome ?? "").trim() || "Sem nome",
