@@ -36,11 +36,15 @@ import {
   CamposDoCliente,
   CamposDoIndividual,
   Cartao,
+  HorariosNasUnidades,
+  marcadosDoHorario,
   marcarIds,
+  textoDoHorario,
   Unidades,
   useMarcados,
   useQuandoDerCerto,
   useValores,
+  valoresDoHorario,
 } from "@/components/cadastro/comuns";
 import UnidadesDoCliente from "@/components/UnidadesDoCliente";
 
@@ -285,6 +289,7 @@ function Equipe({
                       .join(" · ")}
                   </span>
                   <ResumoDosProcedimentos pessoa={pessoa} />
+                  <ResumoDoHorario pessoa={pessoa} />
                 </span>
                 {!pessoa.ativo && (
                   <span className="rounded-full border border-black/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
@@ -325,6 +330,40 @@ function Equipe({
         </div>
       )}
     </Cartao>
+  );
+}
+
+/**
+ * Quando a pessoa atende, na linha fechada da equipe.
+ *
+ * Só aparece quando existe horário informado. Uma linha dizendo "horário não
+ * informado" em toda pessoa de todo cliente encheria a lista de aviso sobre
+ * campo opcional — e não é aviso, é o estado normal.
+ *
+ * O nome da unidade entra quando a pessoa atende em mais de um lugar: aí o
+ * horário sozinho não diz onde.
+ */
+function ResumoDoHorario({ pessoa }: { pessoa: ProfissionalCadastrado }) {
+  const nomes = new Map(pessoa.unidades.map((u) => [u.id, u.nome]));
+  const linhas = pessoa.horarios
+    .map((horario) => ({
+      texto: textoDoHorario(horario),
+      onde: nomes.get(horario.unidadeId) ?? "",
+    }))
+    .filter((l) => l.texto !== "");
+
+  if (linhas.length === 0) return null;
+
+  return (
+    <span className="mt-1.5 block text-xs font-medium text-black/50">
+      {linhas
+        .map((l) =>
+          pessoa.unidades.length > 1 && l.onde !== ""
+            ? `${l.onde}: ${l.texto}`
+            : l.texto,
+        )
+        .join(" · ")}
+    </span>
   );
 }
 
@@ -387,6 +426,7 @@ function FormularioDaPessoa({
     especialidade_principal: pessoa?.especialidadePrincipal ?? "",
     registro: pessoa?.registro ?? "",
     procedimento_outro: pessoa?.procedimentoOutro ?? "",
+    ...valoresDoHorario(pessoa?.horarios ?? []),
   });
   const { marcados, setMarcados } = useMarcados({
     ...marcarIds(
@@ -397,6 +437,7 @@ function FormularioDaPessoa({
       "unidades",
       (pessoa?.unidades ?? []).map((u) => u.id),
     ),
+    ...marcadosDoHorario(pessoa?.horarios ?? []),
   });
   const [ativo, setAtivo] = useState(pessoa?.ativo ?? true);
 
@@ -442,6 +483,16 @@ function FormularioDaPessoa({
         unidades={unidades}
         marcados={marcados}
         aoMarcar={setMarcados}
+      />
+
+      {/* O horário vem depois dos lugares porque depende deles: é um bloco por
+          unidade marcada, e antes de marcar não há o que preencher. */}
+      <HorariosNasUnidades
+        unidades={unidades}
+        marcados={marcados}
+        aoMarcar={setMarcados}
+        valores={valores}
+        aoMudar={mudar}
       />
 
       <div className="flex flex-wrap items-center gap-4">

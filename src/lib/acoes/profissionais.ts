@@ -113,6 +113,91 @@ function numeros(formData: FormData, campo: string) {
   return [...vistos];
 }
 
+/**
+ * Quando a pessoa atende em cada lugar, do jeito que a tabela guarda.
+ *
+ * `null` nos três campos é a resposta normal de quem não organizou agenda: o
+ * vínculo existe, o horário não foi informado. O que não pode existir é meio
+ * horário — e as três regras abaixo são as mesmas três do banco, escritas aqui
+ * para o erro chegar como frase em vez de violação de CHECK.
+ */
+type HorarioGravavel = {
+  dias_semana: number[] | null;
+  hora_inicio: string | null;
+  hora_fim: string | null;
+};
+
+/**
+ * Horário em branco, escrito por extenso.
+ *
+ * Existe para que toda gravação mande as três colunas mesmo quando não há nada
+ * a informar. Omitir as colunas no `insert` daria o mesmo resultado, mas no
+ * `update` deixaria o horário antigo de pé — e "apaguei o horário e ele voltou"
+ * é a pior cara possível de um campo editável.
+ */
+const SEM_HORARIO: HorarioGravavel = {
+  dias_semana: null,
+  hora_inicio: null,
+  hora_fim: null,
+};
+
+/** "07:30" sim; "7:30", "24:00" e qualquer outra coisa, não. */
+const HORA = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+/**
+ * Lê o horário de cada unidade escolhida.
+ *
+ * Os campos chegam nomeados por unidade (`horario-12-dias`, `horario-12-inicio`,
+ * `horario-12-fim`), porque o horário é de um par pessoa-lugar e um campo só
+ * não daria conta de quem atende em dois endereços em dias diferentes.
+ *
+ * `nomes` só entra nas frases de erro: "a hora de fim tem que ser depois da de
+ * início" sem dizer em qual unidade manda procurar o campo errado na tela.
+ */
+function lerHorarios(
+  formData: FormData,
+  unidadeIds: number[],
+  nomes: Map<number, string>,
+): { erro: string } | Map<number, HorarioGravavel> {
+  const porUnidade = new Map<number, HorarioGravavel>();
+
+  for (const unidadeId of unidadeIds) {
+    const dias = numeros(formData, `horario-${unidadeId}-dias`)
+      .filter((d) => d >= 1 && d <= 7)
+      .sort((a, b) => a - b);
+    const inicio = opcional(formData, `horario-${unidadeId}-inicio`);
+    const fim = opcional(formData, `horario-${unidadeId}-fim`);
+    const onde = nomes.get(unidadeId) ?? "unidade";
+
+    if ((inicio === null) !== (fim === null)) {
+      return {
+        erro: `Em ${onde}, informe a hora de início e a de fim — ou deixe as duas em branco.`,
+      };
+    }
+
+    if (inicio !== null && fim !== null) {
+      if (!HORA.test(inicio) || !HORA.test(fim)) {
+        return { erro: `Em ${onde}, o horário está fora do formato 00:00.` };
+      }
+      // Comparação de texto resolve: "HH:MM" com dois dígitos sempre ordena
+      // igual ao relógio.
+      if (fim <= inicio) {
+        return {
+          erro: `Em ${onde}, a hora de fim tem que ser depois da de início.`,
+        };
+      }
+    }
+
+    porUnidade.set(unidadeId, {
+      dias_semana: dias.length === 0 ? null : dias,
+      hora_inicio: inicio,
+      hora_fim: fim,
+    });
+  }
+
+  return porUnidade;
+}
+
 /** O tamanho de um campo, quando ele existe. Devolve o motivo ou nada. */
 function longoDemais(valor: string | null, limite: number, campo: string) {
   if (valor !== null && valor.length > limite) {
@@ -394,9 +479,17 @@ export async function cadastrarIndividual(
 
   const { cliente } = resultado;
 
-  const erro = await gravarPessoa(sessao.supabase, pessoa, dados.area_atuacao, [
-    cliente.unidades[0].id,
-  ]);
+  // Sem horário, e não por esquecimento: a unidade nasce nesta mesma gravação,
+  // pelo gatilho do banco, então o formulário não tinha um número de unidade
+  // para pendurar horário nenhum. Quem quiser informar abre a ficha da pessoa
+  // depois de cadastrada, onde o bloco de horário existe.
+  const erro = await gravarPessoa(
+    sessao.supabase,
+    pessoa,
+    dados.area_atuacao,
+    [cliente.unidades[0].id],
+    new Map(),
+  );
 
   if (erro) {
     const { error: erroAoDesfazer } = await sessao.supabase
@@ -627,6 +720,9 @@ export async function cadastrarProfissional(
   );
   if ("erro" in escolhidas) return recusar(escolhidas.erro);
 
+  const horarios = lerHorarios(formData, escolhidas.ids, escolhidas.nomes);
+  if ("erro" in horarios) return recusar(horarios.erro);
+
   const area = await areaDoCliente(sessao.supabase, clienteId);
   if ("erro" in area) return recusar(area.erro);
 
@@ -635,6 +731,7 @@ export async function cadastrarProfissional(
     pessoa,
     area.area_atuacao,
     escolhidas.ids,
+    horarios,
   );
   if (erro) return recusar(`Não deu para cadastrar: ${erro}`);
 
@@ -683,6 +780,9 @@ export async function editarProfissional(
   );
   if ("erro" in escolhidas) return recusar(escolhidas.erro);
 
+  const horarios = lerHorarios(formData, escolhidas.ids, escolhidas.nomes);
+  if ("erro" in horarios) return recusar(horarios.erro);
+
   const erro = await salvarPessoa(sessao.supabase, id, pessoa, null);
   if (erro) return recusar(erro);
 
@@ -690,6 +790,7 @@ export async function editarProfissional(
     sessao.supabase,
     id,
     escolhidas.ids,
+    horarios,
   );
   if (erroDosLugares) return recusar(erroDosLugares);
 
@@ -1022,19 +1123,22 @@ async function salvarPessoa(
  *
  * A tela só oferece as unidades deste cliente. Esta é a tranca de quem chamasse
  * a ação direto, sem passar por tela nenhuma.
+ *
+ * Devolve os nomes junto porque a mesma consulta já os traz, e quem valida o
+ * horário precisa deles para dizer em qual lugar está o campo errado.
  */
 async function unidadesEscolhidas(
   supabase: ClienteDoServidor,
   clienteId: number,
   unidadeIds: number[],
-): Promise<{ erro: string } | { ids: number[] }> {
+): Promise<{ erro: string } | { ids: number[]; nomes: Map<number, string> }> {
   if (unidadeIds.length === 0) {
     return { erro: "Marque pelo menos um lugar onde a pessoa atende." };
   }
 
   const { data, error } = await supabase
     .from("unidades")
-    .select("id")
+    .select("id, nome")
     .eq("clinica_id", clienteId);
 
   if (error) {
@@ -1052,7 +1156,12 @@ async function unidadesEscolhidas(
     };
   }
 
-  return { ids: unidadeIds };
+  return {
+    ids: unidadeIds,
+    nomes: new Map(
+      (data ?? []).map((u) => [u.id, (u.nome ?? "").trim() || "esta unidade"]),
+    ),
+  };
 }
 
 /**
@@ -1064,8 +1173,14 @@ async function unidadesEscolhidas(
  * fora de todas as fichas, e sem caminho de volta pela tela. Nesta ordem, o
  * pior caso é sobrar um lugar a mais — visível, e corrigível no mesmo lugar.
  *
- * Quem já estava e continua não é tocado: o vínculo guarda dia e horário, e
- * regravar tudo apagaria isso sem motivo.
+ * Quem já estava e continua não é apagado e reinserido, só tem o horário
+ * regravado. A diferença importa: apagar e reinserir passaria pela chave
+ * estrangeira duas vezes por nada, e qualquer coisa que um dia venha a pendurar
+ * no vínculo se perderia numa edição de nome.
+ *
+ * Desmarcar um lugar e marcar de novo, porém, apaga o horário dele — o vínculo
+ * antigo foi embora de verdade. É o comportamento que a tela mostra: o bloco de
+ * horário desaparece junto com a marca e volta em branco.
  *
  * Devolve o motivo da falha, ou nada.
  */
@@ -1073,6 +1188,7 @@ async function trocarUnidades(
   supabase: ClienteDoServidor,
   profissionalId: number,
   unidadeIds: number[],
+  horarios: Map<number, HorarioGravavel>,
 ) {
   const { data: atuais, error } = await supabase
     .from("profissional_unidades")
@@ -1094,6 +1210,8 @@ async function trocarUnidades(
         entraram.map((unidade_id) => ({
           profissional_id: profissionalId,
           unidade_id,
+          ...SEM_HORARIO,
+          ...horarios.get(unidade_id),
         })),
       );
 
@@ -1111,6 +1229,24 @@ async function trocarUnidades(
 
     if (erroAoSair) {
       return `Os dados foram salvos, e a pessoa entrou nos lugares novos, mas os antigos não saíram: ${erroAoSair.message}`;
+    }
+  }
+
+  // Uma gravação por lugar que continuou. São um, dois ou três por pessoa — um
+  // `update` por linha custa menos do que montar um `upsert` que precisaria
+  // repetir a chave inteira e correria o risco de criar vínculo em vez de
+  // corrigir horário.
+  const continuaram = unidadeIds.filter((id) => tinha.has(id));
+
+  for (const unidade_id of continuaram) {
+    const { error: erroDoHorario } = await supabase
+      .from("profissional_unidades")
+      .update({ ...SEM_HORARIO, ...horarios.get(unidade_id) })
+      .eq("profissional_id", profissionalId)
+      .eq("unidade_id", unidade_id);
+
+    if (erroDoHorario) {
+      return `Os dados e os lugares foram salvos, mas o horário não: ${erroDoHorario.message}`;
     }
   }
 
@@ -1166,6 +1302,7 @@ async function gravarPessoa(
   pessoa: DadosDaPessoa,
   area: string,
   unidadeIds: number[],
+  horarios: Map<number, HorarioGravavel>,
 ) {
   const { data: criado, error } = await supabase
     .from("profissionais")
@@ -1188,6 +1325,7 @@ async function gravarPessoa(
   const erroDasLigacoes = await ligar(supabase, criado.id, {
     especialidadeIds: pessoa.especialidadeIds,
     unidadeIds,
+    horarios,
   });
 
   if (!erroDasLigacoes) return null;
@@ -1208,7 +1346,11 @@ async function gravarPessoa(
 async function ligar(
   supabase: ClienteDoServidor,
   profissionalId: number,
-  ligacoes: { especialidadeIds: number[]; unidadeIds: number[] },
+  ligacoes: {
+    especialidadeIds: number[];
+    unidadeIds: number[];
+    horarios: Map<number, HorarioGravavel>;
+  },
 ) {
   if (ligacoes.especialidadeIds.length > 0) {
     const { error } = await supabase.from("profissional_especialidades").insert(
@@ -1224,6 +1366,8 @@ async function ligar(
     ligacoes.unidadeIds.map((unidade_id) => ({
       profissional_id: profissionalId,
       unidade_id,
+      ...SEM_HORARIO,
+      ...ligacoes.horarios.get(unidade_id),
     })),
   );
   if (error) return `não deu para gravar os lugares (${error.message})`;

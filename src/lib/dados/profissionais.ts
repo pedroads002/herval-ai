@@ -98,6 +98,35 @@ export type ClienteDoCadastro = {
   profissionais: ProfissionalCadastrado[];
 };
 
+/**
+ * Quando a pessoa atende num lugar.
+ *
+ * É propriedade do vínculo, e não da pessoa nem da unidade: quem atende em dois
+ * lugares tem um horário em cada um, e é justamente essa a informação que a
+ * Agenda vai precisar para saber se dá para marcar às terças de manhã naquele
+ * endereço. Por isso vem numa lista à parte, indexada pela unidade, em vez de
+ * virar campo dentro de `UnidadeDoCadastro` — a unidade é a mesma para todo
+ * mundo que atende nela, o horário não.
+ *
+ * Tudo aqui é opcional. Cliente que ainda não organizou a agenda fica sem nada
+ * disso preenchido, e isso não é cadastro pela metade: é o normal de quem
+ * combina horário por WhatsApp, caso a caso.
+ */
+export type HorarioNaUnidade = {
+  unidadeId: number;
+  /**
+   * Os dias em que atende. `1` é segunda e `7` é domingo — a mesma numeração
+   * que o CHECK da tabela aceita, e a mesma do `isodow` do Postgres, para que
+   * uma consulta por dia da semana não precise traduzir nada.
+   *
+   * Vazio quando ninguém informou.
+   */
+  dias: number[];
+  /** "HH:MM". Nulo quando ninguém informou — ou os dois cheios, ou os dois nulos. */
+  inicio: string | null;
+  fim: string | null;
+};
+
 export type ProfissionalCadastrado = {
   id: number;
   nome: string;
@@ -138,6 +167,12 @@ export type ProfissionalCadastrado = {
   ativo: boolean;
   especialidades: EspecialidadeDoCadastro[];
   unidades: UnidadeDoCadastro[];
+  /**
+   * Um item por unidade onde a pessoa atende, na mesma ordem de `unidades`.
+   * Quem não informou horário nenhum aparece aqui com a lista de dias vazia e
+   * as duas horas nulas — a linha do vínculo existe de todo jeito.
+   */
+  horarios: HorarioNaUnidade[];
 };
 
 export type DadosDosProfissionais = {
@@ -213,6 +248,10 @@ type LinhaVinculo = {
   profissional_id: number;
   especialidade_id?: number;
   unidade_id?: number;
+  /** Só no vínculo de unidade, e só quando alguém preencheu. */
+  dias_semana?: number[] | null;
+  hora_inicio?: string | null;
+  hora_fim?: string | null;
 };
 
 /**
@@ -264,15 +303,14 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
       .from("especialidades")
       .select("id, nome, ativa")
       .order("nome", { ascending: true }),
-    // As colunas de dia e horário existem em `profissional_unidades`, mas não
-    // são lidas aqui: nenhuma tela mostra horário ainda, e campo carregado sem
-    // ninguém usar é peso morto. Entram quando a Agenda precisar.
     supabase
       .from("profissional_especialidades")
       .select("profissional_id, especialidade_id"),
     supabase
       .from("profissional_unidades")
-      .select("profissional_id, unidade_id"),
+      .select(
+        "profissional_id, unidade_id, dias_semana, hora_inicio, hora_fim",
+      ),
   ]);
 
   const erro =
@@ -336,7 +374,12 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
   const profissionais: ProfissionalCadastrado[] = (
     (respostaProfissionais.data ?? []) as LinhaProfissional[]
   ).map((linha) => {
-    const unidadesDele = (unidadesPorProfissional.get(linha.id) ?? [])
+    // Os vínculos de unidade desta pessoa, guardados antes de virarem unidades:
+    // o horário mora no vínculo, e a unidade sozinha não o carrega.
+    const vinculosDele = (unidadesPorProfissional.get(linha.id) ?? []).filter(
+      (v) => unidadePorId.has(v.unidade_id as number),
+    );
+    const unidadesDele = vinculosDele
       .map((v) => unidadePorId.get(v.unidade_id as number))
       .filter((u): u is UnidadeDoCadastro => u !== undefined);
 
@@ -357,6 +400,12 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
         .map((v) => especialidadePorId.get(v.especialidade_id as number))
         .filter((e): e is EspecialidadeDoCadastro => e !== undefined),
       unidades: unidadesDele,
+      horarios: vinculosDele.map((v) => ({
+        unidadeId: v.unidade_id as number,
+        dias: [...(v.dias_semana ?? [])].sort((a, b) => a - b),
+        inicio: horaCurta(v.hora_inicio),
+        fim: horaCurta(v.hora_fim),
+      })),
     };
   });
 
@@ -407,6 +456,18 @@ export async function carregarCliente(id: number): Promise<DadosDeUmCliente> {
     especialidades,
     falha: null,
   };
+}
+
+/**
+ * A hora do jeito que a tela usa.
+ *
+ * O banco guarda `time`, e o PostgREST devolve "09:00:00". O `<input type=time>`
+ * e a etiqueta da tela querem "09:00" — os segundos aqui seriam sempre zero e
+ * só ocupariam espaço.
+ */
+function horaCurta(valor: string | null | undefined) {
+  if (!valor) return null;
+  return valor.slice(0, 5);
 }
 
 /** Junta uma lista de ligações por profissional, numa passada. */
