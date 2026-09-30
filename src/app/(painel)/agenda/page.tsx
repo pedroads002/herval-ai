@@ -21,7 +21,7 @@ export default async function PaginaAgenda() {
     <>
       <Cabecalho
         titulo="Agenda"
-        descricao="Consultas dos leads que já estão em Agendamento, Reagendamento ou Comparecimento no Funil."
+        descricao="Consultas marcadas. Qualquer lead do Funil pode receber um horário aqui — marcar é o que move ele para Agendamento."
       />
       <AvisoDeCorte aviso={aviso} />
       <PainelAgenda {...dados} />

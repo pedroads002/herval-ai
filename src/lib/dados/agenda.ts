@@ -73,6 +73,17 @@ export type DadosDaAgenda = {
    * a consulta dele continua na grade.
    */
   leads: LeadDaAgenda[];
+  /**
+   * Quem pode receber um horário: todo lead real do banco, em qualquer etapa.
+   *
+   * É uma lista maior que `leads` de propósito. O Funil ainda não grava etapa no
+   * banco, então esperar o lead chegar em "Agendamento" por lá era esperar uma
+   * coisa que não acontece: o lead real entrava pelo WhatsApp em "Leads
+   * Recebidos" e nunca saía de lá, e a Agenda ficava vazia para sempre. Marcar
+   * daqui é o que move o lead para "Agendamento" — quem grava a etapa é
+   * `marcarConsulta`.
+   */
+  candidatos: LeadDaAgenda[];
   pessoas: ProfissionalCadastrado[];
   clientes: ClienteDoCadastro[];
   procedimentos: EspecialidadeDoCadastro[];
@@ -86,6 +97,7 @@ const TETO_DE_LINHAS = 1000;
 const SEM_DADOS: DadosDaAgenda = {
   consultas: [],
   leads: [],
+  candidatos: [],
   pessoas: [],
   clientes: [],
   procedimentos: [],
@@ -134,25 +146,26 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
 
   // O cadastro e as consultas são lidos juntos: nenhuma das duas depende da
   // outra para ser pedida.
-  const [cadastro, respostaConsultas, respostaLeadsDaEtapa] = await Promise.all(
-    [
-      carregarProfissionais(),
-      supabase
-        .from("agendamentos")
-        .select(CAMPOS_DO_AGENDAMENTO)
-        .order("data_consulta", { ascending: true })
-        .limit(TETO_DE_LINHAS),
-      supabase
-        .from("leads")
-        .select(CAMPOS_DO_LEAD)
-        .in("etapa", etapasComAgenda)
-        .limit(TETO_DE_LINHAS),
-    ],
-  );
+  const [cadastro, respostaConsultas, respostaDosLeads] = await Promise.all([
+    carregarProfissionais(),
+    supabase
+      .from("agendamentos")
+      .select(CAMPOS_DO_AGENDAMENTO)
+      .order("data_consulta", { ascending: true })
+      .limit(TETO_DE_LINHAS),
+    // Todos os leads, de qualquer etapa. Filtrar por etapa de agenda aqui era o
+    // que fechava o círculo: só quem já estava em "Agendamento" podia ser
+    // marcado, e só marcando é que alguém chega em "Agendamento".
+    supabase
+      .from("leads")
+      .select(CAMPOS_DO_LEAD)
+      .order("nome", { ascending: true })
+      .limit(TETO_DE_LINHAS),
+  ]);
 
   if (cadastro.falha) return { ...SEM_DADOS, falha: cadastro.falha };
 
-  const erro = respostaConsultas.error ?? respostaLeadsDaEtapa.error;
+  const erro = respostaConsultas.error ?? respostaDosLeads.error;
   if (erro) {
     return {
       ...SEM_DADOS,
@@ -162,9 +175,9 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
 
   const linhasDeConsulta = (respostaConsultas.data ??
     []) as LinhaDeAgendamento[];
-  const linhasDeLead = (respostaLeadsDaEtapa.data ?? []) as LinhaDeLead[];
+  const linhasDeLead = (respostaDosLeads.data ?? []) as LinhaDeLead[];
 
-  // Consulta de lead que já saiu das etapas de agenda: sem esta segunda leitura
+  // Consulta de lead que ficou fora do teto de linhas: sem esta segunda leitura
   // o cartão dele apareceria na grade sem nome, porque o lead não veio.
   const jaTemos = new Set(linhasDeLead.map((l) => l.id));
   const faltando = [
@@ -204,7 +217,7 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
     observacao: (linha.observacao ?? "").trim() || null,
   }));
 
-  const leads = linhasDeLead.map((linha): LeadDaAgenda => ({
+  const candidatos = linhasDeLead.map((linha): LeadDaAgenda => ({
     id: linha.id,
     nome: (linha.nome ?? "").trim() || "Lead sem nome",
     telefone: (linha.telefone ?? "").trim() || null,
@@ -213,14 +226,24 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
     especialidadeInteresseId: linha.especialidade_interesse_id,
   }));
 
+  // A grade e a lista de "Aguardando horário" continuam olhando só as etapas de
+  // agenda: quem está em "Leads Recebidos" pode ser marcado, mas não é alguém
+  // que a Agenda esteja esperando dar horário.
+  const deAgenda = new Set<string>(etapasComAgenda);
+  const temConsulta = new Set(linhasDeConsulta.map((c) => c.lead_id));
+  const leads = candidatos.filter(
+    (lead) => deAgenda.has(lead.etapa) || temConsulta.has(lead.id),
+  );
+
   const cortadas = [
     consultas.length >= TETO_DE_LINHAS ? "consultas" : null,
-    leads.length >= TETO_DE_LINHAS ? "leads" : null,
+    candidatos.length >= TETO_DE_LINHAS ? "leads" : null,
   ].filter((nome): nome is string => nome !== null);
 
   return {
     consultas,
     leads,
+    candidatos,
     pessoas: cadastro.profissionais,
     clientes: cadastro.clientes,
     procedimentos: cadastro.especialidades,

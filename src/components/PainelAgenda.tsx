@@ -20,6 +20,7 @@ import {
   intervaloDaSemana,
   mesmaData,
   nomesCurtosDosDias,
+  nomesDosDias,
   rotuloDaConsulta,
   somarDias,
   textoDoDia,
@@ -67,6 +68,7 @@ type Props = Omit<DadosDaAgenda, "aviso">;
 export default function PainelAgenda({
   consultas,
   leads,
+  candidatos,
   pessoas,
   clientes,
   procedimentos,
@@ -356,7 +358,9 @@ export default function PainelAgenda({
 
       {formAberto && (
         <FormularioNovaConsulta
-          candidatos={semHorario}
+          candidatos={candidatos}
+          aguardando={semHorario}
+          consultas={consultas}
           clientes={clientes}
           unidades={unidades}
           equipe={equipeAtiva}
@@ -513,6 +517,75 @@ function atendeNesteHorario(
     horario.dias.length === 0 ||
     horario.dias.includes(diaDaSemanaDoCadastro(dia));
   return noDia && horaDentroDoHorario(hora, horario.inicio, horario.fim);
+}
+
+/**
+ * O que impede de marcar naquele dia e hora, em uma frase — ou nulo quando não
+ * impede nada.
+ *
+ * São as duas conferências que o servidor repete em `conferirCombinacao` e em
+ * `marcarConsulta`: horário já ocupado pela mesma pessoa, e horário fora do
+ * expediente dela. Aqui é só para a equipe ver antes de clicar; quem recusa de
+ * verdade é o servidor, que é o único que vê o banco no momento da gravação.
+ */
+function conferirHorarioNaTela({
+  pessoa,
+  unidadeId,
+  dia,
+  hora,
+  leadId,
+  consultas,
+}: {
+  pessoa: ProfissionalCadastrado | undefined;
+  unidadeId: number | undefined;
+  dia: string;
+  hora: string;
+  leadId: number | "";
+  consultas: Consulta[];
+}): string | null {
+  if (!pessoa || dia === "") return null;
+
+  // A consulta em aberto do próprio lead não é choque: ela é a que vai ser
+  // remarcada para este horário.
+  if (
+    hora !== "" &&
+    consultas.some(
+      (c) =>
+        c.status === "Agendada" &&
+        c.profissionalId === pessoa.id &&
+        c.dia === dia &&
+        c.hora === hora &&
+        c.leadId !== leadId,
+    )
+  ) {
+    return `${primeiroNome(pessoa.nome)} já tem consulta marcada nesse dia às ${hora}. Escolha outro horário ou outro profissional.`;
+  }
+
+  if (unidadeId === undefined) return null;
+
+  const horarios = pessoa.horarios.filter((h) => h.unidadeId === unidadeId);
+  if (horarios.length === 0) return null;
+
+  const data = dataDoDia(dia);
+  const doDia = horarios.filter(
+    (h) => h.dias.length === 0 || h.dias.includes(diaDaSemanaDoCadastro(data)),
+  );
+
+  if (doDia.length === 0) {
+    return `${primeiroNome(pessoa.nome)} não atende ${nomesDosDias[data.getDay()].toLowerCase()} nessa unidade. Escolha outro dia ou outro profissional.`;
+  }
+
+  if (hora === "") return null;
+
+  if (!doDia.some((h) => horaDentroDoHorario(hora, h.inicio, h.fim))) {
+    const faixas = doDia
+      .map((h) => (h.inicio && h.fim ? `${h.inicio} às ${h.fim}` : null))
+      .filter((f): f is string => f !== null)
+      .join(", ");
+    return `${primeiroNome(pessoa.nome)} atende ${faixas} nessa unidade. Escolha um horário dentro do expediente.`;
+  }
+
+  return null;
 }
 
 type Buscadores = {
@@ -839,6 +912,8 @@ function primeiroNome(nome: string) {
 
 function FormularioNovaConsulta({
   candidatos,
+  aguardando,
+  consultas,
   clientes,
   unidades,
   equipe,
@@ -848,6 +923,9 @@ function FormularioNovaConsulta({
   aoFechar,
 }: {
   candidatos: LeadDaAgenda[];
+  /** Quem está em etapa de agenda e sem consulta aberta: vai primeiro na lista. */
+  aguardando: LeadDaAgenda[];
+  consultas: Consulta[];
   clientes: ClienteDoCadastro[];
   unidades: UnidadeDoCadastro[];
   equipe: ProfissionalCadastrado[];
@@ -861,10 +939,20 @@ function FormularioNovaConsulta({
     RESULTADO_INICIAL,
   );
 
-  const [leadId, setLeadId] = useState<number | "">(candidatos[0]?.id ?? "");
+  // Quem está esperando horário aparece primeiro, e é a escolha inicial: é o
+  // caso comum. Os outros continuam na lista porque o lead real entra pelo
+  // WhatsApp em "Leads Recebidos", e marcar daqui é o que o move.
+  const idsAguardando = new Set(aguardando.map((l) => l.id));
+  const outros = candidatos.filter((l) => !idsAguardando.has(l.id));
+
+  const [leadId, setLeadId] = useState<number | "">(
+    aguardando[0]?.id ?? candidatos[0]?.id ?? "",
+  );
   const [unidadeId, setUnidadeId] = useState<number | "">("");
   const [procedimentoId, setProcedimentoId] = useState<number | "">("");
   const [pessoaId, setPessoaId] = useState<number | "">("");
+  const [dia, setDia] = useState(diaSugerido);
+  const [hora, setHora] = useState("");
 
   useQuandoDerCerto(estado, aoMarcar);
 
@@ -910,6 +998,19 @@ function FormularioNovaConsulta({
     : naUnidade;
   const pessoaEscolhida = habilitados.find((p) => p.id === pessoaId);
 
+  /**
+   * O mesmo que o servidor vai conferir na hora de gravar, dito antes de a pessoa
+   * clicar. A recusa de verdade é a de lá — esta aqui só evita o clique inútil.
+   */
+  const impedimento = conferirHorarioNaTela({
+    pessoa: pessoaEscolhida,
+    unidadeId: unidadeEscolhida?.id,
+    dia,
+    hora,
+    leadId,
+    consultas,
+  });
+
   return (
     <section className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
       <div className="flex items-start justify-between gap-4">
@@ -918,8 +1019,9 @@ function FormularioNovaConsulta({
             Nova consulta
           </h3>
           <p className="mt-1 text-xs font-medium text-black/50">
-            Marca um horário para um lead que já está em etapa de agenda no
-            Funil. Se ele já tiver uma consulta em aberto, ela é remarcada.
+            Marca um horário para qualquer lead do Funil, em qualquer etapa —
+            marcar aqui é o que move o lead para &quot;Agendamento&quot;. Se ele
+            já tiver uma consulta em aberto, ela é remarcada.
           </p>
         </div>
         <button
@@ -934,8 +1036,8 @@ function FormularioNovaConsulta({
 
       {candidatos.length === 0 ? (
         <p className="mt-5 rounded-controle bg-black/[0.03] px-4 py-4 text-sm font-medium text-black/60">
-          Nenhum lead está esperando horário. Para marcar uma consulta, mova um
-          lead para Agendamento no Funil.
+          Não há nenhum lead cadastrado ainda. A consulta é marcada para um
+          lead, e o lead chega pelo WhatsApp ou é cadastrado no Atendimento.
         </p>
       ) : (
         <form action={executar} className="mt-5 space-y-5">
@@ -953,11 +1055,24 @@ function FormularioNovaConsulta({
                 }}
                 className={campoBase}
               >
-                {candidatos.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
+                {aguardando.length > 0 && (
+                  <optgroup label="Esperando horário">
+                    {aguardando.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {outros.length > 0 && (
+                  <optgroup label="Outros leads do Funil">
+                    {outros.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} · {c.etapa}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </Escolha>
 
@@ -1025,16 +1140,32 @@ function FormularioNovaConsulta({
               <input
                 type="date"
                 name="dia"
-                defaultValue={diaSugerido}
+                value={dia}
+                onChange={(e) => setDia(e.target.value)}
                 required
                 className={campoBase}
               />
             </Escolha>
 
             <Escolha rotulo="Hora">
-              <input type="time" name="hora" className={campoBase} />
+              <input
+                type="time"
+                name="hora"
+                value={hora}
+                onChange={(e) => setHora(e.target.value)}
+                className={campoBase}
+              />
             </Escolha>
           </div>
+
+          {impedimento && (
+            <p
+              role="status"
+              className="rounded-controle border border-herval-vermelho/30 bg-herval-vermelho/5 px-4 py-3 text-xs font-bold leading-snug text-herval-vermelho"
+            >
+              {impedimento}
+            </p>
+          )}
 
           <label className="block">
             <span className={estiloRotulo}>Observação</span>
@@ -1050,7 +1181,11 @@ function FormularioNovaConsulta({
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
-              disabled={enviando || unidadesDoCliente.length === 0}
+              disabled={
+                enviando ||
+                unidadesDoCliente.length === 0 ||
+                impedimento !== null
+              }
               className={botaoPrincipal}
             >
               <CalendarPlus className="h-4 w-4" />

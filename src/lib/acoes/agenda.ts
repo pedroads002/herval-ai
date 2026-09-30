@@ -26,6 +26,7 @@ import {
   numeroDoCampo,
   type ConsultaGravavel,
 } from "@/lib/acoes/consultaDoFormulario";
+import { conferirExpediente } from "@/lib/acoes/expedienteDaConsulta";
 import {
   ETAPA_AGENDADO,
   ETAPA_COMPARECEU,
@@ -114,7 +115,7 @@ async function conferirCombinacao(
   if (dados.profissional_id !== null) {
     const { data: vinculo, error: erroDoVinculo } = await supabase
       .from("profissional_unidades")
-      .select("profissional_id")
+      .select("profissional_id, dias_semana, hora_inicio, hora_fim")
       .eq("profissional_id", dados.profissional_id)
       .eq("unidade_id", dados.unidade_id)
       .maybeSingle();
@@ -125,6 +126,9 @@ async function conferirCombinacao(
     if (!vinculo) {
       return `Essa pessoa não atende em ${unidade.nome}. Escolha outra unidade ou outro profissional.`;
     }
+
+    const foraDoExpediente = conferirExpediente(vinculo, dados, unidade.nome);
+    if (foraDoExpediente !== null) return foraDoExpediente;
 
     if (dados.especialidade_id !== null) {
       const { data: realiza, error: erroDoProcedimento } = await supabase
@@ -141,6 +145,50 @@ async function conferirCombinacao(
         return "Essa pessoa não realiza esse procedimento. Escolha outro profissional.";
       }
     }
+  }
+
+  return null;
+}
+
+/**
+ * O horário já está ocupado por outra consulta da mesma pessoa.
+ *
+ * Só olha consulta em aberto: faltou, compareceu e cancelou é passado, e passado
+ * não ocupa horário. E compara a hora exata, não a duração do procedimento — uma
+ * consulta de 40 minutos às 14:00 não impede outra às 14:20 por enquanto.
+ *
+ * Sem profissional, ou sem hora, não há choque possível: a consulta ainda não
+ * ocupa a agenda de ninguém, ela aparece em "Aguardando horário".
+ */
+async function conferirChoqueDeHorario(
+  supabase: ClienteDoServidor,
+  dados: ConsultaGravavel,
+  idQueVaiSerRemarcada: number | null,
+): Promise<string | null> {
+  if (dados.profissional_id === null || dados.hora_consulta === null) {
+    return null;
+  }
+
+  let busca = supabase
+    .from("agendamentos")
+    .select("id")
+    .eq("profissional_id", dados.profissional_id)
+    .eq("data_consulta", dados.data_consulta)
+    .eq("hora_consulta", dados.hora_consulta)
+    .eq("status", "Agendada");
+
+  // A consulta que vai ser remarcada não choca com ela mesma.
+  if (idQueVaiSerRemarcada !== null) {
+    busca = busca.neq("id", idQueVaiSerRemarcada);
+  }
+
+  const { data: choque, error } = await busca.limit(1).maybeSingle();
+
+  if (error) {
+    return `Não deu para conferir se o horário está livre: ${error.message}`;
+  }
+  if (choque) {
+    return "Esse profissional já tem consulta marcada nesse dia e hora. Escolha outro horário ou outro profissional.";
   }
 
   return null;
@@ -182,6 +230,13 @@ export async function marcarConsulta(
     );
   }
 
+  const ocupado = await conferirChoqueDeHorario(
+    sessao.supabase,
+    dados,
+    aberta?.id ?? null,
+  );
+  if (ocupado !== null) return recusar(ocupado);
+
   const { error } = aberta
     ? await sessao.supabase
         .from("agendamentos")
@@ -189,7 +244,17 @@ export async function marcarConsulta(
         .eq("id", aberta.id)
     : await sessao.supabase.from("agendamentos").insert(dados);
 
-  if (error) return recusar(`Não deu para marcar: ${error.message}`);
+  if (error) {
+    // O índice único do banco é a última barreira: ela pega o caso em que duas
+    // pessoas marcam o mesmo horário no mesmo instante, e a conferência de cima
+    // ainda tinha visto o horário livre nas duas.
+    if (error.code === "23505") {
+      return recusar(
+        "Esse profissional acabou de receber consulta nesse mesmo dia e hora. Atualize a tela e escolha outro horário.",
+      );
+    }
+    return recusar(`Não deu para marcar: ${error.message}`);
+  }
 
   const aviso = await moverEtapa(sessao, dados.lead_id, ETAPA_AGENDADO);
 
