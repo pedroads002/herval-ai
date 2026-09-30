@@ -15,6 +15,9 @@
  *                         precisar, e também usado na tela do cliente.
  *   editarCliente         / excluirCliente
  *   editarProfissional    / excluirProfissional
+ *   cadastrarUnidade      / editarUnidade / excluirUnidade — os lugares do
+ *                         cliente. A primeira unidade não passa por aqui: quem
+ *                         a cria é o gatilho do banco, junto com o cliente.
  *
  * Roda no servidor. O navegador manda o formulário, nunca o comando.
  *
@@ -694,6 +697,232 @@ export async function excluirProfissional(
   revalidatePath("/clientes");
   if (clienteId !== null) revalidatePath(`/clientes/${clienteId}`);
   return aceitar("Profissional excluído.");
+}
+
+// ---------------------------------------------------------------------------
+// Unidade
+// ---------------------------------------------------------------------------
+
+const LIMITE_ENDERECO = 200;
+
+/** Os campos de uma unidade, conferidos. */
+function lerUnidade(
+  formData: FormData,
+):
+  | { erro: string }
+  | { nome: string; endereco: string | null; cidade: string | null } {
+  const nome = texto(formData, "nome");
+  if (nome === "") return { erro: "O nome da unidade é obrigatório." };
+
+  const endereco = opcional(formData, "endereco");
+  const cidade = opcional(formData, "cidade");
+
+  const excedeu =
+    longoDemais(nome, LIMITE_NOME, "Nome da unidade") ??
+    longoDemais(endereco, LIMITE_ENDERECO, "Endereço") ??
+    longoDemais(cidade, LIMITE_CURTO, "Cidade");
+  if (excedeu) return { erro: excedeu };
+
+  return { nome, endereco, cidade };
+}
+
+/**
+ * A recusa do banco quando o nome já existe naquele cliente, em português.
+ *
+ * A chave única é `(clinica_id, nome)`: dois lugares com o mesmo nome no mesmo
+ * cliente não dá para distinguir na hora de dizer onde alguém atende, e é
+ * justamente isso que a lista de unidades do cadastro de profissional mostra.
+ */
+function nomeDeUnidadeRepetido(error: { code?: string }) {
+  return error.code === "23505"
+    ? "Este cliente já tem uma unidade com esse nome. Use um nome que diferencie os dois lugares."
+    : null;
+}
+
+/**
+ * Cadastra outra unidade de um cliente que já existe.
+ *
+ * A primeira unidade não passa por aqui: quem a cria é o gatilho do banco, na
+ * hora em que o cliente nasce. Esta ação é para a segunda em diante — o cliente
+ * que abriu outro endereço.
+ */
+export async function cadastrarUnidade(
+  _anterior: ResultadoDoCadastro,
+  formData: FormData,
+): Promise<ResultadoDoCadastro> {
+  const sessao = await exigirSessao();
+  if ("erro" in sessao) return recusar(sessao.erro);
+
+  const clienteId = numero(formData, "cliente");
+  if (clienteId === null) {
+    return recusar("Não deu para saber de qual cliente é a unidade.");
+  }
+
+  const dados = lerUnidade(formData);
+  if ("erro" in dados) return recusar(dados.erro);
+
+  const { error } = await sessao.supabase
+    .from("unidades")
+    .insert({ clinica_id: clienteId, ...dados });
+
+  if (error) {
+    return recusar(
+      nomeDeUnidadeRepetido(error) ??
+        `Não deu para cadastrar a unidade: ${error.message}`,
+    );
+  }
+
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${clienteId}`);
+  return aceitar(`Unidade "${dados.nome}" cadastrada.`);
+}
+
+/** Muda nome, endereço, cidade e situação de uma unidade. */
+export async function editarUnidade(
+  _anterior: ResultadoDoCadastro,
+  formData: FormData,
+): Promise<ResultadoDoCadastro> {
+  const sessao = await exigirSessao();
+  if ("erro" in sessao) return recusar(sessao.erro);
+
+  const id = numero(formData, "id");
+  if (id === null) return recusar("Não deu para saber qual unidade editar.");
+
+  const dados = lerUnidade(formData);
+  if ("erro" in dados) return recusar(dados.erro);
+
+  const { error } = await sessao.supabase
+    .from("unidades")
+    .update({ ...dados, ativa: marcado(formData, "ativa") })
+    .eq("id", id);
+
+  if (error) {
+    return recusar(
+      nomeDeUnidadeRepetido(error) ?? `Não deu para salvar: ${error.message}`,
+    );
+  }
+
+  const clienteId = numero(formData, "cliente");
+  revalidatePath("/clientes");
+  if (clienteId !== null) revalidatePath(`/clientes/${clienteId}`);
+  return aceitar("Unidade salva.");
+}
+
+/**
+ * Apaga uma unidade, com duas recusas antes.
+ *
+ * `profissional_unidades` tem cascade para `unidades`, e é por isso que as duas
+ * conferências existem: sem elas, apagar a unidade desligaria em silêncio quem
+ * atende nela. Como o cliente de um profissional é deduzido da unidade onde ele
+ * atende, a pessoa não ficaria "sem unidade" — ficaria sem cliente, fora de
+ * qualquer ficha, impossível de achar na tela para consertar.
+ *
+ *   última unidade      cliente sem unidade nenhuma é cliente onde ninguém
+ *                       pode ser cadastrado. É o mesmo motivo pelo qual o
+ *                       cadastro de cliente desfaz tudo se o gatilho falhar.
+ *   deixaria alguém sem
+ *   lugar de atendimento quem atende em duas e perde uma continua com a outra;
+ *                       quem atende só nesta some do cadastro. Trocar a pessoa
+ *                       de unidade não existe na tela, então a recusa oferece
+ *                       desativar — a saída que de fato está lá.
+ *
+ * Desativar é a saída para quem quer fechar um lugar sem mexer em ninguém: a
+ * unidade sai das escolhas de cadastro e continua existindo para quem já está
+ * lá.
+ */
+export async function excluirUnidade(
+  _anterior: ResultadoDoCadastro,
+  formData: FormData,
+): Promise<ResultadoDoCadastro> {
+  const sessao = await exigirSessao();
+  if ("erro" in sessao) return recusar(sessao.erro);
+
+  const id = numero(formData, "id");
+  const clienteId = numero(formData, "cliente");
+  if (id === null || clienteId === null) {
+    return recusar("Não deu para saber qual unidade excluir.");
+  }
+
+  const { data: doCliente, error: erroDoCliente } = await sessao.supabase
+    .from("unidades")
+    .select("id")
+    .eq("clinica_id", clienteId);
+
+  if (erroDoCliente) {
+    return recusar(`Não deu para excluir: ${erroDoCliente.message}`);
+  }
+
+  if ((doCliente ?? []).length <= 1) {
+    return recusar(
+      "Esta é a única unidade do cliente, e cliente sem unidade é cliente onde ninguém pode atender. Para fechar o lugar, desative a unidade.",
+    );
+  }
+
+  const impedimento = await quemFicariaSemLugar(sessao.supabase, id);
+  if (typeof impedimento === "string") return recusar(impedimento);
+
+  const { error } = await sessao.supabase
+    .from("unidades")
+    .delete()
+    .eq("id", id);
+
+  if (error) return recusar(`Não deu para excluir: ${error.message}`);
+
+  revalidatePath("/clientes");
+  revalidatePath(`/clientes/${clienteId}`);
+  return aceitar("Unidade excluída.");
+}
+
+/**
+ * Quem perderia o único lugar onde atende se esta unidade fosse apagada.
+ *
+ * Devolve o motivo da recusa, ou nada quando ninguém fica sem lugar.
+ */
+async function quemFicariaSemLugar(
+  supabase: ClienteDoServidor,
+  unidadeId: number,
+) {
+  const { data: aqui, error: erroDaqui } = await supabase
+    .from("profissional_unidades")
+    .select("profissional_id")
+    .eq("unidade_id", unidadeId);
+
+  if (erroDaqui) return `Não deu para excluir: ${erroDaqui.message}`;
+
+  const pessoaIds = [...new Set((aqui ?? []).map((v) => v.profissional_id))];
+  if (pessoaIds.length === 0) return null;
+
+  const { data: todos, error: erroDosVinculos } = await supabase
+    .from("profissional_unidades")
+    .select("profissional_id, unidade_id")
+    .in("profissional_id", pessoaIds);
+
+  if (erroDosVinculos)
+    return `Não deu para excluir: ${erroDosVinculos.message}`;
+
+  const sobra = new Set(
+    (todos ?? [])
+      .filter((v) => v.unidade_id !== unidadeId)
+      .map((v) => v.profissional_id),
+  );
+  const orfaos = pessoaIds.filter((pessoaId) => !sobra.has(pessoaId));
+  if (orfaos.length === 0) return null;
+
+  const { data: pessoas } = await supabase
+    .from("profissionais")
+    .select("id, nome")
+    .in("id", orfaos);
+
+  const nomes = (pessoas ?? [])
+    .map((p) => (p.nome ?? "").trim() || "sem nome")
+    .join(", ");
+
+  // Trocar alguém de unidade não é possível pela tela hoje, então a saída
+  // oferecida é desativar — que é a que existe de fato. Prometer "mova a
+  // pessoa" mandaria procurar um botão que não está lá.
+  return orfaos.length === 1
+    ? `${nomes} atende só nesta unidade. Apagá-la deixaria essa pessoa sem cliente nenhum, fora de qualquer ficha. Desative a unidade, ou exclua a pessoa antes.`
+    : `${nomes} atendem só nesta unidade. Apagá-la deixaria essas pessoas sem cliente nenhum, fora de qualquer ficha. Desative a unidade, ou exclua essas pessoas antes.`;
 }
 
 /**

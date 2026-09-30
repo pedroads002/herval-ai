@@ -42,6 +42,7 @@ import {
   useQuandoDerCerto,
   useValores,
 } from "@/components/cadastro/comuns";
+import UnidadesDoCliente from "@/components/UnidadesDoCliente";
 
 /**
  * A tela de um cliente: os dados dele, quem atende nele, e o que cada pessoa
@@ -74,6 +75,12 @@ export default function DetalheCliente({
       ) : (
         <FormularioDaOperacao cliente={cliente} />
       )}
+
+      {/* Os lugares vêm antes da equipe porque é neles que a equipe é
+          encaixada: quem cadastra alguém precisa que a unidade dele já exista.
+          Aparece nos dois tipos de cliente — atender em dois endereços não é
+          coisa só de clínica com equipe. */}
+      <UnidadesDoCliente cliente={cliente} />
 
       {/* Quem atende sozinho já foi editado no bloco de cima. A lista de
           equipe só aparece quando existe equipe — ou quando o cliente
