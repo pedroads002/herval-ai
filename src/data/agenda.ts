@@ -1,10 +1,12 @@
-import type { Agendamento } from "@/data/agendamentos";
+// A importação de `Consulta` é só de tipo, e desaparece na compilação: sem isso
+// este arquivo — que roda no navegador — arrastaria o cliente de servidor do
+// Supabase para dentro do pacote da página.
+import type { Consulta } from "@/lib/dados/agenda";
 import type { EtapaFunil } from "@/data/leads";
 
 /**
- * Etapas do Funil que aparecem na Agenda. A Agenda não tem base própria: ela
- * mostra os leads que já estão nessas etapas, com o horário e o profissional
- * definidos no próprio lead.
+ * Etapas do Funil que aparecem na Agenda. A Agenda não tem lista própria de
+ * quem pode ser marcado: ela mostra os leads que já estão nessas etapas.
  */
 export const etapasComAgenda: EtapaFunil[] = [
   "Agendamento",
@@ -36,44 +38,43 @@ export const nomesDosDias = [
   "Sábado",
 ];
 
-export const nomesCurtosDosDias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+export const nomesCurtosDosDias = [
+  "Dom",
+  "Seg",
+  "Ter",
+  "Qua",
+  "Qui",
+  "Sex",
+  "Sáb",
+];
 
-/** Bloqueio fixo na grade do profissional. Não é clicável. */
-export type Intervalo = {
-  rotulo: string;
-  /** Hora de início, "HH:MM". */
-  inicio: string;
-  /** Hora de término, "HH:MM". */
-  fim: string;
-};
+export type RotuloDaConsulta =
+  "Agendado" | "Confirmado" | "Compareceu" | "Faltou" | "Cancelada";
 
 /**
- * Intervalo de cada profissional, por id da tela de Profissionais. Vale de
- * segunda a sexta: no fim de semana a clínica não tem escala fixa.
+ * O que a etiqueta do cartão diz. São cinco rótulos para quatro status porque
+ * "Confirmado" não é um desfecho: é a consulta ainda aberta que o paciente
+ * respondeu confirmando presença.
  */
-export const intervalosPorProfissional: Record<number, Intervalo> = {};
-
-/** Verdadeiro quando a linha da grade cai dentro do intervalo do profissional. */
-export function horaEmIntervalo(hora: string, intervalo: Intervalo) {
-  return hora >= intervalo.inicio && hora < intervalo.fim;
+export function rotuloDaConsulta(consulta: Consulta): RotuloDaConsulta {
+  if (consulta.status === "Compareceu") return "Compareceu";
+  if (consulta.status === "Faltou") return "Faltou";
+  if (consulta.status === "Cancelada") return "Cancelada";
+  return consulta.confirmada ? "Confirmado" : "Agendado";
 }
 
-export type StatusConsulta =
-  | "Agendado"
-  | "Confirmado"
-  | "Compareceu"
-  | "Faltou"
-  | "Cancelada";
-
 /**
- * O rótulo na grade sai do status do próprio agendamento, que agora é a fonte
- * única. "Confirmado" é o agendamento ainda aberto que o paciente respondeu.
+ * Verdadeiro quando a hora da grade cai dentro do horário que a pessoa atende
+ * naquela unidade. Horário em branco no cadastro devolve verdadeiro para tudo:
+ * quem não informou horário não tem hora proibida — combina no WhatsApp.
  */
-export function statusDaConsulta(agendamento: Agendamento): StatusConsulta {
-  if (agendamento.status === "Compareceu") return "Compareceu";
-  if (agendamento.status === "Faltou") return "Faltou";
-  if (agendamento.status === "Cancelada") return "Cancelada";
-  return agendamento.confirmada ? "Confirmado" : "Agendado";
+export function horaDentroDoHorario(
+  hora: string,
+  inicio: string | null,
+  fim: string | null,
+) {
+  if (inicio === null || fim === null) return true;
+  return hora >= inicio && hora < fim;
 }
 
 // --- Datas -----------------------------------------------------------------
@@ -106,11 +107,22 @@ export function mesmaData(a: Date, b: Date) {
 }
 
 /**
- * Data real da consulta. `consultaEmDias` conta para trás: 3 é anteontem mais
- * um, -2 é depois de amanhã.
+ * "2026-09-30" vira uma data no fuso de quem está olhando.
+ *
+ * Montada campo por campo de propósito: `new Date("2026-09-30")` é lido como
+ * meia-noite em UTC, e no Brasil isso volta três horas — a consulta apareceria
+ * na grade um dia antes do que está gravado.
  */
-export function dataDaConsulta(agendamento: Agendamento, hoje: Date) {
-  return somarDias(hoje, -agendamento.consultaEmDias);
+export function dataDoDia(dia: string) {
+  const [ano, mes, diaDoMes] = dia.split("-").map(Number);
+  return new Date(ano, (mes ?? 1) - 1, diaDoMes ?? 1);
+}
+
+/** O contrário: a data da grade vira o "AAAA-MM-DD" que o banco guarda. */
+export function textoDoDia(data: Date) {
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${data.getFullYear()}-${mes}-${dia}`;
 }
 
 /** Quantos dias separam a data de hoje, no formato guardado no agendamento. */

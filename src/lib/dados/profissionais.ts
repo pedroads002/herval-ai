@@ -3,9 +3,9 @@
  * banco em vez de arquivo fixo.
  *
  * Mesmo recorte do Atendimento, e pelo mesmo motivo: `src/data/profissionais.ts`
- * continua existindo e continua alimentando Agenda, Especialidades e Estratégia,
- * que ainda não leem o banco. Trocar a fonte lá embaixo derrubaria aquelas três
- * telas de uma vez. Então só esta seção lê daqui.
+ * continua existindo e continua alimentando as abas do Atendimento e a
+ * Estratégia, que ainda não leem o banco. Trocar a fonte lá embaixo derrubaria
+ * aquelas telas de uma vez. Clientes, Procedimentos e Agenda leem daqui.
  *
  * Vocabulário, igual ao do banco:
  *
@@ -43,6 +43,8 @@ export type EspecialidadeDoCadastro = {
   nome: string;
   /** Inativa aparece riscada, como já aparecia antes. */
   ativa: boolean;
+  /** Quanto tempo a consulta ocupa. É o que a Agenda escreve no cartão. */
+  duracaoMinutos: number;
 };
 
 /** Como o cliente opera. É a resposta da primeira pergunta do cadastro. */
@@ -281,6 +283,7 @@ type LinhaEspecialidade = {
   id: number;
   nome: string | null;
   ativa: boolean;
+  duracao_minutos: number | null;
 };
 
 type LinhaVinculo = {
@@ -343,7 +346,7 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
       .limit(TETO_DE_LINHAS),
     supabase
       .from("especialidades")
-      .select("id, nome, ativa")
+      .select("id, nome, ativa, duracao_minutos")
       .order("nome", { ascending: true })
       .limit(TETO_DE_LINHAS),
     // As duas listas de ligação são mais longas que as de cima: uma pessoa que
@@ -402,6 +405,9 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     id: linha.id,
     nome: nomeOu(linha.nome, "Especialidade sem nome"),
     ativa: linha.ativa,
+    // Quarenta é o padrão da coluna no banco; nulo aqui só apareceria se alguém
+    // apagasse o valor à mão.
+    duracaoMinutos: linha.duracao_minutos ?? 40,
   }));
 
   const especialidadePorId = new Map(especialidades.map((e) => [e.id, e]));

@@ -987,6 +987,9 @@ export async function excluirUnidade(
   const impedimento = await quemFicariaSemLugar(sessao.supabase, id);
   if (typeof impedimento === "string") return recusar(impedimento);
 
+  const comConsulta = await quantasConsultas(sessao.supabase, id);
+  if (typeof comConsulta === "string") return recusar(comConsulta);
+
   const { error } = await sessao.supabase
     .from("unidades")
     .delete()
@@ -997,6 +1000,36 @@ export async function excluirUnidade(
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${clienteId}`);
   return aceitar("Unidade excluída.");
+}
+
+/**
+ * Consultas marcadas neste lugar.
+ *
+ * `agendamentos.unidade_id` tem `on delete restrict`, então o banco já recusaria
+ * — mas com uma mensagem em inglês sobre violação de chave estrangeira. Esta
+ * conferência existe para a recusa sair em português e dizer a saída: desativar.
+ * O histórico de atendimento do lugar não pode sumir junto com o lugar.
+ *
+ * Devolve o motivo da recusa, ou nada quando não há consulta nenhuma.
+ */
+async function quantasConsultas(
+  supabase: ClienteDoServidor,
+  unidadeId: number,
+) {
+  const { count, error } = await supabase
+    .from("agendamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("unidade_id", unidadeId);
+
+  if (error)
+    return `Não deu para conferir as consultas da unidade: ${error.message}`;
+
+  const quantas = count ?? 0;
+  if (quantas === 0) return null;
+
+  return quantas === 1
+    ? "Existe uma consulta marcada nesta unidade, e apagá-la levaria o histórico de atendimento do lugar junto. Para fechar o lugar, desative a unidade."
+    : `Existem ${quantas} consultas marcadas nesta unidade, e apagá-la levaria o histórico de atendimento do lugar junto. Para fechar o lugar, desative a unidade.`;
 }
 
 /**
