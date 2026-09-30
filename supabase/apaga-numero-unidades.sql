@@ -1,0 +1,47 @@
+-- ============================================================================
+-- Herval AI · apaga `clinicas.numero_unidades`
+--
+-- >>> PENDENTE quando este arquivo entrou no repositório. Só pode rodar DEPOIS
+-- >>> que a versão do painel que parou de escrever nesta coluna estiver
+-- >>> publicada. Ver "A ordem" abaixo.
+-- ============================================================================
+--
+-- Por que a coluna sai:
+--
+-- `numero_unidades` era um número digitado à mão convivendo com a contagem real
+-- das linhas de `unidades`. Os dois podiam discordar, e não havia nada que os
+-- mantivesse iguais. Um número que pode mentir sobre um fato que o banco já
+-- sabe responder (`select count(*) from unidades where clinica_id = ?`) é pior
+-- que número nenhum: quem lesse a coluna acharia que sabe, e às vezes saberia
+-- errado.
+--
+-- Quem lia a coluna, conferido antes de apagar: **ninguém**.
+--
+--   painel            só escrevia, em `criarCliente`. Parou.
+--   n8n               os três workflows ativos tocam `clinicas` apenas por
+--                     `id` e `instancia_whatsapp`.
+--   views, funções,
+--   constraints,
+--   índices           nenhuma referência.
+--
+-- Nada se perde: no momento em que isto foi escrito, os dois clientes
+-- cadastrados tinham coluna e contagem real iguais. E o valor sempre foi
+-- derivável — é uma contagem.
+--
+-- A ordem, que não é detalhe:
+--
+--   1. o painel para de escrever a coluna  (PR do código)
+--   2. o painel publicado passa a ser essa versão
+--   3. só então este arquivo roda
+--
+-- Invertida, o passo 3 antes do 2 derruba o cadastro de clientes em produção:
+-- o código no ar insere `numero_unidades` e receberia "column does not exist"
+-- a cada tentativa.
+--
+-- Entre o passo 1 e o passo 3 existe uma janela em que clientes novos nascem
+-- com `numero_unidades = 0` (o default da coluna) tendo uma unidade de verdade.
+-- É a contradição que estamos removendo, aparecendo pela última vez, numa
+-- coluna que ninguém lê e que está prestes a deixar de existir.
+-- ============================================================================
+
+alter table public.clinicas drop column if exists numero_unidades;
