@@ -2,12 +2,22 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Move, RotateCcw, Search, X } from "lucide-react";
-import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
-import { useLeads, type DadosDaMovimentacao } from "@/components/ProvedorLeads";
+import {
+  Building2,
+  Clock,
+  ExternalLink,
+  Move,
+  RotateCcw,
+  Search,
+  X,
+} from "lucide-react";
 import MenuDeEtapa, { type PassoDoMenu } from "@/components/MenuDeEtapa";
+import type { DadosDaMovimentacao } from "@/components/ProvedorLeads";
+import { moverLeadDeEtapa } from "@/lib/acoes/funil";
 import { etapasFunil, type EtapaFunil } from "@/data/leads";
-import type { Tarefa } from "@/data/tarefas";
+// Do módulo puro, e não de `dados/funil.ts`: aquele importa o cliente de
+// servidor do Supabase, e nada disso tem o que fazer no pacote do navegador.
+import type { LeadDoFunil } from "@/lib/dados/linhaDoFunil";
 
 const periodos = ["Todos", "Este mês", "Chegaram hoje"] as const;
 type Periodo = (typeof periodos)[number];
@@ -18,8 +28,13 @@ function dentroDoPeriodo(dias: number, periodo: Periodo) {
   return true;
 }
 
-export default function PainelFunil() {
-  const { tarefas, moverEtapa } = useLeads();
+export default function PainelFunil({
+  leads,
+  falha,
+}: {
+  leads: LeadDoFunil[];
+  falha: string | null;
+}) {
   const [busca, setBusca] = useState("");
   const [periodo, setPeriodo] = useState<Periodo>("Todos");
   // Card com o menu "Mover para" aberto.
@@ -29,24 +44,27 @@ export default function PainelFunil() {
    * menu ter passos.
    */
   const [passo, setPasso] = useState<PassoDoMenu>("etapa");
+  /** Lead cuja etapa está sendo gravada agora. */
+  const [gravando, setGravando] = useState<number | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
-    return tarefas.filter(
-      (t) =>
-        dentroDoPeriodo(t.diasAtras, periodo) &&
+    return leads.filter(
+      (lead) =>
+        dentroDoPeriodo(lead.diasAtras, periodo) &&
         (termo === "" ||
-          t.lead.toLowerCase().includes(termo) ||
-          t.telefone.toLowerCase().includes(termo)),
+          lead.nome.toLowerCase().includes(termo) ||
+          lead.telefone.toLowerCase().includes(termo)),
     );
-  }, [tarefas, busca, periodo]);
+  }, [leads, busca, periodo]);
 
   const colunas = useMemo(
     () =>
       etapasFunil.map((etapa) => ({
         etapa,
-        cards: visiveis.filter((t) => t.etapa === etapa),
+        cards: visiveis.filter((lead) => lead.etapa === etapa),
       })),
     [visiveis],
   );
@@ -56,10 +74,41 @@ export default function PainelFunil() {
     setPasso("etapa");
   }
 
-  function mover(id: number, etapa: EtapaFunil, dados?: DadosDaMovimentacao) {
-    moverEtapa(id, etapa, dados);
+  async function mover(
+    id: number,
+    etapa: EtapaFunil,
+    dados?: DadosDaMovimentacao,
+  ) {
     setMovendo(null);
     setPasso("etapa");
+    setErro(null);
+    setGravando(id);
+
+    try {
+      const resultado = await moverLeadDeEtapa(
+        id,
+        etapa,
+        dados?.motivoPerda ?? null,
+      );
+      // O card só muda de coluna quando a página recarrega com o que o banco
+      // passou a dizer. Antecipar o movimento na tela é como a etapa mostrada
+      // passaria a discordar da gravada quando a gravação falhasse.
+      if (!resultado.ok) setErro(resultado.mensagem);
+    } catch {
+      setErro(
+        "Não deu para falar com o servidor. Confira a conexão e tente de novo.",
+      );
+    } finally {
+      setGravando(null);
+    }
+  }
+
+  if (falha) {
+    return (
+      <div className="rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-6">
+        <p className="text-sm font-medium text-black/60">{falha}</p>
+      </div>
+    );
   }
 
   return (
@@ -100,14 +149,21 @@ export default function PainelFunil() {
         </div>
       </div>
 
+      {erro && (
+        <div
+          role="status"
+          className="shrink-0 rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-4"
+        >
+          <p className="text-sm font-medium text-black/70">{erro}</p>
+        </div>
+      )}
+
       <p className="shrink-0 text-sm font-medium text-black/55">
         <span className="font-extrabold text-herval-preto">
           {visiveis.length}
         </span>{" "}
         {visiveis.length === 1 ? "lead exibido" : "leads exibidos"} de{" "}
-        <span className="font-extrabold text-herval-preto">
-          {tarefas.length}
-        </span>{" "}
+        <span className="font-extrabold text-herval-preto">{leads.length}</span>{" "}
         na base · {etapasFunil.length} etapas. É normal etapa ficar vazia.
       </p>
 
@@ -156,15 +212,16 @@ export default function PainelFunil() {
                 </p>
               )}
 
-              {cards.map((tarefa) => (
+              {cards.map((lead) => (
                 <Cartao
-                  key={tarefa.id}
-                  tarefa={tarefa}
-                  menuAberto={movendo === tarefa.id}
+                  key={lead.id}
+                  lead={lead}
+                  menuAberto={movendo === lead.id}
+                  gravando={gravando === lead.id}
                   passo={passo}
-                  aoAbrirMenu={() => abrirMenu(tarefa.id)}
+                  aoAbrirMenu={() => abrirMenu(lead.id)}
                   aoPedirPasso={setPasso}
-                  aoMover={(destino, dados) => mover(tarefa.id, destino, dados)}
+                  aoMover={(destino, dados) => mover(lead.id, destino, dados)}
                 />
               ))}
             </div>
@@ -175,61 +232,77 @@ export default function PainelFunil() {
   );
 }
 
-/** Passos do menu de mover: a lista, ou o campo que a etapa de destino exige. */
-
 function Cartao({
-  tarefa,
+  lead,
   menuAberto,
+  gravando,
   passo,
   aoAbrirMenu,
   aoPedirPasso,
   aoMover,
 }: {
-  tarefa: Tarefa;
+  lead: LeadDoFunil;
   menuAberto: boolean;
+  gravando: boolean;
   passo: PassoDoMenu;
   aoAbrirMenu: () => void;
   aoPedirPasso: (passo: PassoDoMenu) => void;
   aoMover: (etapa: EtapaFunil, dados?: DadosDaMovimentacao) => void;
 }) {
   return (
-    <article className="rounded-controle border border-black/10 bg-herval-branco p-3.5 shadow-card">
-      <h3 className="text-sm font-bold text-herval-preto">{tarefa.lead}</h3>
+    <article
+      className={[
+        "rounded-controle border border-black/10 bg-herval-branco p-3.5 shadow-card transition-opacity",
+        gravando ? "opacity-50" : "",
+      ].join(" ")}
+    >
+      <h3 className="text-sm font-bold text-herval-preto">{lead.nome}</h3>
       <p className="mt-0.5 text-xs font-medium text-black/45">
-        {tarefa.telefone}
+        {lead.telefone}
       </p>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        <EtiquetaResponsavel
-          responsavel={tarefa.responsavel}
-          destacado={tarefa.tipo === "alerta-humano"}
-        />
-        <span className="rounded-full bg-herval-verde/15 px-2.5 py-1 text-[11px] font-bold text-herval-preto">
-          {tarefa.origem}
+        {lead.cliente && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-black/15 px-2.5 py-1 text-[11px] font-bold text-black/65">
+            <Building2 className="h-3 w-3" />
+            {lead.cliente}
+          </span>
+        )}
+        {lead.origem && (
+          <span className="rounded-full bg-herval-verde/15 px-2.5 py-1 text-[11px] font-bold text-herval-preto">
+            {lead.origem}
+          </span>
+        )}
+        <span
+          title="Quando o lead chegou"
+          className="inline-flex items-center gap-1 rounded-full px-1 py-1 text-[11px] font-bold text-black/45"
+        >
+          <Clock className="h-3 w-3" />
+          {textoDaChegada(lead.diasAtras)}
         </span>
-        {(tarefa.remarcacoes ?? 0) > 0 && (
+        {lead.remarcacoes > 0 && (
           <span
             title="Consulta remarcada depois de uma falta"
             className="inline-flex items-center gap-1 rounded-full border border-black/20 px-2.5 py-1 text-[11px] font-bold text-black/70"
           >
             <RotateCcw className="h-3 w-3" />
-            {tarefa.remarcacoes}
-            {tarefa.remarcacoes === 1 ? " remarcação" : " remarcações"}
+            {lead.remarcacoes}
+            {lead.remarcacoes === 1 ? " remarcação" : " remarcações"}
           </span>
         )}
       </div>
 
-      {tarefa.motivoPerda && (
+      {lead.motivoPerda && (
         <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-herval-preto px-2.5 py-1 text-[11px] font-bold text-herval-branco">
           <X className="h-3 w-3" />
-          {tarefa.motivoPerda}
+          {lead.motivoPerda}
         </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
         {/* Atalho para o atendimento sem sair do funil. */}
         <Link
-          href={`/atendimento/${tarefa.id}`}
+          href={`/atendimento/${lead.id}`}
           className="inline-flex items-center gap-1 text-xs font-bold text-black/55 transition-colors hover:text-herval-preto"
         >
           Atender
@@ -239,23 +312,24 @@ function Cartao({
         <button
           type="button"
           onClick={aoAbrirMenu}
+          disabled={gravando}
           aria-expanded={menuAberto}
           className={[
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-colors",
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-colors disabled:cursor-not-allowed",
             menuAberto
               ? "bg-herval-preto text-herval-branco"
               : "border border-black/15 text-black/65 hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto",
           ].join(" ")}
         >
           <Move className="h-3 w-3" />
-          Mover
+          {gravando ? "Movendo..." : "Mover"}
         </button>
       </div>
 
       {menuAberto && (
         <div className="mt-3 rounded-controle bg-black/[0.04] p-2.5">
           <MenuDeEtapa
-            etapaAtual={tarefa.etapa}
+            etapaAtual={lead.etapa}
             passo={passo}
             aoPedirPasso={aoPedirPasso}
             aoMover={aoMover}
@@ -264,4 +338,10 @@ function Cartao({
       )}
     </article>
   );
+}
+
+function textoDaChegada(dias: number) {
+  if (dias === 0) return "hoje";
+  if (dias === 1) return "ontem";
+  return `${dias} dias`;
 }
