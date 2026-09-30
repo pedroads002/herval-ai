@@ -1,9 +1,9 @@
 -- ============================================================================
 -- Herval AI · apaga `clinicas.numero_unidades`
 --
--- >>> PENDENTE quando este arquivo entrou no repositório. Só pode rodar DEPOIS
--- >>> que a versão do painel que parou de escrever nesta coluna estiver
--- >>> publicada. Ver "A ordem" abaixo.
+-- >>> JÁ EXECUTADO no banco em 29/09/2026, como migration
+-- >>> `apaga_numero_unidades`, depois que o PR #42 foi publicado. Este arquivo
+-- >>> é o registro do que foi rodado, não uma pendência.
 -- ============================================================================
 --
 -- Por que a coluna sai:
