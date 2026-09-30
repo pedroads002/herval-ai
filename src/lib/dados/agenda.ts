@@ -76,12 +76,10 @@ export type DadosDaAgenda = {
   /**
    * Quem pode receber um horário: todo lead real do banco, em qualquer etapa.
    *
-   * É uma lista maior que `leads` de propósito. O Funil ainda não grava etapa no
-   * banco, então esperar o lead chegar em "Agendamento" por lá era esperar uma
-   * coisa que não acontece: o lead real entrava pelo WhatsApp em "Leads
-   * Recebidos" e nunca saía de lá, e a Agenda ficava vazia para sempre. Marcar
-   * daqui é o que move o lead para "Agendamento" — quem grava a etapa é
-   * `marcarConsulta`.
+   * É uma lista maior que `leads` de propósito: marcar daqui é o que move o lead
+   * para "Agendamento" — quem grava a etapa é `marcarConsulta`. Exigir que ele já
+   * estivesse em "Agendamento" para poder ser marcado fecharia o círculo, e a
+   * Agenda ficaria vazia para sempre esperando alguém chegar lá sozinho.
    */
   candidatos: LeadDaAgenda[];
   pessoas: ProfissionalCadastrado[];

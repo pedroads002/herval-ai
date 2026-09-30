@@ -7,20 +7,17 @@
  *   definirDesfechoDaConsulta  compareceu, faltou, cancelou.
  *
  * Grava em `agendamentos`, e move o lead de etapa quando o desfecho manda: quem
- * comparece vai para "Comparecimento", quem falta cai em "Reagendamento". A
- * mudança de etapa vira linha em `lead_etapa_eventos`, assinada por quem está
- * logado — é o mesmo histórico que o Funil mostra.
+ * comparece vai para "Comparecimento", quem falta cai em "Reagendamento".
  *
- * A conferência de sessão está aqui dentro, e não só no proxy, pelo mesmo motivo
- * das outras ações: uma ação de servidor é um endereço POST como outro qualquer,
- * e o proxy protege a *tela*.
+ * A sessão e a mudança de etapa vêm de `acoes/etapaDoLead.ts`, compartilhadas com
+ * o Funil: as duas telas movem o mesmo lead, e a etapa precisa ser gravada e
+ * assinada do mesmo jeito venha o movimento de onde vier.
  */
 
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/servidor";
-import { supabaseConfigurado } from "@/lib/supabase/config";
-import { carregarPerfil } from "@/lib/perfil";
 import { statusPossiveis, type StatusDaConsulta } from "@/lib/dados/agenda";
+import { exigirSessao, moverEtapaDoLead } from "@/lib/acoes/etapaDoLead";
 import {
   lerConsulta,
   numeroDoCampo,
@@ -43,38 +40,6 @@ function recusar(mensagem: string): ResultadoDoCadastro {
 
 function aceitar(mensagem: string): ResultadoDoCadastro {
   return { ok: true, mensagem, envio: Date.now() };
-}
-
-type Sessao = {
-  supabase: ClienteDoServidor;
-  usuarioId: string;
-  usuarioNome: string;
-};
-
-/**
- * Sessão mais nome de quem está logado. O nome vem junto porque toda mudança de
- * etapa é assinada, e a política do banco exige que a assinatura seja a de quem
- * está gravando.
- */
-async function exigirSessao(): Promise<{ erro: string } | Sessao> {
-  if (!supabaseConfigurado()) {
-    return { erro: "O Supabase não está configurado neste ambiente." };
-  }
-
-  const supabase = await criarClienteServidor();
-  const { data } = await supabase.auth.getUser();
-
-  if (!data.user) {
-    return { erro: "Sua sessão expirou. Entre de novo para gravar." };
-  }
-
-  const perfil = await carregarPerfil();
-
-  return {
-    supabase,
-    usuarioId: data.user.id,
-    usuarioNome: perfil?.nomeCompleto || data.user.email || "Equipe",
-  };
 }
 
 /**
@@ -256,7 +221,7 @@ export async function marcarConsulta(
     return recusar(`Não deu para marcar: ${error.message}`);
   }
 
-  const aviso = await moverEtapa(sessao, dados.lead_id, ETAPA_AGENDADO);
+  const aviso = await moverEtapaDoLead(sessao, dados.lead_id, ETAPA_AGENDADO);
 
   revalidar();
   return aceitar(
@@ -311,7 +276,7 @@ export async function definirDesfechoDaConsulta(
   const aviso =
     destino === null
       ? null
-      : await moverEtapa(sessao, consulta.lead_id, destino);
+      : await moverEtapaDoLead(sessao, consulta.lead_id, destino);
 
   revalidar();
   return aceitar(
@@ -324,55 +289,6 @@ function etapaDoDesfecho(status: StatusDaConsulta): EtapaFunil | null {
   if (status === "Compareceu") return ETAPA_COMPARECEU;
   if (status === "Faltou") return ETAPA_REMARCAR;
   if (status === "Agendada") return ETAPA_AGENDADO;
-  return null;
-}
-
-/**
- * Move o lead de etapa e registra quem moveu. Devolve um aviso quando a etapa
- * não pôde ser gravada — e nunca derruba a ação: a consulta já está gravada, e
- * dizer "não deu para marcar" depois de marcar seria mentira.
- */
-async function moverEtapa(
-  sessao: Sessao,
-  leadId: number,
-  destino: EtapaFunil,
-): Promise<string | null> {
-  const { data: lead, error: erroDaLeitura } = await sessao.supabase
-    .from("leads")
-    .select("etapa")
-    .eq("id", leadId)
-    .maybeSingle();
-
-  if (erroDaLeitura || !lead) {
-    return "A etapa do lead no Funil não foi atualizada.";
-  }
-  if (lead.etapa === destino) return null;
-
-  const { error: erroDaEtapa } = await sessao.supabase
-    .from("leads")
-    .update({ etapa: destino })
-    .eq("id", leadId);
-
-  if (erroDaEtapa) {
-    return `A etapa do lead no Funil continua em "${lead.etapa}": ${erroDaEtapa.message}`;
-  }
-
-  const { error: erroDoHistorico } = await sessao.supabase
-    .from("lead_etapa_eventos")
-    .insert({
-      lead_id: leadId,
-      de_etapa: lead.etapa,
-      para_etapa: destino,
-      autor_id: sessao.usuarioId,
-      autor_nome: sessao.usuarioNome,
-    });
-
-  // A etapa mudou e o histórico não registrou. Vale avisar, porque quem for
-  // conferir depois vai ver uma etapa que ninguém aparentemente mudou.
-  if (erroDoHistorico) {
-    return `O lead foi para "${destino}", mas a mudança não entrou no histórico.`;
-  }
-
   return null;
 }
 

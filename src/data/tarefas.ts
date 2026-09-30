@@ -11,7 +11,6 @@ export type TipoTarefa = "acao-ia" | "alerta-humano";
 /** Quem executa a ação depois de decidida. */
 export type Responsavel = "IA" | "Humano" | "Automática";
 
-
 import {
   type EtapaFunil,
   type Lead,
@@ -70,7 +69,12 @@ export type Tarefa = Lead & {
 };
 
 // Vazio de propósito: o conteúdo de exemplo saiu, a estrutura ficou.
-// Quando esta tela passar a ler o banco, é este array que some.
+//
+// O Funil já não lê daqui — ele lê o banco, por `lib/dados/funil.ts`. Quem ainda
+// depende deste array é a Fila de Tarefas, a Visão Geral e os Relatórios, e é por
+// isso que ele não pôde sair junto: essas telas mostram score, prazo e regra
+// disparada, campos que o banco não tem. Este array some quando cada uma delas
+// passar a ler o que existe de verdade.
 export const tarefasIniciais: Tarefa[] = [];
 
 /** Situações consideradas "ativas" no filtro da fila. */
