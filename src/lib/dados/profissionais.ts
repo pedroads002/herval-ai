@@ -52,6 +52,16 @@ export type TipoDeOperacao = "individual" | "equipe";
 export type UnidadeDoCadastro = {
   id: number;
   nome: string;
+  /**
+   * Endereço e cidade da unidade, e não do cliente.
+   *
+   * O cliente tem os dele em `clinicas`, que é o endereço principal. Estes são
+   * do lugar: quem tem duas unidades tem dois endereços, e o do cliente não
+   * responde por qual é qual. Vazio é o normal em cliente de uma unidade só,
+   * onde o endereço do cliente já diz tudo.
+   */
+  endereco: string;
+  cidade: string;
   ativa: boolean;
   clienteId: number;
   clienteNome: string;
@@ -165,6 +175,8 @@ type LinhaUnidade = {
   id: number;
   clinica_id: number;
   nome: string | null;
+  endereco: string | null;
+  cidade: string | null;
   ativa: boolean;
 };
 
@@ -246,7 +258,7 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
       .order("nome", { ascending: true }),
     supabase
       .from("unidades")
-      .select("id, clinica_id, nome, ativa")
+      .select("id, clinica_id, nome, endereco, cidade, ativa")
       .order("nome", { ascending: true }),
     supabase
       .from("especialidades")
@@ -291,6 +303,8 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
   ).map((linha) => ({
     id: linha.id,
     nome: nomeOu(linha.nome, "Unidade sem nome"),
+    endereco: (linha.endereco ?? "").trim(),
+    cidade: (linha.cidade ?? "").trim(),
     ativa: linha.ativa,
     clienteId: linha.clinica_id,
     clienteNome: nomesDeCliente.get(linha.clinica_id) ?? "Cliente removido",

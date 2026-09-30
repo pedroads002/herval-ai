@@ -180,16 +180,23 @@ export function Descricao({
  * ativo: quem cadastra um cliente está cadastrando alguém que vai ser
  * atendido. Desmarcar é a exceção, e exceção merece um clique, não dois.
  */
+/**
+ * `palavras` existe por concordância: "unidade" é feminino, e o padrão
+ * masculino viraria "Unidade ... Ativo" ao lado de uma etiqueta que diz
+ * "Inativa" na mesma tela.
+ */
 export function Status({
   nome,
   etiqueta,
   ligado,
   aoMudar,
+  palavras = ["Ativo", "Inativo"],
 }: {
   nome: string;
   etiqueta: string;
   ligado: boolean;
   aoMudar: (ligado: boolean) => void;
+  palavras?: [string, string];
 }) {
   return (
     <div>
@@ -202,7 +209,7 @@ export function Status({
           onChange={(e) => aoMudar(e.target.checked)}
           className="h-3.5 w-3.5 accent-herval-verde"
         />
-        {ligado ? "Ativo" : "Inativo"}
+        {ligado ? palavras[0] : palavras[1]}
       </label>
     </div>
   );
