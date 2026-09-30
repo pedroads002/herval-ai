@@ -620,10 +620,12 @@ export async function cadastrarProfissional(
   const pessoa = lerPessoa(formData);
   if ("erro" in pessoa) return recusar(pessoa.erro);
 
-  const unidadeIds = numeros(formData, "unidades");
-  if (unidadeIds.length === 0) {
-    return recusar("Marque pelo menos um lugar onde a pessoa atende.");
-  }
+  const escolhidas = await unidadesEscolhidas(
+    sessao.supabase,
+    clienteId,
+    numeros(formData, "unidades"),
+  );
+  if ("erro" in escolhidas) return recusar(escolhidas.erro);
 
   const area = await areaDoCliente(sessao.supabase, clienteId);
   if ("erro" in area) return recusar(area.erro);
@@ -632,7 +634,7 @@ export async function cadastrarProfissional(
     sessao.supabase,
     pessoa,
     area.area_atuacao,
-    unidadeIds,
+    escolhidas.ids,
   );
   if (erro) return recusar(`Não deu para cadastrar: ${erro}`);
 
@@ -648,6 +650,11 @@ export async function cadastrarProfissional(
  * vieram — em vez de comparar um a um. A lista tem dezenas de itens, não
  * milhares, e comparar diferenças aqui seria mais código para o mesmo
  * resultado, com mais lugar para errar.
+ *
+ * Onde a pessoa atende também é editável, e só entre as unidades do mesmo
+ * cliente — ver `unidadesEscolhidas`. Os lugares não seguem a regra dos
+ * procedimentos: eles são o único vínculo que diz de qual cliente a pessoa é,
+ * então regravar do zero é arriscado demais. Ver `trocarUnidades`.
  */
 export async function editarProfissional(
   _anterior: ResultadoDoCadastro,
@@ -661,15 +668,33 @@ export async function editarProfissional(
     return recusar("Não deu para saber qual profissional editar.");
   }
 
+  const clienteId = numero(formData, "cliente");
+  if (clienteId === null) {
+    return recusar("Não deu para saber de qual cliente é este profissional.");
+  }
+
   const pessoa = lerPessoa(formData);
   if ("erro" in pessoa) return recusar(pessoa.erro);
+
+  const escolhidas = await unidadesEscolhidas(
+    sessao.supabase,
+    clienteId,
+    numeros(formData, "unidades"),
+  );
+  if ("erro" in escolhidas) return recusar(escolhidas.erro);
 
   const erro = await salvarPessoa(sessao.supabase, id, pessoa, null);
   if (erro) return recusar(erro);
 
-  const clienteId = numero(formData, "cliente");
+  const erroDosLugares = await trocarUnidades(
+    sessao.supabase,
+    id,
+    escolhidas.ids,
+  );
+  if (erroDosLugares) return recusar(erroDosLugares);
+
   revalidatePath("/clientes");
-  if (clienteId !== null) revalidatePath(`/clientes/${clienteId}`);
+  revalidatePath(`/clientes/${clienteId}`);
   return aceitar("Alterações salvas.");
 }
 
@@ -917,12 +942,11 @@ async function quemFicariaSemLugar(
     .map((p) => (p.nome ?? "").trim() || "sem nome")
     .join(", ");
 
-  // Trocar alguém de unidade não é possível pela tela hoje, então a saída
-  // oferecida é desativar — que é a que existe de fato. Prometer "mova a
-  // pessoa" mandaria procurar um botão que não está lá.
+  // As três saídas oferecidas são as três que existem de fato na tela: mudar a
+  // unidade da pessoa ao editá-la, desativar o lugar, ou excluir a pessoa.
   return orfaos.length === 1
-    ? `${nomes} atende só nesta unidade. Apagá-la deixaria essa pessoa sem cliente nenhum, fora de qualquer ficha. Desative a unidade, ou exclua a pessoa antes.`
-    : `${nomes} atendem só nesta unidade. Apagá-la deixaria essas pessoas sem cliente nenhum, fora de qualquer ficha. Desative a unidade, ou exclua essas pessoas antes.`;
+    ? `${nomes} atende só nesta unidade. Apagá-la deixaria essa pessoa sem cliente nenhum, fora de qualquer ficha. Edite a pessoa e mude a unidade dela, desative este lugar, ou exclua a pessoa antes.`
+    : `${nomes} atendem só nesta unidade. Apagá-la deixaria essas pessoas sem cliente nenhum, fora de qualquer ficha. Edite cada uma e mude a unidade dela, desative este lugar, ou exclua essas pessoas antes.`;
 }
 
 /**
@@ -982,6 +1006,112 @@ async function salvarPessoa(
 
   if (erroAoLigar) {
     return `Os dados foram salvos, mas os procedimentos não: ${erroAoLigar.message}`;
+  }
+
+  return null;
+}
+
+/**
+ * Os lugares escolhidos no formulário, conferidos contra o cliente.
+ *
+ * A conferência não é formalidade. `profissional_unidades` é o vínculo que diz
+ * de qual cliente a pessoa é — o painel deduz o cliente da unidade, porque
+ * `profissionais` não tem coluna de cliente. Uma unidade de outro cliente aqui
+ * mudaria a pessoa de ficha sem ninguém ter pedido isso, e deixaria a área de
+ * atuação dela, herdada do cliente antigo, apontando para o lugar errado.
+ *
+ * A tela só oferece as unidades deste cliente. Esta é a tranca de quem chamasse
+ * a ação direto, sem passar por tela nenhuma.
+ */
+async function unidadesEscolhidas(
+  supabase: ClienteDoServidor,
+  clienteId: number,
+  unidadeIds: number[],
+): Promise<{ erro: string } | { ids: number[] }> {
+  if (unidadeIds.length === 0) {
+    return { erro: "Marque pelo menos um lugar onde a pessoa atende." };
+  }
+
+  const { data, error } = await supabase
+    .from("unidades")
+    .select("id")
+    .eq("clinica_id", clienteId);
+
+  if (error) {
+    return {
+      erro: `Não deu para conferir as unidades do cliente: ${error.message}`,
+    };
+  }
+
+  const doCliente = new Set((data ?? []).map((u) => u.id));
+  const forasteiras = unidadeIds.filter((id) => !doCliente.has(id));
+
+  if (forasteiras.length > 0) {
+    return {
+      erro: "Só dá para escolher unidades deste cliente. Para a pessoa atender em outro cliente, cadastre-a lá.",
+    };
+  }
+
+  return { ids: unidadeIds };
+}
+
+/**
+ * Regrava onde a pessoa atende — e na ordem que não deixa ninguém sem lugar.
+ *
+ * Insere o que entrou antes de apagar o que saiu, de propósito: o Supabase não
+ * junta as duas gravações numa transação, e apagar primeiro faria um erro no
+ * meio deixar a pessoa sem unidade nenhuma. Sem unidade ela fica sem cliente,
+ * fora de todas as fichas, e sem caminho de volta pela tela. Nesta ordem, o
+ * pior caso é sobrar um lugar a mais — visível, e corrigível no mesmo lugar.
+ *
+ * Quem já estava e continua não é tocado: o vínculo guarda dia e horário, e
+ * regravar tudo apagaria isso sem motivo.
+ *
+ * Devolve o motivo da falha, ou nada.
+ */
+async function trocarUnidades(
+  supabase: ClienteDoServidor,
+  profissionalId: number,
+  unidadeIds: number[],
+) {
+  const { data: atuais, error } = await supabase
+    .from("profissional_unidades")
+    .select("unidade_id")
+    .eq("profissional_id", profissionalId);
+
+  if (error) {
+    return `Os dados foram salvos, mas os lugares não: ${error.message}`;
+  }
+
+  const tinha = new Set((atuais ?? []).map((v) => v.unidade_id));
+  const entraram = unidadeIds.filter((id) => !tinha.has(id));
+  const sairam = [...tinha].filter((id) => !unidadeIds.includes(id));
+
+  if (entraram.length > 0) {
+    const { error: erroAoEntrar } = await supabase
+      .from("profissional_unidades")
+      .insert(
+        entraram.map((unidade_id) => ({
+          profissional_id: profissionalId,
+          unidade_id,
+        })),
+      );
+
+    if (erroAoEntrar) {
+      return `Os dados foram salvos, mas os lugares não: ${erroAoEntrar.message}`;
+    }
+  }
+
+  if (sairam.length > 0) {
+    const { error: erroAoSair } = await supabase
+      .from("profissional_unidades")
+      .delete()
+      .eq("profissional_id", profissionalId)
+      .in("unidade_id", sairam);
+
+    if (erroAoSair) {
+      return `Os dados foram salvos, e a pessoa entrou nos lugares novos, mas os antigos não saíram: ${erroAoSair.message}`;
+    }
   }
 
   return null;

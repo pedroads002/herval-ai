@@ -222,10 +222,6 @@ function Equipe({
   const [aberto, setAberto] = useState<number | null>(null);
   const [adicionando, setAdicionando] = useState(false);
 
-  const unidades = cliente.unidades
-    .filter((u) => u.ativa)
-    .map((u) => ({ id: u.id, nome: u.nome }));
-
   return (
     <Cartao
       titulo="Profissionais"
@@ -323,7 +319,6 @@ function Equipe({
           <FormularioDaPessoa
             cliente={cliente}
             pessoa={null}
-            unidades={unidades}
             especialidades={especialidades}
             aoSalvar={() => setAdicionando(false)}
           />
@@ -373,13 +368,11 @@ function ResumoDosProcedimentos({
 function FormularioDaPessoa({
   cliente,
   pessoa,
-  unidades,
   especialidades,
   aoSalvar,
 }: {
   cliente: ClienteDoCadastro;
   pessoa: ProfissionalCadastrado | null;
-  unidades?: { id: number; nome: string }[];
   especialidades: EspecialidadeDoCadastro[];
   aoSalvar: () => void;
 }) {
@@ -395,13 +388,33 @@ function FormularioDaPessoa({
     registro: pessoa?.registro ?? "",
     procedimento_outro: pessoa?.procedimentoOutro ?? "",
   });
-  const { marcados, setMarcados } = useMarcados(
-    marcarIds(
+  const { marcados, setMarcados } = useMarcados({
+    ...marcarIds(
       "especialidades",
       (pessoa?.especialidades ?? []).map((e) => e.id),
     ),
-  );
+    ...marcarIds(
+      "unidades",
+      (pessoa?.unidades ?? []).map((u) => u.id),
+    ),
+  });
   const [ativo, setAtivo] = useState(pessoa?.ativo ?? true);
+
+  /**
+   * As unidades oferecidas, tanto no cadastro quanto na edição.
+   *
+   * Inativa fica de fora, com uma exceção: a unidade inativa onde a pessoa já
+   * atende continua na lista, marcada e com o aviso no nome. Escondê-la apagaria
+   * esse vínculo no primeiro "salvar alterações" — sem ninguém pedir, e sem
+   * nada disso aparecer na tela.
+   */
+  const jaAtende = new Set((pessoa?.unidades ?? []).map((u) => u.id));
+  const unidades = cliente.unidades
+    .filter((u) => u.ativa || jaAtende.has(u.id))
+    .map((u) => ({
+      id: u.id,
+      nome: u.ativa ? u.nome : `${u.nome} (inativa)`,
+    }));
 
   useQuandoDerCerto(estado, aoSalvar);
 
@@ -420,16 +433,16 @@ function FormularioDaPessoa({
         especialidades={especialidades}
       />
 
-      {/* Só no cadastro: onde a pessoa atende já está gravado quando ela
-          existe, e mexer nisso é outra conversa — mudar de unidade não é
-          corrigir um dado, é mudar de lugar de trabalho. */}
-      {!pessoa && unidades && (
-        <Unidades
-          unidades={unidades}
-          marcados={marcados}
-          aoMarcar={setMarcados}
-        />
-      )}
+      {/* No cadastro e na edição, e sempre dentro do mesmo cliente: a lista só
+          tem as unidades dele porque o vínculo de unidade é o que diz de qual
+          cliente a pessoa é. Uma unidade de outro cliente aqui mudaria a pessoa
+          de ficha — que é mudança de contrato, não correção de dado. A ação no
+          servidor confere isso de novo, para quem a chamasse sem passar aqui. */}
+      <Unidades
+        unidades={unidades}
+        marcados={marcados}
+        aoMarcar={setMarcados}
+      />
 
       <div className="flex flex-wrap items-center gap-4">
         <button type="submit" disabled={enviando} className={botaoPrincipal}>
