@@ -344,7 +344,7 @@ export type ClinicaDoLead = {
  *
  * Sem preço. A tabela `clinica_especialidades` tem uma coluna `valor`, mas o
  * sistema não guarda nem mostra valor de nada — nem aqui, nem em nenhuma outra
- * tela. Esta consulta ignora a coluna de propósito.
+ * tela. Nada nesta leitura toca nessa coluna. Ver `especialidadesDaClinica`.
  */
 export type EspecialidadeDaClinica = {
   id: number;
@@ -362,6 +362,87 @@ export type ConversaDoLead = {
   especialidades: EspecialidadeDaClinica[];
   falha: string | null;
 };
+
+/**
+ * Os procedimentos que a clínica atende: a união do que a equipe dela realiza.
+ *
+ * Não sai de `clinica_especialidades`. Aquela tabela existe, está vazia e nada
+ * no painel escreve nela — enquanto isso, o que a clínica atende já está
+ * gravado, procedimento por procedimento, no cadastro de cada profissional.
+ * Derivar daí é o que não desatualiza: cadastrar alguém novo já muda a lista,
+ * sem depender de alguém lembrar de uma segunda tela.
+ *
+ * Fora da conta: pessoa inativa e unidade inativa. Oferecer procedimento que
+ * ninguém disponível realiza é o que a trava 3 existe para impedir na conversa,
+ * e a tela não deve contradizer a trava. Procedimento desativado no catálogo
+ * também fica fora, pelo mesmo motivo.
+ *
+ * Devolve `{ data, error }` para entrar no mesmo `Promise.all` das outras
+ * leituras. São duas idas ao banco porque a segunda depende da primeira: para
+ * saber os procedimentos da equipe é preciso saber quem é a equipe.
+ */
+async function especialidadesDaClinica(
+  supabase: Awaited<ReturnType<typeof criarClienteServidor>>,
+  clinicaId: number | null,
+): Promise<{
+  data: { id: number; nome: string; duracao_minutos: number }[] | null;
+  error: { message: string } | null;
+}> {
+  if (clinicaId === null) return { data: null, error: null };
+
+  const { data: vinculos, error: erroDosVinculos } = await supabase
+    .from("profissional_unidades")
+    .select(
+      "profissional_id, profissionais!inner(ativo), unidades!inner(clinica_id, ativa)",
+    )
+    .eq("unidades.clinica_id", clinicaId)
+    .eq("unidades.ativa", true)
+    .eq("profissionais.ativo", true);
+
+  if (erroDosVinculos) return { data: null, error: erroDosVinculos };
+
+  const pessoaIds = [
+    ...new Set((vinculos ?? []).map((v) => v.profissional_id)),
+  ];
+
+  if (pessoaIds.length === 0) return { data: [], error: null };
+
+  const { data: linhas, error } = await supabase
+    .from("profissional_especialidades")
+    .select("especialidades!inner(id, nome, duracao_minutos, ativa)")
+    .in("profissional_id", pessoaIds)
+    .eq("especialidades.ativa", true);
+
+  if (error) return { data: null, error };
+
+  /**
+   * O join volta como `{ especialidades: {...} }`. A biblioteca tipa o lado do
+   * join de forma larga, e descrever o formato do PostgREST aqui dentro
+   * ficaria desatualizado na primeira mudança da consulta. Os campos são
+   * conferidos um a um abaixo.
+   */
+  type LinhaEspecialidade = {
+    especialidades: {
+      id: number;
+      nome: string;
+      duracao_minutos: number;
+    } | null;
+  };
+
+  // Duas pessoas que fazem o mesmo procedimento devolvem duas linhas, e a
+  // clínica atende aquilo uma vez só.
+  const porId = new Map<
+    number,
+    { id: number; nome: string; duracao_minutos: number }
+  >();
+
+  for (const linha of (linhas ?? []) as unknown as LinhaEspecialidade[]) {
+    const e = linha.especialidades;
+    if (e !== null) porId.set(e.id, e);
+  }
+
+  return { data: [...porId.values()], error: null };
+}
 
 /**
  * Carrega um lead só, com a conversa, as notas e a ficha da clínica.
@@ -440,18 +521,7 @@ export async function carregarConversa(
           )
           .eq("id", lidoLead.clinica_id)
           .maybeSingle(),
-    // As especialidades saem de `clinica_especialidades`, e não da lista geral:
-    // o que importa aqui é o que ESTA clínica atende. Só as ativas, porque
-    // oferecer procedimento desativado é o que a trava 3 existe para impedir na
-    // conversa — a tela não deve contradizer a trava. A coluna `valor` da
-    // tabela não é lida: o sistema não exibe preço.
-    lidoLead.clinica_id === null
-      ? Promise.resolve({ data: null, error: null })
-      : supabase
-          .from("clinica_especialidades")
-          .select("especialidades!inner(id, nome, duracao_minutos, ativa)")
-          .eq("clinica_id", lidoLead.clinica_id)
-          .eq("especialidades.ativa", true),
+    especialidadesDaClinica(supabase, lidoLead.clinica_id),
   ]);
 
   if (respostaMensagens.error) {
@@ -472,37 +542,18 @@ export async function carregarConversa(
     convenios: string | null;
   } | null;
 
-  /**
-   * O join volta como `{ especialidades: {...} }`. A biblioteca tipa o lado do
-   * join de forma larga, e a alternativa seria descrever o formato do PostgREST
-   * aqui dentro — o que ficaria desatualizado na primeira mudança da consulta.
-   * Os campos são conferidos um a um logo abaixo.
-   */
-  type LinhaEspecialidade = {
-    especialidades: {
-      id: number;
-      nome: string;
-      duracao_minutos: number;
-    } | null;
-  };
-
-  const especialidades = (
-    (respostaEspecialidades.data ?? []) as unknown as LinhaEspecialidade[]
-  )
-    .filter((linha) => linha.especialidades !== null)
-    .map((linha) => {
-      const e = linha.especialidades as NonNullable<
-        LinhaEspecialidade["especialidades"]
-      >;
-      return {
-        id: e.id,
-        nome: e.nome,
-        duracaoMinutos: e.duracao_minutos,
-        doInteresseDoLead:
-          lidoLead.especialidade_interesse_id != null &&
-          lidoLead.especialidade_interesse_id === e.id,
-      } satisfies EspecialidadeDaClinica;
-    })
+  const especialidades = (respostaEspecialidades.data ?? [])
+    .map(
+      (e) =>
+        ({
+          id: e.id,
+          nome: e.nome,
+          duracaoMinutos: e.duracao_minutos,
+          doInteresseDoLead:
+            lidoLead.especialidade_interesse_id != null &&
+            lidoLead.especialidade_interesse_id === e.id,
+        }) satisfies EspecialidadeDaClinica,
+    )
     // A de interesse do lead primeiro: é a que o CRC vai querer ver antes de
     // qualquer outra ao abrir o atendimento.
     .sort((a, b) => {
