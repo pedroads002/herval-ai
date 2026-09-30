@@ -19,7 +19,7 @@ import {
   type LinhaFunil,
   type LinhaProducao,
 } from "@/lib/relatorios";
-import { formatarMoeda, formatarNumero } from "@/lib/formato";
+import { formatarNumero } from "@/lib/formato";
 import PainelFilaAtendimento from "@/components/PainelFilaAtendimento";
 import {
   comPercentual,
@@ -69,7 +69,11 @@ function faixaDoPreset(preset: Preset, hoje: Date): Faixa {
     return { de: diasAtrasDe(primeiro, hoje), ate: diasAtrasDe(ultimo, hoje) };
   }
 
-  const primeiroDoPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  const primeiroDoPassado = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth() - 1,
+    1,
+  );
   const ultimoDoPassado = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
   return {
     de: diasAtrasDe(primeiroDoPassado, hoje),
@@ -181,7 +185,8 @@ export default function PainelRelatorios() {
   const producaoPorId = new Map(producao.map((l) => [l.clinica.id, l]));
 
   const visiveis = (linha: LinhaFunil) =>
-    mostrarSemAtividade || temAtividade(linha, producaoPorId.get(linha.clinica.id));
+    mostrarSemAtividade ||
+    temAtividade(linha, producaoPorId.get(linha.clinica.id));
 
   const idsVisiveis = new Set(
     funil.filter(visiveis).map((linha) => linha.clinica.id),
@@ -295,7 +300,9 @@ export default function PainelRelatorios() {
                 value={clinicaId}
                 onChange={(e) =>
                   setClinicaId(
-                    e.target.value === "todas" ? "todas" : Number(e.target.value),
+                    e.target.value === "todas"
+                      ? "todas"
+                      : Number(e.target.value),
                   )
                 }
                 className={estiloCampo}
@@ -371,227 +378,241 @@ export default function PainelRelatorios() {
         />
       ) : (
         <div className="space-y-8">
-      {/* KPIs */}
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Kpi
-          rotulo="Leads de marketing"
-          valor={formatarNumero(resumo.leadsMarketing)}
-          detalhe={`${formatarNumero(resumo.qualificados)} qualificados`}
-        />
-        <Kpi
-          rotulo="Agendados (funil)"
-          valor={formatarNumero(resumo.agendadosFunil)}
-          detalhe={`${formatarNumero(resumo.consultaFutura)} com consulta futura`}
-        />
-        <Kpi
-          rotulo="Taxa de agendamento"
-          valor={comPercentual(resumo.taxaAgendamento)}
-          detalhe={`sobre ${formatarNumero(resumo.qualificados)} qualificados · meta ${metasPadrao.taxaAgendamento}%${
-            resumo.inalcancaveis > 0
-              ? ` · ${formatarNumero(resumo.inalcancaveis)} deles longe demais`
-              : ""
-          }`}
-          alerta={
-            resumo.taxaAgendamento !== null &&
-            resumo.taxaAgendamento < metasPadrao.taxaAgendamento
-          }
-        />
-        <Kpi
-          rotulo="Produção de agendamentos"
-          valor={formatarNumero(resumo.producao)}
-          detalhe="pelo ato de agendar · remarcação conta de novo"
-        />
-        <Kpi
-          rotulo="Show-rate da produção"
-          valor={comPercentual(resumo.showRateProducao)}
-          detalhe={`${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoAteAData)} consultas até a data`}
-          alerta={
-            resumo.showRateProducao !== null &&
-            resumo.showRateProducao < metasPadrao.pisoShowRate
-          }
-        />
-        <Kpi
-          rotulo="Quem fechou o agendamento"
-          valor={`${comPercentual(resumo.percentualIa)} IA`}
-          detalhe={`${comPercentual(
-            resumo.percentualIa === null ? null : 100 - resumo.percentualIa,
-          )} CRC · ${formatarNumero(resumo.fechadosPelaIa)} × ${formatarNumero(resumo.fechadosPeloCrc)}`}
-        />
-      </div>
-
-      {/* Fica fora do card para não esticar a linha inteira de indicadores. */}
-      <p className="-mt-4 flex items-start gap-2 text-xs font-medium leading-relaxed text-black/50">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>
-          <span className="font-bold text-herval-preto">
-            Quem fechou o agendamento
-          </span>{" "}
-          mede quem travou o agendamento. A IA executa o processo (follow-up,
-          lembrete, reagendamento) em 100% dos casos, mesmo quando quem fecha é
-          o CRC.
-        </span>
-      </p>
-
-      {/* Pontos de atenção */}
-      <PontosDeAtencao
-        alertas={alertas}
-        visiveis={metasPadrao.alertasVisiveis}
-        legenda={`Gerados a partir dos mesmos números das tabelas abaixo, comparados com as metas. Clínicas com menos de ${metasPadrao.amostraMinima} agendamentos no período ficam de fora: percentual sobre volume baixo gera alarme falso.`}
-        vazio="Nenhuma clínica fora das metas no período selecionado."
-      />
-
-      {/* Tabela A */}
-      <Tabela
-        titulo="Funil de marketing (consultas do período)"
-        legenda={
-          'Conta os leads pela safra — o mês em que chegaram. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho.' +
-          (resumo.inalcancaveis > 0
-            ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
-            : "")
-        }
-        cabecalhos={[
-          "Clínica",
-          "Leads",
-          "Desqual.",
-          "Qualif.",
-          "Agendados",
-          "Até a data",
-          "Consulta futura",
-          "Compareceram",
-          "% compar.",
-          "% agend./qualif.",
-          "R$ orçamento",
-        ]}
-        vazio={funilVisivel.length === 0}
-      >
-        {funilVisivel.map((linha) => (
-          <tr key={linha.clinica.id} className="border-t border-black/[0.07]">
-            <Nome clinica={linha.clinica.nome} ativa={linha.clinica.ativa} />
-            <Num>{linha.leads}</Num>
-            <Num>{linha.desqualificados}</Num>
-            <Num>{linha.qualificados}</Num>
-            <Num>{linha.agendados}</Num>
-            <Num>{linha.ateAData}</Num>
-            <Num>{linha.consultaFutura}</Num>
-            <Num>{linha.compareceram}</Num>
-            <Num>{comPercentual(linha.taxaComparecimento)}</Num>
-            <Num
+          {/* KPIs */}
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <Kpi
+              rotulo="Leads de marketing"
+              valor={formatarNumero(resumo.leadsMarketing)}
+              detalhe={`${formatarNumero(resumo.qualificados)} qualificados`}
+            />
+            <Kpi
+              rotulo="Agendados (funil)"
+              valor={formatarNumero(resumo.agendadosFunil)}
+              detalhe={`${formatarNumero(resumo.consultaFutura)} com consulta futura`}
+            />
+            <Kpi
+              rotulo="Taxa de agendamento"
+              valor={comPercentual(resumo.taxaAgendamento)}
+              detalhe={`sobre ${formatarNumero(resumo.qualificados)} qualificados · meta ${metasPadrao.taxaAgendamento}%${
+                resumo.inalcancaveis > 0
+                  ? ` · ${formatarNumero(resumo.inalcancaveis)} deles longe demais`
+                  : ""
+              }`}
               alerta={
-                linha.taxaAgendamento !== null &&
-                linha.qualificados >= metasPadrao.amostraMinima &&
-                linha.taxaAgendamento < metasPadrao.taxaAgendamento
+                resumo.taxaAgendamento !== null &&
+                resumo.taxaAgendamento < metasPadrao.taxaAgendamento
               }
-            >
-              {comPercentual(linha.taxaAgendamento)}
-            </Num>
-            <Num>{formatarMoeda(linha.orcamento)}</Num>
-          </tr>
-        ))}
-        <Total linhas={funilVisivel} colunas={colunasFunil} />
-      </Tabela>
-
-      {/* Tabela B */}
-      <Tabela
-        titulo="Follow — colheita de meses anteriores"
-        legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. Vendas aqui são comparecimentos desses mesmos leads."
-        cabecalhos={[
-          "Clínica",
-          "Agendados de safra anterior",
-          "Vendas de safra anterior",
-          "R$ de follow",
-        ]}
-        vazio={followVisivel.length === 0}
-      >
-        {followVisivel.map((linha) => (
-          <tr key={linha.clinica.id} className="border-t border-black/[0.07]">
-            <Nome clinica={linha.clinica.nome} ativa={linha.clinica.ativa} />
-            <Num>{linha.agendadosDeSafraAnterior}</Num>
-            <Num>{linha.vendasDeSafraAnterior}</Num>
-            <Num>{formatarMoeda(linha.orcamento)}</Num>
-          </tr>
-        ))}
-        <Total linhas={followVisivel} colunas={colunasFollow} />
-      </Tabela>
-
-      {/* Tabela C */}
-      <Tabela
-        titulo="Produção de agendamentos (pelo ato de agendar)"
-        selo="Métrica oficial de comparecimento"
-        legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas dessa produção que já aconteceram; as futuras ficam de fora do cálculo."
-        cabecalhos={[
-          "Clínica",
-          "Agendamentos",
-          "Cancelados",
-          "Consulta até a data",
-          "Consulta futura",
-          "Compareceram",
-          "Show-rate",
-        ]}
-        vazio={producaoVisivel.length === 0}
-      >
-        {producaoVisivel.map((linha) => (
-          <tr key={linha.clinica.id} className="border-t border-black/[0.07]">
-            <Nome clinica={linha.clinica.nome} ativa={linha.clinica.ativa} />
-            <Num>{linha.agendamentos}</Num>
-            <Num>{linha.cancelados}</Num>
-            <Num>{linha.consultaAteAData}</Num>
-            <Num>{linha.consultaFutura}</Num>
-            <Num>{linha.compareceram}</Num>
-            <Num
+            />
+            <Kpi
+              rotulo="Produção de agendamentos"
+              valor={formatarNumero(resumo.producao)}
+              detalhe="pelo ato de agendar · remarcação conta de novo"
+            />
+            <Kpi
+              rotulo="Show-rate da produção"
+              valor={comPercentual(resumo.showRateProducao)}
+              detalhe={`${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoAteAData)} consultas até a data`}
               alerta={
-                linha.showRate !== null &&
-                linha.consultaAteAData >= metasPadrao.amostraMinima &&
-                linha.showRate < metasPadrao.pisoShowRate
+                resumo.showRateProducao !== null &&
+                resumo.showRateProducao < metasPadrao.pisoShowRate
               }
-            >
-              {comPercentual(linha.showRate)}
-            </Num>
-          </tr>
-        ))}
-        <Total linhas={producaoVisivel} colunas={colunasProducao} />
-      </Tabela>
+            />
+            <Kpi
+              rotulo="Quem fechou o agendamento"
+              valor={`${comPercentual(resumo.percentualIa)} IA`}
+              detalhe={`${comPercentual(
+                resumo.percentualIa === null ? null : 100 - resumo.percentualIa,
+              )} CRC · ${formatarNumero(resumo.fechadosPelaIa)} × ${formatarNumero(resumo.fechadosPeloCrc)}`}
+            />
+          </div>
 
-      {/* Qual tabela usar */}
-      <section className="rounded-card border border-black/10 bg-black/[0.03] p-8">
-        <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
-          <Info className="h-4 w-4" />
-          Qual tabela usar?
-        </h2>
-        <dl className="mt-5 grid gap-5 lg:grid-cols-3">
-          {[
-            {
-              titulo: "Funil de marketing",
-              quando: "Para fechar o mês e avaliar campanha.",
-              texto:
-                "Responde se o investimento em anúncio virou consulta. Como conta pela data da consulta, o número muda quando um paciente antecipa ou adia.",
-            },
-            {
-              titulo: "Produção de agendamentos",
-              quando: "Para acompanhar a semana de trabalho.",
-              texto:
-                "Responde quanto a equipe marcou nesses dias e quanto disso se sustentou. É onde cancelamento e no-show aparecem primeiro, por isso é a métrica oficial de comparecimento.",
-            },
-            {
-              titulo: "Follow",
-              quando: "Para saber se a base antiga está rendendo.",
-              texto:
-                "Responde quanto do resultado veio de lead que já estava na casa. Follow alto com funil fraco quer dizer que a operação está segurando o mês sem mídia nova.",
-            },
-          ].map((item) => (
-            <div key={item.titulo}>
-              <dt className="text-sm font-extrabold text-herval-preto">
-                {item.titulo}
-              </dt>
-              <dd className="mt-1 text-sm font-bold text-black/60">
-                {item.quando}
-              </dd>
-              <dd className="mt-1.5 text-sm font-medium leading-relaxed text-black/55">
-                {item.texto}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+          {/* Fica fora do card para não esticar a linha inteira de indicadores. */}
+          <p className="-mt-4 flex items-start gap-2 text-xs font-medium leading-relaxed text-black/50">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-bold text-herval-preto">
+                Quem fechou o agendamento
+              </span>{" "}
+              mede quem travou o agendamento. A IA executa o processo
+              (follow-up, lembrete, reagendamento) em 100% dos casos, mesmo
+              quando quem fecha é o CRC.
+            </span>
+          </p>
+
+          {/* Pontos de atenção */}
+          <PontosDeAtencao
+            alertas={alertas}
+            visiveis={metasPadrao.alertasVisiveis}
+            legenda={`Gerados a partir dos mesmos números das tabelas abaixo, comparados com as metas. Clínicas com menos de ${metasPadrao.amostraMinima} agendamentos no período ficam de fora: percentual sobre volume baixo gera alarme falso.`}
+            vazio="Nenhuma clínica fora das metas no período selecionado."
+          />
+
+          {/* Tabela A */}
+          <Tabela
+            titulo="Funil de marketing (consultas do período)"
+            legenda={
+              'Conta os leads pela safra — o mês em que chegaram. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho.' +
+              (resumo.inalcancaveis > 0
+                ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
+                : "")
+            }
+            cabecalhos={[
+              "Clínica",
+              "Leads",
+              "Desqual.",
+              "Qualif.",
+              "Agendados",
+              "Até a data",
+              "Consulta futura",
+              "Compareceram",
+              "% compar.",
+              "% agend./qualif.",
+            ]}
+            vazio={funilVisivel.length === 0}
+          >
+            {funilVisivel.map((linha) => (
+              <tr
+                key={linha.clinica.id}
+                className="border-t border-black/[0.07]"
+              >
+                <Nome
+                  clinica={linha.clinica.nome}
+                  ativa={linha.clinica.ativa}
+                />
+                <Num>{linha.leads}</Num>
+                <Num>{linha.desqualificados}</Num>
+                <Num>{linha.qualificados}</Num>
+                <Num>{linha.agendados}</Num>
+                <Num>{linha.ateAData}</Num>
+                <Num>{linha.consultaFutura}</Num>
+                <Num>{linha.compareceram}</Num>
+                <Num>{comPercentual(linha.taxaComparecimento)}</Num>
+                <Num
+                  alerta={
+                    linha.taxaAgendamento !== null &&
+                    linha.qualificados >= metasPadrao.amostraMinima &&
+                    linha.taxaAgendamento < metasPadrao.taxaAgendamento
+                  }
+                >
+                  {comPercentual(linha.taxaAgendamento)}
+                </Num>
+              </tr>
+            ))}
+            <Total linhas={funilVisivel} colunas={colunasFunil} />
+          </Tabela>
+
+          {/* Tabela B */}
+          <Tabela
+            titulo="Follow — colheita de meses anteriores"
+            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. Vendas aqui são comparecimentos desses mesmos leads."
+            cabecalhos={[
+              "Clínica",
+              "Agendados de safra anterior",
+              "Vendas de safra anterior",
+            ]}
+            vazio={followVisivel.length === 0}
+          >
+            {followVisivel.map((linha) => (
+              <tr
+                key={linha.clinica.id}
+                className="border-t border-black/[0.07]"
+              >
+                <Nome
+                  clinica={linha.clinica.nome}
+                  ativa={linha.clinica.ativa}
+                />
+                <Num>{linha.agendadosDeSafraAnterior}</Num>
+                <Num>{linha.vendasDeSafraAnterior}</Num>
+              </tr>
+            ))}
+            <Total linhas={followVisivel} colunas={colunasFollow} />
+          </Tabela>
+
+          {/* Tabela C */}
+          <Tabela
+            titulo="Produção de agendamentos (pelo ato de agendar)"
+            selo="Métrica oficial de comparecimento"
+            legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas dessa produção que já aconteceram; as futuras ficam de fora do cálculo."
+            cabecalhos={[
+              "Clínica",
+              "Agendamentos",
+              "Cancelados",
+              "Consulta até a data",
+              "Consulta futura",
+              "Compareceram",
+              "Show-rate",
+            ]}
+            vazio={producaoVisivel.length === 0}
+          >
+            {producaoVisivel.map((linha) => (
+              <tr
+                key={linha.clinica.id}
+                className="border-t border-black/[0.07]"
+              >
+                <Nome
+                  clinica={linha.clinica.nome}
+                  ativa={linha.clinica.ativa}
+                />
+                <Num>{linha.agendamentos}</Num>
+                <Num>{linha.cancelados}</Num>
+                <Num>{linha.consultaAteAData}</Num>
+                <Num>{linha.consultaFutura}</Num>
+                <Num>{linha.compareceram}</Num>
+                <Num
+                  alerta={
+                    linha.showRate !== null &&
+                    linha.consultaAteAData >= metasPadrao.amostraMinima &&
+                    linha.showRate < metasPadrao.pisoShowRate
+                  }
+                >
+                  {comPercentual(linha.showRate)}
+                </Num>
+              </tr>
+            ))}
+            <Total linhas={producaoVisivel} colunas={colunasProducao} />
+          </Tabela>
+
+          {/* Qual tabela usar */}
+          <section className="rounded-card border border-black/10 bg-black/[0.03] p-8">
+            <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
+              <Info className="h-4 w-4" />
+              Qual tabela usar?
+            </h2>
+            <dl className="mt-5 grid gap-5 lg:grid-cols-3">
+              {[
+                {
+                  titulo: "Funil de marketing",
+                  quando: "Para fechar o mês e avaliar campanha.",
+                  texto:
+                    "Responde se o investimento em anúncio virou consulta. Como conta pela data da consulta, o número muda quando um paciente antecipa ou adia.",
+                },
+                {
+                  titulo: "Produção de agendamentos",
+                  quando: "Para acompanhar a semana de trabalho.",
+                  texto:
+                    "Responde quanto a equipe marcou nesses dias e quanto disso se sustentou. É onde cancelamento e no-show aparecem primeiro, por isso é a métrica oficial de comparecimento.",
+                },
+                {
+                  titulo: "Follow",
+                  quando: "Para saber se a base antiga está rendendo.",
+                  texto:
+                    "Responde quanto do resultado veio de lead que já estava na casa. Follow alto com funil fraco quer dizer que a operação está segurando o mês sem mídia nova.",
+                },
+              ].map((item) => (
+                <div key={item.titulo}>
+                  <dt className="text-sm font-extrabold text-herval-preto">
+                    {item.titulo}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold text-black/60">
+                    {item.quando}
+                  </dd>
+                  <dd className="mt-1.5 text-sm font-medium leading-relaxed text-black/55">
+                    {item.texto}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         </div>
       )}
     </div>
@@ -609,14 +630,16 @@ const colunasFunil: Coluna<LinhaFunil>[] = [
   { tipo: "soma", valor: (l) => l.consultaFutura },
   { tipo: "soma", valor: (l) => l.compareceram },
   { tipo: "taxa", parte: (l) => l.compareceram, total: (l) => l.ateAData },
-  { tipo: "taxa", parte: (l) => l.agendadosDaSafra, total: (l) => l.qualificados },
-  { tipo: "soma", valor: (l) => l.orcamento, moeda: true },
+  {
+    tipo: "taxa",
+    parte: (l) => l.agendadosDaSafra,
+    total: (l) => l.qualificados,
+  },
 ];
 
 const colunasFollow: Coluna<LinhaFollow>[] = [
   { tipo: "soma", valor: (l) => l.agendadosDeSafraAnterior },
   { tipo: "soma", valor: (l) => l.vendasDeSafraAnterior },
-  { tipo: "soma", valor: (l) => l.orcamento, moeda: true },
 ];
 
 const colunasProducao: Coluna<LinhaProducao>[] = [
@@ -625,5 +648,9 @@ const colunasProducao: Coluna<LinhaProducao>[] = [
   { tipo: "soma", valor: (l) => l.consultaAteAData },
   { tipo: "soma", valor: (l) => l.consultaFutura },
   { tipo: "soma", valor: (l) => l.compareceram },
-  { tipo: "taxa", parte: (l) => l.compareceram, total: (l) => l.consultaAteAData },
+  {
+    tipo: "taxa",
+    parte: (l) => l.compareceram,
+    total: (l) => l.consultaAteAData,
+  },
 ];

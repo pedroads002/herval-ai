@@ -10,7 +10,6 @@ import {
 import { clinicasIniciais, type Clinica } from "@/data/clinicas";
 import { especialidadePorId } from "@/data/especialidades";
 import { profissionaisDaClinica } from "@/data/profissionais";
-import { formatarMoeda } from "@/lib/formato";
 
 const campoBase =
   "w-full rounded-controle border border-black/15 bg-herval-branco px-4 py-3 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
@@ -18,7 +17,8 @@ const campoBase =
 const rotuloBase = "mb-2 block text-sm font-bold text-herval-preto";
 
 /** Campos de texto livre da ficha. O resto da ficha é lista, e não se digita. */
-type CampoDeTexto = "historia" | "diferenciais" | "endereco" | "horarioFuncionamento";
+type CampoDeTexto =
+  "historia" | "diferenciais" | "endereco" | "horarioFuncionamento";
 
 export default function FormularioEstrategia() {
   const [clinicas, setClinicas] = useState<Clinica[]>(clinicasIniciais);
@@ -63,7 +63,9 @@ export default function FormularioEstrategia() {
     temporizador.current = setTimeout(() => setSalvo(false), 2000);
   }
 
-  const descricaoModo = modosAtendimento.find((m) => m.modo === modo)?.descricao;
+  const descricaoModo = modosAtendimento.find(
+    (m) => m.modo === modo,
+  )?.descricao;
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -106,9 +108,8 @@ export default function FormularioEstrategia() {
         </p>
 
         <p className="mt-4 inline-flex items-start gap-2 rounded-controle bg-black/[0.04] px-4 py-3 text-xs font-medium text-black/70">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          O primeiro contato de lead novo é sempre humano, independente do modo
-          selecionado.
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />O primeiro contato de
+          lead novo é sempre humano, independente do modo selecionado.
         </p>
       </section>
 
@@ -129,8 +130,8 @@ export default function FormularioEstrategia() {
           </p>
           <p className="mt-2 text-xs font-medium text-black/45">
             É da ficha que a equipe tira o que responder quando o lead pergunta
-            preço, convênio ou endereço. Ela aparece aqui assim que existir uma
-            clínica.
+            convênio, condições ou endereço. Ela aparece aqui assim que existir
+            uma clínica.
           </p>
         </section>
       ) : (
@@ -158,7 +159,7 @@ export default function FormularioEstrategia() {
             </select>
             <p className="mt-2 text-xs font-medium text-black/50">
               Cada cliente tem a própria ficha. É dela que a equipe tira o que
-              responder quando o lead pergunta preço, convênio ou endereço.
+              responder quando o lead pergunta convênio, condições ou endereço.
             </p>
           </div>
 
@@ -183,14 +184,6 @@ export default function FormularioEstrategia() {
           </div>
 
           <div className="grid gap-8 sm:grid-cols-2">
-            <div>
-              <span className={rotuloBase}>Ticket médio</span>
-              <p className="text-sm font-bold text-herval-preto">
-                {clinica.ticketMedio === null
-                  ? "Sem histórico de venda ainda"
-                  : formatarMoeda(clinica.ticketMedio)}
-              </p>
-            </div>
             <div>
               <span className={rotuloBase}>Condições</span>
               <p className="text-sm font-medium text-black/70">
@@ -243,7 +236,7 @@ export default function FormularioEstrategia() {
 
           <div>
             <span className={rotuloBase}>
-              Procedimentos e valor da avaliação
+              Procedimentos
             </span>
             <ul className="space-y-1.5">
               {clinica.procedimentos.map((procedimento) => {
@@ -265,11 +258,6 @@ export default function FormularioEstrategia() {
                         carro-chefe
                       </span>
                     )}
-                    <span>
-                      {procedimento.valorConsulta === null
-                        ? "avaliação gratuita"
-                        : `avaliação ${formatarMoeda(procedimento.valorConsulta)}`}
-                    </span>
                   </li>
                 );
               })}

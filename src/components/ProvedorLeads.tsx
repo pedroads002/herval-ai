@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import {
   agendamentosIniciais,
   etapaPorStatus,
@@ -14,7 +20,11 @@ import {
   type EtapaFunil,
   type MotivoPerda,
 } from "@/data/leads";
-import { tarefasIniciais, type StatusTarefa, type Tarefa } from "@/data/tarefas";
+import {
+  tarefasIniciais,
+  type StatusTarefa,
+  type Tarefa,
+} from "@/data/tarefas";
 import {
   AGENTE_AUTOMATICO,
   historicoDeEtapasInicial,
@@ -44,7 +54,6 @@ import {
 /** O que o CRC precisa informar quando move o lead à mão. */
 export type DadosDaMovimentacao = {
   motivoPerda?: MotivoPerda;
-  valorVenda?: number;
 };
 
 /** Horário e profissional definidos na Agenda. */
@@ -122,9 +131,8 @@ export default function ProvedorLeads({
   children: React.ReactNode;
 }) {
   const [tarefas, setTarefas] = useState<Tarefa[]>(tarefasIniciais);
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>(
-    agendamentosIniciais,
-  );
+  const [agendamentos, setAgendamentos] =
+    useState<Agendamento[]>(agendamentosIniciais);
   const [historicoDeEtapas, setHistoricoDeEtapas] = useState<MudancaDeEtapa[]>(
     historicoDeEtapasInicial,
   );
@@ -196,17 +204,14 @@ export default function ProvedorLeads({
       setTarefas((atuais) =>
         atuais.map((tarefa) => {
           if (tarefa.id !== id) return tarefa;
-          // Motivo e valor só existem enquanto o lead está na etapa que os
-          // pede; sair de lá limpa o campo para não sobrar dado sem sentido.
-          const { motivoPerda: _m, valorVenda: _v, ...resto } = tarefa;
+          // O motivo só existe enquanto o lead está na etapa que o pede; sair
+          // de lá limpa o campo para não sobrar dado sem sentido.
+          const { motivoPerda: _m, ...resto } = tarefa;
           return {
             ...resto,
             etapa,
             ...(etapa === ETAPA_PERDIDA && dados?.motivoPerda
               ? { motivoPerda: dados.motivoPerda }
-              : {}),
-            ...(etapa === ETAPA_GANHA && dados?.valorVenda !== undefined
-              ? { valorVenda: dados.valorVenda }
               : {}),
           };
         }),
@@ -287,7 +292,6 @@ export default function ProvedorLeads({
             criadoHaDias: 0,
             status: "Agendada" as const,
             fechadoPor: "CRC" as const,
-            valorOrcamento: null,
             confirmada: false,
             ...dados,
           },
@@ -338,7 +342,8 @@ export default function ProvedorLeads({
       formato: FormatoMensagem = "texto",
     ): Promise<ResultadoDoEnvio> => {
       const conteudo = texto.trim();
-      if (!conteudo) return { enviada: false, motivo: "A mensagem está vazia." };
+      if (!conteudo)
+        return { enviada: false, motivo: "A mensagem está vazia." };
 
       const lead = tarefas.find((t) => t.id === leadId);
       if (!lead) return { enviada: false, motivo: "Lead não encontrado." };
@@ -412,7 +417,8 @@ export default function ProvedorLeads({
         },
       ]);
 
-      if (!etapa) return { etapa: null, retomada: false, abrirAgendamento: false };
+      if (!etapa)
+        return { etapa: null, retomada: false, abrirAgendamento: false };
 
       const consequencia = consequenciaDaLigacao(
         {

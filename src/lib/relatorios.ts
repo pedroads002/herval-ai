@@ -127,7 +127,6 @@ export type LinhaFunil = {
    * como agendar.
    */
   inalcancaveis: number;
-  orcamento: number;
 };
 
 /** Uma linha da tabela "Follow", colheita de safras anteriores. */
@@ -135,7 +134,6 @@ export type LinhaFollow = {
   clinica: Clinica;
   agendadosDeSafraAnterior: number;
   vendasDeSafraAnterior: number;
-  orcamento: number;
 };
 
 /** Uma linha da tabela "Produção", pelo ato de agendar. */
@@ -221,7 +219,6 @@ export function montarFunil({
       inalcancaveis: daClinica.filter(
         (l) => ehQualificado(l) && l.motivoPerda === MOTIVO_DISTANCIA,
       ).length,
-      orcamento: compareceram.reduce((s, a) => s + (a.valorOrcamento ?? 0), 0),
     };
   });
 }
@@ -254,7 +251,6 @@ export function montarFollow({
       clinica,
       agendadosDeSafraAnterior: deFollow.length,
       vendasDeSafraAnterior: compareceram.length,
-      orcamento: compareceram.reduce((s, a) => s + (a.valorOrcamento ?? 0), 0),
     };
   });
 }
@@ -325,7 +321,7 @@ export function montarResumo(
   agendamentos: Agendamento[],
   faixa: Faixa,
 ): ResumoGeral {
-  const soma = <T,>(lista: T[], campo: (item: T) => number) =>
+  const soma = <T>(lista: T[], campo: (item: T) => number) =>
     lista.reduce((total, item) => total + campo(item), 0);
 
   const qualificados = soma(funil, (l) => l.qualificados);
@@ -502,8 +498,6 @@ export function temAtividade(
   producao: LinhaProducao | undefined,
 ) {
   return (
-    funil.leads > 0 ||
-    funil.agendados > 0 ||
-    (producao?.agendamentos ?? 0) > 0
+    funil.leads > 0 || funil.agendados > 0 || (producao?.agendamentos ?? 0) > 0
   );
 }

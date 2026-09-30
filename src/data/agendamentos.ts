@@ -1,16 +1,9 @@
 import type { EtapaFunil } from "@/data/leads";
-import {
-  ETAPA_AGENDADO,
-  ETAPA_COMPARECEU,
-  ETAPA_REMARCAR,
-} from "@/data/leads";
+import { ETAPA_AGENDADO, ETAPA_COMPARECEU, ETAPA_REMARCAR } from "@/data/leads";
 
 /** Status de uma consulta marcada. */
 export type StatusAgendamento =
-  | "Agendada"
-  | "Compareceu"
-  | "Faltou"
-  | "Cancelada";
+  "Agendada" | "Compareceu" | "Faltou" | "Cancelada";
 
 export const statusAgendamento: StatusAgendamento[] = [
   "Agendada",
@@ -45,8 +38,6 @@ export type Agendamento = {
   consultaEmDias: number;
   status: StatusAgendamento;
   fechadoPor: FechadoPor;
-  /** Em reais, guardado como número. Só existe quando o paciente compareceu. */
-  valorOrcamento: number | null;
   /** Id da tela de Profissionais. Nulo enquanto a agenda não for montada. */
   profissionalId: number | null;
   /** Id da tela de Especialidades. */
@@ -78,8 +69,8 @@ export function etapaPorStatus(status: StatusAgendamento): EtapaFunil | null {
 /**
  * Formato compacto, como em `leadsHistoricos`. Cada linha é:
  * [id, leadId, clinicaId, criadoHaDias, consultaEmDias, status, fechadoPor,
- *  valorOrcamento, profissionalId, especialidadeId, hora, confirmada]
- * com status pela posição na lista, fechadoPor 0 = IA e 1 = CRC, 0 em valor,
+ *  profissionalId, especialidadeId, hora, confirmada]
+ * com status pela posição na lista, fechadoPor 0 = IA e 1 = CRC, 0 em
  * profissional e especialidade quando não há, hora como número inteiro (-1
  * quando não há) e confirmada como 0 ou 1.
  *
@@ -87,15 +78,35 @@ export function etapaPorStatus(status: StatusAgendamento): EtapaFunil | null {
  * Quando esta tela passar a ler o banco, é este array que some.
  */
 type LinhaAgendamento = [
-  number, number, number, number, number, number,
-  number, number, number, number, number, number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
 ];
 
 const registros: LinhaAgendamento[] = [];
 
 export const agendamentosIniciais: Agendamento[] = registros.map(
-  ([id, leadId, clinicaId, criadoHaDias, consultaEmDias, status, fechado, valor,
-    prof, esp, hora, confirmada]) => ({
+  ([
+    id,
+    leadId,
+    clinicaId,
+    criadoHaDias,
+    consultaEmDias,
+    status,
+    fechado,
+    prof,
+    esp,
+    hora,
+    confirmada,
+  ]) => ({
     id,
     leadId,
     clinicaId,
@@ -103,7 +114,6 @@ export const agendamentosIniciais: Agendamento[] = registros.map(
     consultaEmDias,
     status: statusAgendamento[status],
     fechadoPor: fechado === 0 ? "IA" : "CRC",
-    valorOrcamento: valor > 0 ? valor : null,
     profissionalId: prof > 0 ? prof : null,
     especialidadeId: esp > 0 ? esp : null,
     hora: hora >= 0 ? `${String(hora).padStart(2, "0")}:00` : null,
