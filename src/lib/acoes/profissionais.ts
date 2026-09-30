@@ -277,10 +277,11 @@ function lerPessoa(formData: FormData): { erro: string } | DadosDaPessoa {
  * junto, com o mesmo nome do cliente. Duplicar isso no painel daria duas
  * unidades para quem cadastrasse por aqui e uma para quem cadastrasse por fora.
  *
- * `numero_unidades` é preenchido com 1 porque é o que o gatilho acabou de
- * fazer. A coluna é um número digitado à mão, que já convive com a contagem
- * real das unidades — deixá-la em zero com uma unidade existindo seria criar a
- * contradição no momento do cadastro.
+ * Quantas unidades o cliente tem não é gravado em lugar nenhum: conta-se as
+ * linhas de `unidades`. Existiu uma coluna `numero_unidades` para isso, um
+ * número digitado à mão que podia discordar da contagem real — e um número que
+ * pode mentir sobre um fato que o banco já sabe responder é pior que número
+ * nenhum. Ela saiu junto com esta mudança.
  *
  * Se o gatilho não tiver criado a unidade, o cliente é apagado e o cadastro
  * falha. Cliente sem unidade nenhuma é um cliente onde ninguém pode ser
@@ -293,7 +294,7 @@ async function criarCliente(
 ): Promise<{ erro: string } | { cliente: ClienteCriado }> {
   const { data: criado, error } = await supabase
     .from("clinicas")
-    .insert({ ...dados, tipo_operacao: tipoOperacao, numero_unidades: 1 })
+    .insert({ ...dados, tipo_operacao: tipoOperacao })
     .select("id, nome")
     .single();
 
