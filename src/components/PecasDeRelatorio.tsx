@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, TriangleAlert } from "lucide-react";
-import { formatarMoeda, formatarNumero } from "@/lib/formato";
+import { formatarNumero } from "@/lib/formato";
 import type { Alerta } from "@/lib/relatorios";
 
 /**
@@ -186,7 +186,7 @@ export function Num({
  * mediana do conjunto não sai das medianas das linhas.
  */
 export type Coluna<T> =
-  | { tipo: "soma"; valor: (linha: T) => number; moeda?: boolean }
+  | { tipo: "soma"; valor: (linha: T) => number }
   | { tipo: "taxa"; parte: (linha: T) => number; total: (linha: T) => number }
   | { tipo: "texto"; valor: () => string };
 
@@ -216,9 +216,7 @@ export function Total<T>({
             ? razao(soma(coluna.parte), soma(coluna.total))
             : coluna.tipo === "texto"
               ? coluna.valor()
-              : coluna.moeda
-                ? formatarMoeda(soma(coluna.valor))
-                : formatarNumero(soma(coluna.valor))}
+              : formatarNumero(soma(coluna.valor))}
         </Num>
       ))}
     </tr>

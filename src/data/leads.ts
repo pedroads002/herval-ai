@@ -54,12 +54,7 @@ export const etapasFunil: EtapaFunil[] = [
 
 /** Por onde o lead chegou. */
 export type OrigemContato =
-  | "Meta Ads"
-  | "Instagram"
-  | "Google Ads"
-  | "Indicação"
-  | "Site"
-  | "WhatsApp";
+  "Meta Ads" | "Instagram" | "Google Ads" | "Indicação" | "Site" | "WhatsApp";
 
 export const origensContato: OrigemContato[] = [
   "Meta Ads",
@@ -169,8 +164,6 @@ export type Lead = {
   diasAtras: number;
   /** Obrigatório em "Venda Perdida". Escolhido na lista, nunca digitado. */
   motivoPerda?: MotivoPerda;
-  /** Obrigatório em "Venda Ganha". Em reais, guardado como número. */
-  valorVenda?: number;
   /** Quantas vezes a consulta deste lead precisou ser remarcada. */
   remarcacoes?: number;
 };

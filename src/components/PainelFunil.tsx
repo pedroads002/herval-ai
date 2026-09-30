@@ -2,23 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  ExternalLink,
-  Move,
-  RotateCcw,
-  Search,
-  Trophy,
-  X,
-} from "lucide-react";
+import { ExternalLink, Move, RotateCcw, Search, X } from "lucide-react";
 import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
-import {
-  useLeads,
-  type DadosDaMovimentacao,
-} from "@/components/ProvedorLeads";
+import { useLeads, type DadosDaMovimentacao } from "@/components/ProvedorLeads";
 import MenuDeEtapa, { type PassoDoMenu } from "@/components/MenuDeEtapa";
 import { etapasFunil, type EtapaFunil } from "@/data/leads";
 import type { Tarefa } from "@/data/tarefas";
-import { formatarMoeda } from "@/lib/formato";
 
 const periodos = ["Todos", "Este mês", "Chegaram hoje"] as const;
 type Periodo = (typeof periodos)[number];
@@ -36,8 +25,8 @@ export default function PainelFunil() {
   // Card com o menu "Mover para" aberto.
   const [movendo, setMovendo] = useState<number | null>(null);
   /**
-   * Mover é livre, mas duas etapas cobram informação antes de aceitar: Venda
-   * Ganha pede o valor e Venda Perdida pede o motivo. Daí o menu ter passos.
+   * Mover é livre, mas Venda Perdida cobra o motivo antes de aceitar. Daí o
+   * menu ter passos.
    */
   const [passo, setPasso] = useState<PassoDoMenu>("etapa");
 
@@ -234,13 +223,6 @@ function Cartao({
         <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-herval-preto px-2.5 py-1 text-[11px] font-bold text-herval-branco">
           <X className="h-3 w-3" />
           {tarefa.motivoPerda}
-        </p>
-      )}
-
-      {tarefa.valorVenda !== undefined && (
-        <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-2.5 py-1 text-[11px] font-extrabold text-herval-preto">
-          <Trophy className="h-3 w-3" />
-          {formatarMoeda(tarefa.valorVenda)}
         </p>
       )}
 

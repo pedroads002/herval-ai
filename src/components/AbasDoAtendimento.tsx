@@ -11,14 +11,22 @@ import {
   procedimentoDaClinica,
   type Clinica,
 } from "@/data/clinicas";
-import { especialidadePorId, especialidadesIniciais } from "@/data/especialidades";
+import {
+  especialidadePorId,
+  especialidadesIniciais,
+} from "@/data/especialidades";
 import { profissionaisDisponiveis } from "@/data/profissionais";
 import { diasAteAData, inicioDoDia, somarDias } from "@/data/agenda";
-import { formatarDuracao, formatarMoeda } from "@/lib/formato";
+import { formatarDuracao } from "@/lib/formato";
 import { duracao, tempoRelativo } from "@/lib/tempo";
 import type { DadosDaConsulta } from "@/components/ProvedorLeads";
 
-export const abasDoAtendimento = ["Agenda", "Ligações", "Clínica", "Log"] as const;
+export const abasDoAtendimento = [
+  "Agenda",
+  "Ligações",
+  "Clínica",
+  "Log",
+] as const;
 export type AbaDoAtendimento = (typeof abasDoAtendimento)[number];
 
 const rotulo = "text-[11px] font-bold uppercase tracking-wide text-black/45";
@@ -28,7 +36,9 @@ const campo =
 /** Um dia relativo vira texto sem virar data fixa: "em 3 dias", "há 2 dias". */
 function quandoEmDias(dias: number) {
   if (dias === 0) return "hoje";
-  return dias < 0 ? `em ${duracao(-dias * 1440)}` : `há ${duracao(dias * 1440)}`;
+  return dias < 0
+    ? `em ${duracao(-dias * 1440)}`
+    : `há ${duracao(dias * 1440)}`;
 }
 
 /**
@@ -72,7 +82,6 @@ export function AbaAgenda({
   aoAlternar: (aberto: boolean) => void;
   aoAgendar: (dados: DadosDaConsulta) => void;
 }) {
-
   /*
     O botão fica colado no rodapé do cartão, e não logo abaixo do texto.
 
@@ -99,8 +108,8 @@ export function AbaAgenda({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-bold text-herval-preto">
-                    {especialidadePorId(agendamento.especialidadeId ?? 0)?.nome ??
-                      "Especialidade não informada"}
+                    {especialidadePorId(agendamento.especialidadeId ?? 0)
+                      ?.nome ?? "Especialidade não informada"}
                   </span>
                   <span className="rounded-full border border-black/20 px-2 py-0.5 text-[11px] font-bold text-black/60">
                     {agendamento.status}
@@ -108,7 +117,9 @@ export function AbaAgenda({
                 </div>
                 <p className="mt-1 text-xs font-medium text-black/60">
                   Consulta {quandoEmDias(agendamento.consultaEmDias)}
-                  {agendamento.hora ? ` · ${agendamento.hora}` : " · sem horário"}
+                  {agendamento.hora
+                    ? ` · ${agendamento.hora}`
+                    : " · sem horário"}
                 </p>
                 {agendamento.observacao && (
                   <p className="mt-2 rounded bg-black/[0.04] px-2.5 py-1.5 text-xs text-black/70">
@@ -168,7 +179,9 @@ function FormularioDeConsulta({
       procedimentoDaClinica(clinica, e.id) !== null,
   );
 
-  const [especialidadeId, setEspecialidadeId] = useState(oferecidas[0]?.id ?? 0);
+  const [especialidadeId, setEspecialidadeId] = useState(
+    oferecidas[0]?.id ?? 0,
+  );
   const [profissionalId, setProfissionalId] = useState(0);
   const [hora, setHora] = useState("09:00");
   const [observacao, setObservacao] = useState("");
@@ -417,7 +430,9 @@ export function AbaClinica({ clinica }: { clinica: Clinica | undefined }) {
       </div>
 
       <Bloco titulo="Estratégia e diferenciais">
-        <p className="text-xs leading-relaxed text-black/70">{clinica.historia}</p>
+        <p className="text-xs leading-relaxed text-black/70">
+          {clinica.historia}
+        </p>
         <p className="mt-2 text-xs leading-relaxed text-black/70">
           {clinica.diferenciais}
         </p>
@@ -425,13 +440,7 @@ export function AbaClinica({ clinica }: { clinica: Clinica | undefined }) {
 
       <Bloco titulo="Comercial e condições">
         <p className="text-xs text-black/70">
-          Ticket médio{" "}
-          <span className="font-bold text-herval-preto">
-            {clinica.ticketMedio === null
-              ? "ainda sem histórico"
-              : formatarMoeda(clinica.ticketMedio)}
-          </span>{" "}
-          · em até {clinica.parcelasMaximas}x
+          Em até {clinica.parcelasMaximas}x
         </p>
         <p className="mt-1 text-xs text-black/70">
           {clinica.formasPagamento.join(", ")}
@@ -468,16 +477,20 @@ export function AbaClinica({ clinica }: { clinica: Clinica | undefined }) {
         </ul>
       </Bloco>
 
-      <Bloco titulo="Valores por procedimento">
+      <Bloco titulo="Procedimentos">
         <ul className="space-y-1.5">
           {clinica.procedimentos.map((procedimento) => {
-            const foco = procedimento.especialidadeId === clinica.tratamentoFocoId;
+            const foco =
+              procedimento.especialidadeId === clinica.tratamentoFocoId;
             const cobertura = conveniosQueCobrem(
               clinica,
               procedimento.especialidadeId,
             );
             return (
-              <li key={procedimento.especialidadeId} className="text-xs text-black/70">
+              <li
+                key={procedimento.especialidadeId}
+                className="text-xs text-black/70"
+              >
                 <span className="font-bold text-herval-preto">
                   {especialidadePorId(procedimento.especialidadeId)?.nome}
                 </span>
@@ -486,11 +499,8 @@ export function AbaClinica({ clinica }: { clinica: Clinica | undefined }) {
                     carro-chefe
                   </span>
                 )}
-                {" · "}
-                {procedimento.valorConsulta === null
-                  ? "avaliação gratuita"
-                  : `avaliação ${formatarMoeda(procedimento.valorConsulta)}`}
-                {cobertura.length > 0 && ` · coberto por ${cobertura.map((c) => c.nome).join(", ")}`}
+                {cobertura.length > 0 &&
+                  ` · coberto por ${cobertura.map((c) => c.nome).join(", ")}`}
               </li>
             );
           })}

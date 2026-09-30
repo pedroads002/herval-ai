@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import {
-  ETAPA_GANHA,
   ETAPA_PERDIDA,
   etapasFunil,
   motivosDePerda,
@@ -13,14 +11,17 @@ import {
 import type { DadosDaMovimentacao } from "@/components/ProvedorLeads";
 
 /**
- * O menu de mover o lead de etapa, com as duas exigências que a regra impõe:
- * Venda Perdida pede motivo da lista e Venda Ganha pede o valor.
+ * O menu de mover o lead de etapa, com a exigência que a regra impõe: Venda
+ * Perdida pede motivo da lista.
+ *
+ * Venda Ganha não pede nada. Ela pedia o valor da venda, e isso saiu: o
+ * sistema não guarda nem exibe valor de nada nem de ninguém.
  *
  * Mora num arquivo próprio porque o Funil e a tela de atendimento movem o
  * mesmo lead — se cada uma tivesse a sua cópia, a regra passaria a valer só
  * onde alguém lembrasse de repeti-la.
  */
-export type PassoDoMenu = "etapa" | "motivo" | "valor";
+export type PassoDoMenu = "etapa" | "motivo";
 
 /**
  * Explicação curta em opções que o CRC costuma usar fora do lugar. Só "Spam"
@@ -55,20 +56,13 @@ export default function MenuDeEtapa({
     );
   }
 
-  if (passo === "valor") {
-    return (
-      <CampoDeValor aoConfirmar={(valorVenda) => aoMover(ETAPA_GANHA, { valorVenda })} />
-    );
-  }
-
   return (
     <ListaDeOpcoes
       titulo="Mover para"
       opcoes={etapasFunil.filter((destino) => destino !== etapaAtual)}
       aoEscolher={(destino) => {
-        // Estas duas cobram informação antes de aceitar o movimento.
+        // Venda Perdida cobra o motivo antes de aceitar o movimento.
         if (destino === ETAPA_PERDIDA) return aoPedirPasso("motivo");
-        if (destino === ETAPA_GANHA) return aoPedirPasso("valor");
         aoMover(destino as EtapaFunil);
       }}
     />
@@ -112,47 +106,6 @@ function ListaDeOpcoes({
           </li>
         ))}
       </ul>
-    </>
-  );
-}
-
-/** Valor da venda: obrigatório para marcar Venda Ganha, e só o valor. */
-function CampoDeValor({
-  aoConfirmar,
-}: {
-  aoConfirmar: (valor: number) => void;
-}) {
-  const [texto, setTexto] = useState("");
-  const valor = Number(texto.replace(",", "."));
-  const valido = texto.trim() !== "" && Number.isFinite(valor) && valor > 0;
-
-  return (
-    <>
-      <p className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-black/45">
-        Valor da venda (R$)
-      </p>
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        inputMode="decimal"
-        autoFocus
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && valido) aoConfirmar(valor);
-        }}
-        placeholder="0,00"
-        className="w-full rounded border border-black/15 bg-herval-branco px-2.5 py-1.5 text-xs font-bold text-herval-preto outline-none focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/30"
-      />
-      <button
-        type="button"
-        disabled={!valido}
-        onClick={() => aoConfirmar(valor)}
-        className="mt-2 w-full rounded bg-herval-verde px-2 py-1.5 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
-      >
-        Confirmar venda
-      </button>
     </>
   );
 }

@@ -48,14 +48,11 @@ export type Convenio = {
 /**
  * O que a clínica oferece e quanto cobra pela consulta de avaliação.
  *
- * É uma lista só, e não uma lista de procedimentos mais uma tabela de preços:
- * duas listas que precisam concordar sobre quais procedimentos existem é como
- * a divergência começa. Estar aqui já quer dizer que a clínica oferece.
+ * Estar aqui já quer dizer que a clínica oferece o procedimento. Nada além
+ * disso: o sistema não guarda nem exibe valor de nada nem de ninguém.
  */
 export type ProcedimentoDaClinica = {
   especialidadeId: number;
-  /** Em reais. Nulo quando a avaliação é gratuita nesta clínica. */
-  valorConsulta: number | null;
 };
 
 export type Clinica = {
@@ -77,8 +74,6 @@ export type Clinica = {
   procedimentos: ProcedimentoDaClinica[];
 
   // Comercial e condições
-  /** Em reais. Nulo em cliente que ainda não tem histórico de venda. */
-  ticketMedio: number | null;
   parcelasMaximas: number;
   formasPagamento: FormaPagamento[];
   convenios: Convenio[];
@@ -103,7 +98,10 @@ export function nomeDaClinica(id: number) {
 }
 
 /** O procedimento na clínica. Nulo quando ela não oferece. */
-export function procedimentoDaClinica(clinica: Clinica, especialidadeId: number) {
+export function procedimentoDaClinica(
+  clinica: Clinica,
+  especialidadeId: number,
+) {
   return (
     clinica.procedimentos.find((p) => p.especialidadeId === especialidadeId) ??
     null

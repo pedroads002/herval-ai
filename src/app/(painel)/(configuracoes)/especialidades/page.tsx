@@ -6,7 +6,7 @@ export default function PaginaEspecialidades() {
     <>
       <Cabecalho
         titulo="Especialidades"
-        descricao="Categorias de atendimento, valor da avaliação e como a IA deve falar de cada uma."
+        descricao="Categorias de atendimento, duração e como a IA deve falar de cada uma."
       />
       <ListaEspecialidades />
     </>

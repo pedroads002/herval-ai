@@ -24,9 +24,9 @@ export const modosAtendimento: {
 export const modoInicial: ModoAtendimento = "Todo lead";
 
 /**
- * A ficha da clínica — história, diferenciais, ticket médio, formas de
- * pagamento, público-alvo, endereço e horário — não mora mais aqui: virou
- * campo de cada cliente em `clinicas.ts`.
+ * A ficha da clínica — história, diferenciais, formas de pagamento,
+ * público-alvo, endereço e horário — não mora mais aqui: virou campo de cada
+ * cliente em `clinicas.ts`.
  *
  * Enquanto morava neste arquivo, existia uma ficha só para doze clientes: a
  * história da Corpus Harmonia e a da Dra. Helena Braga eram a mesma frase.
