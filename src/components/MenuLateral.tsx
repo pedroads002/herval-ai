@@ -29,7 +29,7 @@ const itens = [
   { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
   { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
   { href: "/regua-automacao", rotulo: "Régua de Automação", Icone: Workflow },
-  { href: "/profissionais", rotulo: "Profissionais", Icone: Stethoscope },
+  { href: "/clientes", rotulo: "Clientes", Icone: Stethoscope },
   { href: "/especialidades", rotulo: "Especialidades", Icone: ClipboardList },
   { href: "/estrategia", rotulo: "Estratégia da Clínica", Icone: Building2 },
   { href: "/objecoes", rotulo: "Quebra de Objeções", Icone: MessageSquareWarning },

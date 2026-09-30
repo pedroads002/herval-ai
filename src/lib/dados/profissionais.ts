@@ -1,5 +1,5 @@
 /**
- * A via de leitura da seção Profissionais — a segunda parte do painel que lê o
+ * A via de leitura da seção Clientes — a segunda parte do painel que lê o
  * banco em vez de arquivo fixo.
  *
  * Mesmo recorte do Atendimento, e pelo mesmo motivo: `src/data/profissionais.ts`
@@ -9,13 +9,14 @@
  *
  * Vocabulário, igual ao do banco:
  *
- *   CLIENTE      uma linha em `clinicas`. Sempre uma por cliente, tenha ele dez
- *                unidades ou nenhuma.
+ *   CLIENTE      uma linha em `clinicas` — a entidade-pai. Pode ser um
+ *                profissional que atende sozinho ou uma clínica com equipe.
  *   UNIDADE      um lugar físico do cliente. Todo cliente tem no mínimo uma.
- *   PROFISSIONAL a pessoa que atende, em uma ou mais unidades.
+ *   PROFISSIONAL a pessoa que atende, em uma ou mais unidades do cliente.
+ *   PROCEDIMENTO uma linha em `especialidades`, ligada a cada profissional.
  *
- * Roda apenas no servidor. Quem chama é o componente de servidor de
- * `/profissionais`.
+ * Roda apenas no servidor. Quem chama são os componentes de servidor de
+ * `/clientes` e `/clientes/[id]`.
  */
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
@@ -28,13 +29,24 @@ export {
   type TipoDeProfissional,
 } from "@/lib/dados/tiposDeProfissional";
 
-/** Uma especialidade, do jeito que a tela precisa mostrar. */
+/**
+ * Um procedimento, do jeito que a tela precisa mostrar.
+ *
+ * No banco a tabela se chama `especialidades` e continua com esse nome — as
+ * telas de Estratégia e de Especialidades leem de lá. O que mudou foi a
+ * palavra na tela do cadastro, que passou a dizer "procedimento", que é como a
+ * agência fala. Renomear a tabela para acompanhar o rótulo derrubaria as duas
+ * outras telas sem nada em troca.
+ */
 export type EspecialidadeDoCadastro = {
   id: number;
   nome: string;
   /** Inativa aparece riscada, como já aparecia antes. */
   ativa: boolean;
 };
+
+/** Como o cliente opera. É a resposta da primeira pergunta do cadastro. */
+export type TipoDeOperacao = "individual" | "equipe";
 
 /** Uma unidade, já sabendo de que cliente ela é. */
 export type UnidadeDoCadastro = {
@@ -45,17 +57,61 @@ export type UnidadeDoCadastro = {
   clienteNome: string;
 };
 
-/** Um cliente com as unidades dele. É este o agrupamento do "onde atende". */
+/**
+ * Um cliente: a entidade-pai do cadastro.
+ *
+ * É uma linha em `clinicas`, tanto para quem atende sozinho quanto para uma
+ * clínica com equipe — o que separa os dois é `tipoOperacao`, e não duas
+ * tabelas. Quem atende sozinho é um cliente com um profissional só, e tratá-lo
+ * como outra coisa obrigaria toda leitura do sistema a perguntar em qual das
+ * duas tabelas procurar.
+ */
 export type ClienteDoCadastro = {
   id: number;
   nome: string;
   ativa: boolean;
+  tipoOperacao: TipoDeOperacao;
+  /** Como o cliente deve ser chamado. Vazio quando ninguém informou. */
+  nomeExibicao: string;
+  /** Só faz sentido em clínica: quem responde pela operação. */
+  responsavelPrincipal: string;
+  areaAtuacao: string;
+  whatsapp: string;
+  email: string;
+  instagram: string;
+  cidade: string;
+  estado: string;
+  endereco: string;
+  descricao: string;
   unidades: UnidadeDoCadastro[];
+  /** Quem atende neste cliente. Vazio é possível e não é defeito. */
+  profissionais: ProfissionalCadastrado[];
 };
 
 export type ProfissionalCadastrado = {
   id: number;
   nome: string;
+  /** Como a pessoa deve ser chamada na conversa. Vazio cai de volta no nome. */
+  nomeExibicao: string;
+  /** O que a pessoa faz principalmente. Texto livre: "Ortodontia", "Botox". */
+  especialidadePrincipal: string;
+  /**
+   * O procedimento que não estava na lista, digitado à mão.
+   *
+   * Fica em texto solto, e não vira linha nova no catálogo, de propósito:
+   * catálogo alimentado por digitação de formulário enche de variações da
+   * mesma coisa ("Botox", "botox", "Toxina botulínica") e ninguém depois
+   * consegue dizer quantos profissionais fazem aquilo.
+   */
+  procedimentoOutro: string;
+  /**
+   * De qual cliente esta pessoa é.
+   *
+   * Sai da unidade onde ela atende, que é o vínculo que já existia. Nulo é
+   * possível só para quem foi gravado sem unidade nenhuma — o cadastro pela
+   * tela não deixa isso acontecer.
+   */
+  clienteId: number | null;
   /**
    * Não é o tipo fechado, e sim o que está gravado.
    *
@@ -97,6 +153,9 @@ const SEM_DADOS: DadosDosProfissionais = {
 type LinhaProfissional = {
   id: number;
   nome: string | null;
+  nome_exibicao: string | null;
+  especialidade_principal: string | null;
+  procedimento_outro: string | null;
   tipo: string | null;
   registro: string | null;
   ativo: boolean;
@@ -113,7 +172,24 @@ type LinhaCliente = {
   id: number;
   nome: string | null;
   ativa: boolean;
+  tipo_operacao: string | null;
+  nome_exibicao: string | null;
+  responsavel_principal: string | null;
+  area_atuacao: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  instagram: string | null;
+  cidade: string | null;
+  estado: string | null;
+  endereco: string | null;
+  descricao: string | null;
 };
+
+const COLUNAS_DO_CLIENTE =
+  "id, nome, ativa, tipo_operacao, nome_exibicao, responsavel_principal, area_atuacao, whatsapp, email, instagram, cidade, estado, endereco, descricao";
+
+const COLUNAS_DO_PROFISSIONAL =
+  "id, nome, nome_exibicao, especialidade_principal, procedimento_outro, tipo, registro, ativo";
 
 type LinhaEspecialidade = {
   id: number;
@@ -162,11 +238,11 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
   ] = await Promise.all([
     supabase
       .from("profissionais")
-      .select("id, nome, tipo, registro, ativo")
+      .select(COLUNAS_DO_PROFISSIONAL)
       .order("nome", { ascending: true }),
     supabase
       .from("clinicas")
-      .select("id, nome, ativa")
+      .select(COLUNAS_DO_CLIENTE)
       .order("nome", { ascending: true }),
     supabase
       .from("unidades")
@@ -182,7 +258,9 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     supabase
       .from("profissional_especialidades")
       .select("profissional_id, especialidade_id"),
-    supabase.from("profissional_unidades").select("profissional_id, unidade_id"),
+    supabase
+      .from("profissional_unidades")
+      .select("profissional_id, unidade_id"),
   ]);
 
   const erro =
@@ -220,13 +298,6 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
 
   const unidadePorId = new Map(unidades.map((u) => [u.id, u]));
 
-  const clientes: ClienteDoCadastro[] = clientesCrus.map((linha) => ({
-    id: linha.id,
-    nome: nomesDeCliente.get(linha.id) ?? "Cliente sem nome",
-    ativa: linha.ativa,
-    unidades: unidades.filter((u) => u.clienteId === linha.id),
-  }));
-
   const especialidades: EspecialidadeDoCadastro[] = (
     (respostaEspecialidades.data ?? []) as LinhaEspecialidade[]
   ).map((linha) => ({
@@ -250,21 +321,78 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
 
   const profissionais: ProfissionalCadastrado[] = (
     (respostaProfissionais.data ?? []) as LinhaProfissional[]
-  ).map((linha) => ({
-    id: linha.id,
-    nome: nomeOu(linha.nome, "Sem nome"),
-    tipo: nomeOu(linha.tipo, "Cargo não informado"),
-    registro: (linha.registro ?? "").trim(),
-    ativo: linha.ativo,
-    especialidades: (especialidadesPorProfissional.get(linha.id) ?? [])
-      .map((v) => especialidadePorId.get(v.especialidade_id as number))
-      .filter((e): e is EspecialidadeDoCadastro => e !== undefined),
-    unidades: (unidadesPorProfissional.get(linha.id) ?? [])
+  ).map((linha) => {
+    const unidadesDele = (unidadesPorProfissional.get(linha.id) ?? [])
       .map((v) => unidadePorId.get(v.unidade_id as number))
-      .filter((u): u is UnidadeDoCadastro => u !== undefined),
+      .filter((u): u is UnidadeDoCadastro => u !== undefined);
+
+    return {
+      id: linha.id,
+      nome: nomeOu(linha.nome, "Sem nome"),
+      nomeExibicao: (linha.nome_exibicao ?? "").trim(),
+      especialidadePrincipal: (linha.especialidade_principal ?? "").trim(),
+      procedimentoOutro: (linha.procedimento_outro ?? "").trim(),
+      tipo: nomeOu(linha.tipo, "Área não informada"),
+      registro: (linha.registro ?? "").trim(),
+      ativo: linha.ativo,
+      // De qual cliente a pessoa é: sai da unidade onde ela atende. Quem tem
+      // mais de uma unidade tem todas do mesmo cliente, então a primeira
+      // responde.
+      clienteId: unidadesDele[0]?.clienteId ?? null,
+      especialidades: (especialidadesPorProfissional.get(linha.id) ?? [])
+        .map((v) => especialidadePorId.get(v.especialidade_id as number))
+        .filter((e): e is EspecialidadeDoCadastro => e !== undefined),
+      unidades: unidadesDele,
+    };
+  });
+
+  const clientes: ClienteDoCadastro[] = clientesCrus.map((linha) => ({
+    id: linha.id,
+    nome: nomesDeCliente.get(linha.id) ?? "Cliente sem nome",
+    ativa: linha.ativa,
+    tipoOperacao:
+      linha.tipo_operacao === "individual" ? "individual" : "equipe",
+    nomeExibicao: (linha.nome_exibicao ?? "").trim(),
+    responsavelPrincipal: (linha.responsavel_principal ?? "").trim(),
+    areaAtuacao: (linha.area_atuacao ?? "").trim(),
+    whatsapp: (linha.whatsapp ?? "").trim(),
+    email: (linha.email ?? "").trim(),
+    instagram: (linha.instagram ?? "").trim(),
+    cidade: (linha.cidade ?? "").trim(),
+    estado: (linha.estado ?? "").trim(),
+    endereco: (linha.endereco ?? "").trim(),
+    descricao: (linha.descricao ?? "").trim(),
+    unidades: unidades.filter((u) => u.clienteId === linha.id),
+    profissionais: profissionais.filter((p) => p.clienteId === linha.id),
   }));
 
   return { profissionais, clientes, especialidades, falha: null };
+}
+
+export type DadosDeUmCliente = {
+  cliente: ClienteDoCadastro | null;
+  especialidades: EspecialidadeDoCadastro[];
+  falha: string | null;
+};
+
+/**
+ * Um cliente só, com os profissionais dele, para a tela de detalhe.
+ *
+ * Reaproveita a leitura da seção inteira em vez de montar consultas próprias.
+ * O cadastro tem dezenas de clientes, não milhares: buscar tudo e escolher um
+ * custa menos do que manter duas montagens do mesmo objeto, que é onde as duas
+ * telas começariam a discordar sobre o que um cliente é.
+ */
+export async function carregarCliente(id: number): Promise<DadosDeUmCliente> {
+  const { clientes, especialidades, falha } = await carregarProfissionais();
+
+  if (falha) return { cliente: null, especialidades: [], falha };
+
+  return {
+    cliente: clientes.find((c) => c.id === id) ?? null,
+    especialidades,
+    falha: null,
+  };
 }
 
 /** Junta uma lista de ligações por profissional, numa passada. */
