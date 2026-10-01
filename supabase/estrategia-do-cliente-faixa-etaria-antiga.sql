@@ -1,0 +1,30 @@
+-- ============================================================================
+-- Herval AI · derrubar a `faixa_etaria` antiga
+--
+-- >>> EXECUTADO em 01/10/2026, depois de a nova versão do workflow `Helô - base`
+-- >>> ser publicada (migração `estrategia_do_cliente_faixa_etaria_antiga`).
+-- >>> A condição abaixo era a razão de este arquivo existir separado; ela foi
+-- >>> cumprida antes de rodar, e o texto fica como registro da ordem.
+-- ============================================================================
+--
+-- `estrategia-do-cliente.sql` trocou a faixa etária de texto livre por duas
+-- idades (`faixa_etaria_de` e `faixa_etaria_ate`) e deixou a coluna de texto no
+-- lugar, de propósito.
+--
+-- O motivo é a ordem. A versão do workflow que está no ar ainda seleciona
+-- `c.faixa_etaria` no node `Contexto e Travas`. Derrubar a coluna antes de essa
+-- versão sair do ar faz a consulta do cérebro falhar com "column does not exist"
+-- no meio de uma conversa de paciente de verdade — e o jeito que isso apareceria
+-- não é um erro na tela de ninguém, é a Helô parando de responder.
+--
+-- A nova versão do node lê as duas colunas novas e já não cita a antiga. Ela foi
+-- publicada em 01/10/2026 (`activeVersionId` passou a ser
+-- `cf3058c2-2cd0-4bd1-927f-1164a3ee886a`), e só então esta coluna deixou de ser
+-- lida por alguém. Conferido antes de rodar: as quatro travas respondem igual ao
+-- que respondiam antes do publish, e campo vazio continua chegando como
+-- "(não cadastrado)".
+--
+-- Não há conteúdo para perder: a coluna está nula nas duas linhas de `clinicas`.
+-- ============================================================================
+alter table public.clinicas
+  drop column if exists faixa_etaria;

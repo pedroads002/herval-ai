@@ -8,6 +8,32 @@ contra `supabase/cerebro-ia.sql` — o banco já andou além daquele arquivo
 (`leads.atendimento_ia` e `clinicas.instancia_whatsapp` existem no banco e não
 no SQL).
 
+> **Este documento é de 23/09/2026 e o workflow andou depois dele.** Quando os
+> dois discordarem, **quem vale é o workflow `Helô - base` ao vivo**, não o texto
+> daqui. Em 30/09/2026, com a seção Estratégia do Cliente, o node
+> `Contexto e Travas` e o prompt do `Supervisor1` mudaram assim:
+>
+> - `c.tratamentos_oferecidos` saiu do `select`. A coluna foi derrubada do banco:
+>   não era lida nem aqui nem no painel. O trecho abaixo ainda a mostra — é o que
+>   o node tinha em 23/09, não o que ele tem hoje.
+> - `c.faixa_etaria` (texto) virou `c.faixa_etaria_de` e `c.faixa_etaria_ate`,
+>   duas idades.
+> - `formas_pagamento`, `classe_economica` e `principais_dores` viraram lista;
+>   `parcelamento` virou número; `convenios` virou jsonb com
+>   `{ nome, especialidade_ids }`.
+> - Por causa disso o node passou a devolver colunas `*_texto`
+>   (`formas_pagamento_texto`, `parcelamento_texto`, `convenios_texto`,
+>   `classe_economica_texto`, `faixa_etaria_texto`, `principais_dores_texto`,
+>   e os `sim/não` da avaliação), e é **essas** que o prompt interpola. Sem isso a
+>   Helô diria `{"Pix","Boleto"}` para o paciente em vez de `Pix, Boleto`.
+> - Entraram no prompt o objetivo do atendimento, a prioridade comercial, o tom,
+>   as observações e a política da avaliação. "Informações a evitar" e a política
+>   de valores ficaram na seção das travas, perto do topo — restrição no fim de um
+>   prompt longo é obedecida menos que restrição no começo.
+>
+> A migração que fez isso no banco está em `supabase/estrategia-do-cliente.sql`,
+> com o raciocínio de cada coluna.
+
 ---
 
 ## 1. Um node de contexto, não três de trava
