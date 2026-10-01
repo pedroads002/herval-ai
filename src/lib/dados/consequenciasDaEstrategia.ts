@@ -226,7 +226,7 @@ export function consequenciaDasObservacoes(texto: string): string {
   if (texto === "") {
     return "Nada registrado. É o campo para o que não cabe nos outros — se não houver nada, não falta nada.";
   }
-  return "A Helô lê isto na seção de como este cliente quer ser atendido, logo depois do objetivo.";
+  return "A Helô lê isto na seção de como este cliente quer ser atendido, depois do objetivo e da prioridade comercial.";
 }
 
 export function consequenciaDaHistoria(texto: string): string {
