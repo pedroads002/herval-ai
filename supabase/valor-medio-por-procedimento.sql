@@ -1,9 +1,9 @@
 -- ============================================================================
 -- Herval AI · valor médio no lugar do preço fechado
 --
--- >>> A PARTE 1 JÁ FOI EXECUTADA no banco em 01/10/2026. Este arquivo é o
--- >>> registro do que foi rodado. A PARTE 2 (derrubar `valor`) está AQUI DE
--- >>> PROPÓSITO E AINDA NÃO FOI RODADA — ver a condição logo abaixo dela.
+-- >>> AS DUAS PARTES JÁ FORAM EXECUTADAS no banco em 01/10/2026. Este arquivo é
+-- >>> o registro do que foi rodado. Depois da Parte 2 não existe mais nenhuma
+-- >>> coluna de preço fechado em lugar nenhum do banco.
 -- ============================================================================
 --
 -- A REGRA QUE MUDOU
@@ -47,7 +47,7 @@ comment on column clinica_especialidades.valor_medio_ate is
   'Limite superior da faixa de valor médio aproximado. Nunca preço fechado.';
 
 -- ----------------------------------------------------------------------------
--- PARTE 2 — derrubar o preço fechado (AINDA NÃO RODADA)
+-- PARTE 2 — derrubar o preço fechado (executada em 01/10/2026)
 -- ----------------------------------------------------------------------------
 --
 -- A coluna `valor` não é lida por nenhuma linha de código do painel. Quem a lê
@@ -59,11 +59,14 @@ comment on column clinica_especialidades.valor_medio_ate is
 -- consulta do n8n ainda apontando para ela faz a consulta falhar, e a Helô
 -- para de responder no meio das conversas.
 --
--- ESTADO EM 01/10/2026: a versão nova do workflow já está gravada no n8n — a
--- consulta lê `valor_medio_de` / `valor_medio_ate` e não menciona `ce.valor` em
--- lugar nenhum — mas AINDA NÃO FOI PUBLICADA. A versão no ar continua a antiga.
+-- A CONDIÇÃO ERA: o workflow `Helô - base` estar PUBLICADO (não só gravado) com
+-- a consulta lendo a faixa e sem nenhuma menção a `ce.valor`. Foi cumprida em
+-- 01/10/2026 — versão `20d8e593-d6e1-48c2-9377-465666adbc5d` publicada antes
+-- deste drop. A coluna tinha 0 linhas: nenhum dado foi perdido.
 --
--- CONDIÇÃO PARA RODAR: essa versão estar PUBLICADA (não só gravada). Enquanto a
--- versão ativa for a antiga, derrubar a coluna derruba a Helô.
+-- Os workflows de desenvolvimento, todos inativos (`Helô - base (dev -
+-- guardas)` e `Helô - Travas (dev)`), guardam cópias antigas dessa consulta e
+-- podem ainda citar `ce.valor`. Inativos não quebram nada em produção, mas vão
+-- falhar se alguém rodar à mão. Corrigir quando algum deles voltar a ser usado.
 
--- alter table clinica_especialidades drop column valor;
+alter table clinica_especialidades drop column valor;
