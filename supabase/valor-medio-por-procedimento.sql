@@ -51,16 +51,19 @@ comment on column clinica_especialidades.valor_medio_ate is
 -- ----------------------------------------------------------------------------
 --
 -- A coluna `valor` não é lida por nenhuma linha de código do painel. Quem a lê
--- é o cérebro: o node "Contexto e Travas" do workflow `Helô - base` monta
+-- é o cérebro: o node "Contexto e Travas" do workflow `Helô - base` montava
 -- `especialidades_ativas` com `'valor', ce.valor`, e o prompt do Supervisor1
--- formata aquilo como "R$ 950,00".
+-- formatava aquilo como "R$ 950,00".
 --
 -- Por isso esta parte NÃO pode rodar antes da outra: derrubar a coluna com a
 -- consulta do n8n ainda apontando para ela faz a consulta falhar, e a Helô
 -- para de responder no meio das conversas.
 --
--- CONDIÇÃO PARA RODAR: o workflow `Helô - base` já estar publicado com a
--- consulta lendo `valor_medio_de` / `valor_medio_ate` e sem nenhuma menção a
--- `ce.valor`.
+-- ESTADO EM 01/10/2026: a versão nova do workflow já está gravada no n8n — a
+-- consulta lê `valor_medio_de` / `valor_medio_ate` e não menciona `ce.valor` em
+-- lugar nenhum — mas AINDA NÃO FOI PUBLICADA. A versão no ar continua a antiga.
+--
+-- CONDIÇÃO PARA RODAR: essa versão estar PUBLICADA (não só gravada). Enquanto a
+-- versão ativa for a antiga, derrubar a coluna derruba a Helô.
 
 -- alter table clinica_especialidades drop column valor;

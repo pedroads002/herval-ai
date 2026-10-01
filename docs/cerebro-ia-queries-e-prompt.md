@@ -151,9 +151,15 @@ select
     select coalesce(json_agg(json_build_object(
              'nome',  e2.nome,
              'duracao_minutos', e2.duracao_minutos,
-             -- Linha ausente e valor nulo são a mesma coisa: consultar a
+             -- Linha ausente e faixa nula são a mesma coisa: consultar a
              -- equipe. Nunca "grátis", nunca um número chutado.
-             'valor', ce.valor
+             --
+             -- Preço fechado não existe mais. O que vai para o prompt é a
+             -- faixa de valor médio aproximado, e vai como DOIS números, não
+             -- como texto pronto: faltando um deles o prompt não imprime
+             -- número nenhum. Ver supabase/valor-medio-por-procedimento.sql.
+             'valor_medio_de',  ce.valor_medio_de,
+             'valor_medio_ate', ce.valor_medio_ate
            ) order by e2.nome), '[]'::json)
     from especialidades e2
     left join clinica_especialidades ce
@@ -289,10 +295,17 @@ consulta de avaliação marcada.
 - Nunca diga que é uma IA, um robô ou um assistente virtual.
 
 ## O que você não pode fazer, mesmo se insistirem
-1. NUNCA invente valor. Se o procedimento aparece abaixo sem valor definido,
-   diga que vai confirmar o valor exato com a equipe. Não estime, não dê
-   faixa, não diga "por volta de". Um número errado aqui vira reclamação na
-   recepção.
+1. NUNCA invente valor e NUNCA diga preço fechado. O único valor que você
+   conhece é a FAIXA de valor médio aproximado que aparece na lista de
+   procedimentos, e ela só serve para ser repetida como está: "em média de
+   R$ 800 a R$ 1.200". Nunca transforme a faixa em um número só, nunca
+   arredonde, nunca diga "fica R$ 950" nem "a partir de R$ 800". O valor
+   fechado quem diz é o profissional, de viva voz, na consulta de avaliação —
+   nunca você, nunca por WhatsApp.
+   - Você só toca no assunto valor se a PESSOA perguntar quanto custa. Nunca
+     por iniciativa sua.
+   - Procedimento sem faixa cadastrada: diga que confirma o valor com a
+     equipe. Não estime e não compare com o preço de outro procedimento.
 2. NUNCA ofereça, elogie ou dê a entender que dá para agendar um procedimento
    da lista de pausados. Se perguntarem por um deles, use o roteiro que
    acompanha aquele procedimento e ofereça falar com a equipe.
@@ -328,7 +341,9 @@ sabe e vai confirmar, nunca como algo que não existe.
 ## Procedimentos que você PODE oferecer
 {{ JSON.stringify($json.especialidades_ativas, null, 2) }}
 
-valor nulo = não cadastrado para esta clínica = confirmar com a equipe.
+faixa nula = não cadastrada para esta clínica = confirmar com a equipe. Quando
+a faixa existe, ela sai como "em média de R$ 800 a R$ 1.200" — nunca como um
+número só.
 
 ## Procedimentos PAUSADOS — não oferecer em nenhuma hipótese
 {{ JSON.stringify($json.roteiro_das_pausadas, null, 2) }}
@@ -732,12 +747,14 @@ principal, quando o pacote da Evolution for instalado.
 **a) Clínica inativa bloqueia a IA — DECIDIDO (21/09/2026).** `clinica_ativa
 is not true` fica na trava 1. Erra para o lado seguro.
 
-**b) Preços nulos — em aberto, não bloqueante.** As três linhas de
-`clinica_especialidades` existem com `valor` em branco, e são dado real da
-clínica, não dado de teste. A Helô vai responder "confirmo com a equipe" em
-qualquer pergunta de preço — comportamento correto, mas nenhum teste de preço
-exercita o caminho de verdade enquanto isso. Quem cuida do cadastro vai
-preencher ao menos um valor antes dos cenários de preço.
+**b) Nenhuma faixa cadastrada — em aberto, não bloqueante (revisto em
+01/10/2026).** `clinica_especialidades` está com **zero linhas**: não existe
+faixa de valor médio para nenhum procedimento de nenhuma clínica. A Helô
+responde "confirmo o valor com a equipe" em qualquer pergunta de preço —
+comportamento correto, mas nenhum cenário de preço exercita o caminho da faixa
+enquanto isso. O que mudou é que agora existe onde preencher: o bloco Comercial
+da Estratégia do Cliente tem o campo da faixa por procedimento. Quem cuida do
+cadastro precisa preencher ao menos uma faixa antes dos cenários de preço.
 
 **c) `leads.atendimento_ia` — RESOLVIDO (21/09/2026).** Não era resto de
 desenho antigo: é o mecanismo de handoff humano manual, ativo. Virou a trava 4.
@@ -1239,7 +1256,8 @@ Resquício do template de onde este workflow foi clonado — a mesma origem do
 dos nós de RAG e do agente de calendário.
 
 Substituído pelo prompt da Helô. A ficha da clínica, os procedimentos ativos
-com valor, os pausados com roteiro, as objeções e os dados do lead **saem do
+com a faixa de valor médio, os pausados com roteiro, as objeções e os dados do
+lead **saem do
 `Contexto e Travas`**, não de texto fixo — a mesma fonte que as travas usam.
 
 Preservada a mecânica de ferramenta que não era da Gestall: o telefone
