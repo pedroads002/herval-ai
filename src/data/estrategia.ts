@@ -1,3 +1,17 @@
+/**
+ * >>> Ninguém importa este arquivo hoje, e isso é de propósito.
+ *
+ * O "Modo de atendimento da IA" morava na tela de Estratégia. Quando ela virou
+ * "Estratégia do Cliente", o modo saiu: ele não é estratégia comercial de
+ * cliente nenhum, é uma chave de operação da Helô — e ainda não foi decidido se
+ * a casa dele é Teste da IA, Régua de Automação ou Templates do WhatsApp.
+ *
+ * Fica aqui parado até essa decisão. Não foi apagado porque a chave existe de
+ * verdade: é `clinicas.modo_atendimento`, e é ela que a primeira trava do
+ * cérebro lê para decidir se a Helô responde. Apagar a lista daqui obrigaria a
+ * reescrevê-la igual quando a tela nova aparecer.
+ */
+
 /** Como a IA atua na base de leads. */
 export type ModoAtendimento =
   | "Pausada"
