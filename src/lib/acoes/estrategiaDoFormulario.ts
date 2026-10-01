@@ -498,7 +498,7 @@ function lerFaixasDeValor(
     */
     if (de.valor === ate.valor) {
       return {
-        erro: "Uma faixa ficou com os dois limites iguais, e isso é preço fechado, não média. Se o valor varia pouco, use uma margem — R$ 900 a R$ 1.000.",
+        erro: "Uma faixa ficou com os dois limites iguais, e isso é preço fechado, não média. Se o valor varia pouco, use uma margem — em média de R$ 900 a R$ 950.",
       };
     }
 

@@ -1310,7 +1310,7 @@ function problemaDaFaixa(par: { de: string; ate: string }): string | null {
 
   if (de === "" && ate === "") return null;
   if (de === "" || ate === "") {
-    return "Falta o outro limite. Uma ponta só vira “a partir de”, que não é média.";
+    return "Falta o outro limite. A frase precisa dos dois para sair como “em média de R$ 900 a R$ 950”.";
   }
 
   const numeroDe = Number(de);

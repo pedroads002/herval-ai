@@ -18,11 +18,11 @@ export function formatarNumero(valor: number) {
  * código, a primeira tela apressada volta a imprimir preço fechado. Aqui não
  * tem como — faltaria metade do argumento.
  *
- * O "cerca de" é parte do dado, não enfeite: sem ele a frase vira cotação, e
+ * O "em média de" é parte do dado, não enfeite: sem ele a frase vira cotação, e
  * cotação fora da consulta de avaliação é exatamente o que não pode existir.
  */
 export function formatarFaixaDeValorMedio(de: number, ate: number) {
-  return `cerca de R$ ${numero.format(de)} a R$ ${numero.format(ate)}`;
+  return `em média de R$ ${numero.format(de)} a R$ ${numero.format(ate)}`;
 }
 
 /** 40 vira "40 min"; 50 vira "50 min"; 90 vira "1h30". */
