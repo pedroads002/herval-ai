@@ -23,16 +23,24 @@ import {
   type ClienteDoSeletor,
   type FichaDaEstrategia,
   type LinhaDaClinica,
+  type ProcedimentoDoCatalogo,
 } from "@/lib/dados/fichaDaEstrategia";
 
-export type { ClienteDoSeletor, FichaDaEstrategia };
+export type { ClienteDoSeletor, FichaDaEstrategia, ProcedimentoDoCatalogo };
 
 export type DadosDaEstrategia = {
   clientes: ClienteDoSeletor[];
   ficha: FichaDaEstrategia | null;
-  /** Nome de cada procedimento citado em convênio, por id. */
-  nomesDeProcedimentos: Map<number, string>;
+  /** O catálogo inteiro: é dele que sai o que marcar em cada convênio. */
+  procedimentos: ProcedimentoDoCatalogo[];
+  /**
+   * A frase que aparece na tela quando não deu para ler. Em português de
+   * gente — nada de "Supabase" nem de "banco", que são palavras de quem
+   * construiu o painel e não de quem o usa.
+   */
   falha: string | null;
+  /** O erro técnico de verdade, em letra miúda, para quem for investigar. */
+  detalheTecnico: string | null;
   aviso: string | null;
 };
 
@@ -42,8 +50,9 @@ const TETO_DE_LINHAS = 1000;
 const SEM_DADOS: DadosDaEstrategia = {
   clientes: [],
   ficha: null,
-  nomesDeProcedimentos: new Map(),
+  procedimentos: [],
   falha: null,
+  detalheTecnico: null,
   aviso: null,
 };
 
@@ -70,7 +79,10 @@ export async function carregarEstrategiaDoCliente(
   if (!supabaseConfigurado()) {
     return {
       ...SEM_DADOS,
-      falha: "O Supabase não está configurado neste ambiente.",
+      falha:
+        "Esta cópia do painel não está ligada aos dados, então não há estratégia para mostrar.",
+      detalheTecnico:
+        "As variáveis de ambiente do Supabase não estão definidas neste ambiente.",
     };
   }
 
@@ -85,7 +97,9 @@ export async function carregarEstrategiaDoCliente(
   if (respostaDosClientes.error) {
     return {
       ...SEM_DADOS,
-      falha: `Não deu para ler a estratégia: ${respostaDosClientes.error.message}`,
+      falha:
+        "Não deu para abrir a estratégia agora. Tente de novo em instantes; se continuar, avise quem cuida do painel.",
+      detalheTecnico: respostaDosClientes.error.message,
     };
   }
 
@@ -119,54 +133,53 @@ export async function carregarEstrategiaDoCliente(
 
   if (linhas.length >= TETO_DE_LINHAS) {
     avisos.push(
-      `O seletor está mostrando no máximo ${TETO_DE_LINHAS} clientes. Nada foi perdido no banco, mas esta lista não está completa.`,
+      `O seletor está mostrando no máximo ${TETO_DE_LINHAS} clientes. Nada foi perdido, mas esta lista não está completa.`,
     );
   }
 
   /*
-    A segunda leitura depende da primeira: só busca nome de procedimento se
-    algum convênio citar algum. Cliente sem convênio não paga uma consulta a
-    mais para não usar o resultado.
+    O catálogo inteiro, e não só os procedimentos citados nos convênios de hoje.
+
+    Enquanto a tela só lia, bastava buscar o nome dos ids citados. Agora ela
+    edita: para marcar quais procedimentos um convênio cobre é preciso oferecer
+    todos os que existem. `especialidades` é catálogo global, sem `clinica_id`,
+    então é uma leitura só para qualquer cliente.
+
+    Falhar aqui não esconde a estratégia inteira — é detalhe do bloco de
+    convênios. O convênio aparece com o aviso, e o resto continua de pé.
   */
-  const idsCitados = [
-    ...new Set(
-      ficha.convenios.flatMap((convenio) => convenio.especialidadeIds),
-    ),
-  ];
+  const respostaDosProcedimentos = await supabase
+    .from("especialidades")
+    .select("id, nome, ativa")
+    .order("nome", { ascending: true })
+    .limit(TETO_DE_LINHAS);
 
-  const nomesDeProcedimentos = new Map<number, string>();
+  const procedimentos: ProcedimentoDoCatalogo[] = [];
 
-  if (idsCitados.length > 0) {
-    const respostaDosProcedimentos = await supabase
-      .from("especialidades")
-      .select("id, nome")
-      .in("id", idsCitados);
-
-    if (respostaDosProcedimentos.error) {
-      // Nome de procedimento é detalhe do bloco de convênios, não a tela toda.
-      // Falhar aqui não pode esconder a estratégia inteira: o convênio aparece
-      // com o aviso de que o nome não veio, e o resto continua de pé.
-      avisos.push(
-        "Não deu para ler o nome dos procedimentos cobertos pelos convênios.",
-      );
-    } else {
-      for (const procedimento of (respostaDosProcedimentos.data ?? []) as {
-        id: number;
-        nome: string | null;
-      }[]) {
-        nomesDeProcedimentos.set(
-          procedimento.id,
-          (procedimento.nome ?? "").trim() || "Sem nome",
-        );
-      }
+  if (respostaDosProcedimentos.error) {
+    avisos.push(
+      "Não deu para ler a lista de procedimentos. Os convênios aparecem sem o nome do que cobrem, e não dá para mudá-los agora.",
+    );
+  } else {
+    for (const procedimento of (respostaDosProcedimentos.data ?? []) as {
+      id: number;
+      nome: string | null;
+      ativa: boolean | null;
+    }[]) {
+      procedimentos.push({
+        id: procedimento.id,
+        nome: (procedimento.nome ?? "").trim() || "Sem nome",
+        ativa: procedimento.ativa === true,
+      });
     }
   }
 
   return {
     clientes,
     ficha,
-    nomesDeProcedimentos,
+    procedimentos,
     falha: null,
+    detalheTecnico: null,
     aviso: avisos.length > 0 ? avisos.join(" ") : null,
   };
 }

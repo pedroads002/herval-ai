@@ -16,6 +16,28 @@
  * lugares, e é por isso que o SQL cita este arquivo no comentário dele.
  */
 
+/**
+ * Os cinco blocos da estratégia, na ordem da migração.
+ *
+ * Moram aqui, e não no arquivo que lê o formulário, porque três lados precisam
+ * do mesmo nome: a tela, para saber qual cartão está sendo editado; a contagem
+ * de completude, para dizer em que bloco está o que falta; e a gravação, para
+ * saber quais colunas aquele envio tem o direito de tocar.
+ *
+ * Esse último é o motivo de existirem nomes de bloco em vez de um formulário
+ * único: cada cartão grava sozinho, e um envio que trouxesse só o bloco 1
+ * apagaria os outros quatro se a gravação não soubesse se conter.
+ */
+export const BLOCOS_DA_ESTRATEGIA = [
+  "objetivo",
+  "avaliacao",
+  "comercial",
+  "publico",
+  "comunicacao",
+] as const;
+
+export type BlocoDaEstrategia = (typeof BLOCOS_DA_ESTRATEGIA)[number];
+
 export const OBJETIVOS_DE_ATENDIMENTO = [
   "Agendar avaliação",
   "Agendar consulta",
@@ -155,6 +177,19 @@ export type FichaDaEstrategia = {
   */
   endereco: string;
   horarioDeFuncionamento: string;
+};
+
+/**
+ * Um procedimento do catálogo, como a tela o oferece em convênio.
+ *
+ * Mora aqui, e não no módulo que lê o banco, porque a tela precisa do tipo: um
+ * componente de cliente que importasse de `estrategiaDoCliente.ts` arrastaria o
+ * cliente do Supabase para dentro do navegador.
+ */
+export type ProcedimentoDoCatalogo = {
+  id: number;
+  nome: string;
+  ativa: boolean;
 };
 
 /** Um cliente na lista do seletor. Só o necessário para escolher. */

@@ -46,7 +46,7 @@ export default async function PaginaEstrategia({
       ? numero
       : null;
 
-  const { clientes, ficha, nomesDeProcedimentos, falha, aviso } =
+  const { clientes, ficha, procedimentos, falha, detalheTecnico, aviso } =
     await carregarEstrategiaDoCliente(clienteId);
 
   return (
@@ -59,10 +59,9 @@ export default async function PaginaEstrategia({
       <FormularioEstrategia
         clientes={clientes}
         ficha={ficha}
-        // Vira objeto simples porque a tela só faz consulta por id, e objeto é o
-        // que o resto dos componentes já recebe. A busca é a mesma.
-        nomesDeProcedimentos={Object.fromEntries(nomesDeProcedimentos)}
+        procedimentos={procedimentos}
         falha={falha}
+        detalheTecnico={detalheTecnico}
       />
     </>
   );
