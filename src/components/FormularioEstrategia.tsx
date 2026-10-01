@@ -709,7 +709,7 @@ function BlocoAvaliacao({
     <Cartao
       bloco="avaliacao"
       titulo="Avaliação / Consulta"
-      explicacao="O que vem antes do procedimento. São regras, não preço: nenhum campo aqui guarda valor, e nenhuma combinação deles autoriza a Helô a dizer um número."
+      explicacao="O que vem antes do procedimento. São regras, não preço: nenhum campo aqui guarda valor, e nenhuma combinação deles faz a Helô fechar um número — fechar valor é da consulta de avaliação."
       blocoAberto={blocoAberto}
       aoEditar={aoEditar}
       aoFechar={aoFechar}
@@ -874,8 +874,8 @@ function FormAvaliacao({
         )}
       />
       <p className="text-xs font-medium text-black/45">
-        Mesmo em &ldquo;sim&rdquo;, a Helô não diz número: ela confirma com a
-        equipe. Esta chave só decide se ela entra no assunto.
+        Mesmo em &ldquo;sim&rdquo;, a Helô não fecha número: no máximo uma
+        média, se perguntarem. Esta chave só decide se ela entra no assunto.
       </p>
     </FormularioDoBloco>
   );

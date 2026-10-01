@@ -103,7 +103,7 @@ export function consequenciaDaGratuidade(valor: boolean | null): string {
   if (valor === null) return EM_BRANCO;
   return valor
     ? "A Helô pode afirmar que a avaliação é gratuita. É a única coisa sobre dinheiro que ela afirma sem consultar a equipe."
-    : "A Helô diz que a avaliação é cobrada, e que a equipe confirma o valor. Ela não diz o valor, nem uma faixa.";
+    : "A Helô diz que a avaliação é cobrada, e que a equipe confirma o valor. Ela não fecha número por conta própria.";
 }
 
 const POR_QUANDO_COBRADA: Record<QuandoCobrada, string> = {
@@ -129,16 +129,19 @@ export function consequenciaDoAbatimento(valor: boolean | null): string {
 /*
   Valor é o ponto mais sensível do prompt, e as duas linhas (política e
   permissão) estão juntas na regra 2 da seção de travas, perto do topo. O prompt
-  é explícito: essas duas linhas só APERTAM a regra "nunca invente valor", nunca
-  a soltam. Nenhuma combinação daqui autoriza a Helô a dizer um número.
+  é explícito: essas duas linhas só APERTAM a regra 1, nunca a soltam. E a regra
+  1 é um piso igual para todo cliente: média aproximada só se o paciente
+  perguntar, nunca oferecida; valor fechado nunca antes da consulta de avaliação.
+  Nenhuma combinação daqui autoriza a Helô a fechar um número — no máximo aperta
+  até ela não falar de valor nenhum.
 */
 const POR_POLITICA: Record<PoliticaDeValores, string> = {
   "Pode informar":
-    "A Helô pode entrar no assunto valor, mas o número exato continua vindo da equipe: ela confirma, não cota.",
+    "A Helô pode entrar no assunto valor e, se perguntarem, passar uma média. Fechar o número, não: isso é da consulta de avaliação.",
   "Só a partir de":
     "A Helô pode falar em “a partir de”, sem fechar número — quem fecha é a equipe.",
   "Só se perguntarem":
-    "A Helô não traz valor por conta própria. Se a pessoa perguntar, ela responde que confirma com a equipe.",
+    "A Helô não traz valor por conta própria. Se a pessoa perguntar, ela pode passar uma média; o valor fechado fica para a avaliação.",
   "Não informa antes da avaliação":
     "A Helô não fala de valor antes da avaliação: nem número, nem faixa, nem “a partir de”. O assunto fica para depois.",
 };
@@ -149,7 +152,7 @@ export function consequenciaDaPoliticaDeValores(
 ): string {
   const base =
     politica === null
-      ? "Sem política cadastrada, vale só a regra de sempre: a Helô nunca inventa valor e manda confirmar com a equipe."
+      ? "Sem política cadastrada, vale só a regra de sempre: média aproximada apenas se a pessoa perguntar, e valor fechado só na consulta de avaliação."
       : POR_POLITICA[politica];
 
   if (podeInformarValor === false) {
