@@ -1027,7 +1027,24 @@ function FormComercial({
           max={PARCELAMENTO_MAXIMO}
           placeholder="Ex.: 12"
           value={parcelamento}
-          onChange={(e) => setParcelamento(e.target.value)}
+          onChange={(e) => {
+            /*
+              Só aceita o que a gravação aceitaria: vazio, ou um inteiro de 1
+              a PARCELAMENTO_MAXIMO. Quem digitar "30" para no "3" — a tecla
+              que passaria do limite é ignorada, e o campo nunca mostra um
+              número que o banco vai recusar. Recusar a tecla, e não corrigir
+              depois, é o que evita a prévia prometer "até 30x".
+            */
+            const texto = e.target.value;
+            if (texto === "") {
+              setParcelamento("");
+              return;
+            }
+            if (!/^\d+$/.test(texto)) return;
+            const numero = Number(texto);
+            if (numero < 1 || numero > PARCELAMENTO_MAXIMO) return;
+            setParcelamento(texto);
+          }}
           className={`${campoBase} max-w-40`}
         />
         <Consequencia

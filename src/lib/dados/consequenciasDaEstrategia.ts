@@ -21,6 +21,7 @@
  * então o branco também tem consequência, e ela precisa aparecer.
  */
 
+import { PARCELAMENTO_MAXIMO } from "@/lib/dados/fichaDaEstrategia";
 import type {
   FichaDaEstrategia,
   ObjetivoDeAtendimento,
@@ -175,6 +176,17 @@ export function consequenciaDasFormasDePagamento(
 
 export function consequenciaDoParcelamento(valor: number | null): string {
   if (valor === null) return EM_BRANCO;
+
+  /*
+    A tela já recusa número fora de 1 a PARCELAMENTO_MAXIMO, e a gravação
+    recusa de novo. Mesmo assim esta função checa: ela é a única frase da
+    prévia que repete um número digitado, e prometer "até 30x" para algo que
+    nunca vai ser gravado é pior que não prometer nada.
+  */
+  if (!Number.isInteger(valor) || valor < 1 || valor > PARCELAMENTO_MAXIMO) {
+    return `Este número não é gravável: o parcelamento vai de 1 a ${PARCELAMENTO_MAXIMO}. Enquanto estiver assim, a Helô continua com o que já estava salvo.`;
+  }
+
   return `A Helô pode dizer que dá para dividir em até ${valor}x. Quantas vezes, não quanto: o valor da parcela é assunto da equipe.`;
 }
 
