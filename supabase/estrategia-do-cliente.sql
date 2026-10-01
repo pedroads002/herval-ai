@@ -15,7 +15,7 @@
 -- verdade, em cinco blocos.
 --
 -- O que este arquivo faz:
---   1. cria as 11 colunas que não existiam;
+--   1. cria as 14 colunas que não existiam (2 delas são as do item 3);
 --   2. muda o formato de 5 colunas de texto livre para lista/número/jsonb;
 --   3. troca `faixa_etaria` (texto) por duas colunas de idade;
 --   4. derruba `tratamentos_oferecidos`, que ninguém lê;
