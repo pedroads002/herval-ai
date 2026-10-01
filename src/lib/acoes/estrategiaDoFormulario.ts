@@ -32,6 +32,7 @@ import {
   PRIORIDADES_COMERCIAIS,
   QUANDO_A_AVALIACAO_E_COBRADA,
   TIPOS_DE_AVALIACAO,
+  VALOR_MEDIO_MAXIMO,
   type BlocoDaEstrategia,
 } from "@/lib/dados/fichaDaEstrategia";
 
@@ -58,6 +59,18 @@ const MAXIMO_DE_CONVENIOS = 20;
 export type ConvenioGravavel = {
   nome: string;
   especialidade_ids: number[];
+};
+
+/**
+ * Uma faixa de valor médio como `clinica_especialidades` a guarda.
+ *
+ * Esta é a única coisa que esta tela grava fora de `clinicas`, e por isso vem
+ * separada dos campos: é outra tabela, com outra chave.
+ */
+export type FaixaGravavel = {
+  especialidade_id: number;
+  valor_medio_de: number;
+  valor_medio_ate: number;
 };
 
 /**
@@ -106,6 +119,16 @@ export type EstrategiaGravavel = {
   clienteId: number;
   bloco: BlocoDaEstrategia;
   campos: CamposDaEstrategia;
+  /**
+   * As faixas de valor médio deste envio, ou nulo quando o bloco não é o
+   * Comercial.
+   *
+   * Nulo e lista vazia são coisas diferentes aqui, e a diferença é destrutiva:
+   * vazia quer dizer "este cliente não tem faixa nenhuma", e a gravação apaga as
+   * que havia; nulo quer dizer "este envio não fala de faixa", e a gravação nem
+   * encosta naquela tabela.
+   */
+  faixas: FaixaGravavel[] | null;
 };
 
 export function lerEstrategia(
@@ -125,13 +148,18 @@ export function lerEstrategia(
   const campos = lerBloco(bloco, formData);
   if ("erro" in campos) return campos;
 
-  return { clienteId, bloco, campos: campos.campos };
+  return {
+    clienteId,
+    bloco,
+    campos: campos.campos,
+    faixas: campos.faixas ?? null,
+  };
 }
 
 function lerBloco(
   bloco: BlocoDaEstrategia,
   formData: FormData,
-): { erro: string } | { campos: CamposDaEstrategia } {
+): { erro: string } | { campos: CamposDaEstrategia; faixas?: FaixaGravavel[] } {
   if (bloco === "objetivo") {
     const objetivo = daLista(
       formData,
@@ -263,6 +291,9 @@ function lerBloco(
     const convenios = lerConvenios(formData);
     if ("erro" in convenios) return convenios;
 
+    const faixas = lerFaixasDeValor(formData);
+    if ("erro" in faixas) return faixas;
+
     return {
       campos: {
         formas_pagamento: formas.valores,
@@ -270,6 +301,7 @@ function lerBloco(
         convenios: convenios.convenios,
         politica_de_valores: politica.valor,
       },
+      faixas: faixas.faixas,
     };
   }
 
@@ -412,6 +444,96 @@ function lerConvenios(
   }
 
   return { convenios };
+}
+
+/**
+ * As faixas de valor médio, lidas procedimento por procedimento.
+ *
+ * A tela manda um par por procedimento que ela mostrou (`faixa-7-de`,
+ * `faixa-7-ate`), e a varredura é pelas chaves do envio, não por uma lista
+ * fechada: quem decide quais procedimentos aparecem é a tela, e ela muda quando
+ * o catálogo muda.
+ *
+ * Os dois campos em branco é como se apaga uma faixa, e não é erro. Um campo só
+ * é erro de propósito: "a partir de R$ 800" sem o outro limite é exatamente o
+ * que a política mais estrita proíbe, e deixar passar em silêncio seria gravar
+ * meia faixa que o banco recusaria depois, em inglês.
+ */
+function lerFaixasDeValor(
+  formData: FormData,
+): { erro: string } | { faixas: FaixaGravavel[] } {
+  const faixas: FaixaGravavel[] = [];
+
+  for (const chave of formData.keys()) {
+    const encontrado = /^faixa-(\d+)-de$/.exec(chave);
+    if (encontrado === null) continue;
+
+    const id = inteiroPositivo(encontrado[1]);
+    if (id === null) continue;
+    if (faixas.some((faixa) => faixa.especialidade_id === id)) continue;
+
+    const de = reais(formData, `faixa-${id}-de`);
+    if ("erro" in de) return de;
+    const ate = reais(formData, `faixa-${id}-ate`);
+    if ("erro" in ate) return ate;
+
+    if (de.valor === null && ate.valor === null) continue;
+
+    if (de.valor === null || ate.valor === null) {
+      return {
+        erro: "Uma faixa de valor médio ficou com metade preenchida. Preencha o 'de' e o 'até', ou deixe os dois em branco para a equipe confirmar.",
+      };
+    }
+
+    if (de.valor > ate.valor) {
+      return {
+        erro: "Numa faixa de valor médio o 'de' ficou acima do 'até'. Confira os dois números.",
+      };
+    }
+
+    /*
+      Os dois limites iguais não é faixa, é preço fechado com outro nome: "de
+      R$ 950 a R$ 950" é uma cotação, e cotação fora da consulta de avaliação é
+      o que não pode existir em campo nenhum. Mesma trava do CHECK no banco.
+    */
+    if (de.valor === ate.valor) {
+      return {
+        erro: "Uma faixa ficou com os dois limites iguais, e isso é preço fechado, não média. Se o valor varia pouco, use uma margem — R$ 900 a R$ 1.000.",
+      };
+    }
+
+    faixas.push({
+      especialidade_id: id,
+      valor_medio_de: de.valor,
+      valor_medio_ate: ate.valor,
+    });
+  }
+
+  return { faixas };
+}
+
+/**
+ * Um valor em reais inteiros.
+ *
+ * Sem centavo de propósito: isto é média aproximada, e centavo em cima de uma
+ * aproximação é precisão falsa — é o que faria a estimativa parecer orçamento.
+ */
+function reais(formData: FormData, campo: string): Talvez<number | null> {
+  const bruto = textoDoCampo(formData, campo);
+  if (bruto === null) return { valor: null };
+
+  const numero = Number(bruto);
+  if (!Number.isInteger(numero) || numero <= 0) {
+    return {
+      erro: "O valor médio tem de ser um número inteiro de reais, sem centavo.",
+    };
+  }
+  if (numero > VALOR_MEDIO_MAXIMO) {
+    return {
+      erro: `O valor médio passou de R$ ${VALOR_MEDIO_MAXIMO.toLocaleString("pt-BR")}. Confira se não sobrou um zero.`,
+    };
+  }
+  return { valor: numero };
 }
 
 function inteiroPositivo(bruto: FormDataEntryValue | string | null) {

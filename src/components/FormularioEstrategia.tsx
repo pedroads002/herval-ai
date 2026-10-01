@@ -24,10 +24,12 @@ import {
   PRIORIDADES_COMERCIAIS,
   QUANDO_A_AVALIACAO_E_COBRADA,
   TIPOS_DE_AVALIACAO,
+  VALOR_MEDIO_MAXIMO,
   type BlocoDaEstrategia,
   type ClasseEconomica,
   type ClienteDoSeletor,
   type ConvenioDaFicha,
+  type FaixaDeValorMedio,
   type FichaDaEstrategia,
   type FormaDePagamento,
   type ObjetivoDeAtendimento,
@@ -59,6 +61,7 @@ import {
   consequenciaDoParcelamento,
   consequenciaDoTipoDeAvaliacao,
   consequenciaDoTom,
+  consequenciaDoValorMedio,
   consequenciaDosConvenios,
   consequenciaDosDiferenciais,
   resumoDaEstrategia,
@@ -72,6 +75,7 @@ import {
   campoBase,
   useQuandoDerCerto,
 } from "@/components/cadastro/comuns";
+import { formatarFaixaDeValorMedio } from "@/lib/formato";
 
 /**
  * A tela da Estratégia do Cliente.
@@ -961,6 +965,43 @@ function BlocoComercial({
               ficha.heloPodeInformarValor,
             )}
           />
+
+          <div>
+            <span className={rotuloBase}>Valor médio por procedimento</span>
+            {ficha.valoresMedios.length === 0 ? (
+              /*
+                Não diz "Falta preencher", como os outros campos em branco: aqui
+                o branco é resposta. Sem faixa, a Helô confirma o valor com a
+                equipe, que é um jeito legítimo de a clínica trabalhar — e por
+                isso este campo também não entra na contagem de completude.
+              */
+              <p className="text-sm font-medium text-black/45">
+                Nenhuma faixa cadastrada.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {ficha.valoresMedios.map((faixa) => (
+                  <li
+                    key={faixa.especialidadeId}
+                    className="text-sm text-black/70"
+                  >
+                    <span className="font-bold text-herval-preto">
+                      {nomesPorId.get(faixa.especialidadeId) ??
+                        "procedimento removido"}
+                    </span>
+                    {" · "}
+                    {formatarFaixaDeValorMedio(faixa.de, faixa.ate)}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Consequencia
+              texto={consequenciaDoValorMedio(
+                ficha.valoresMedios.length,
+                procedimentos.length,
+              )}
+            />
+          </div>
         </div>
       }
       formulario={
@@ -997,6 +1038,9 @@ function FormComercial({
       nome: convenio.nome,
       especialidadeIds: [...convenio.especialidadeIds],
     })),
+  );
+  const [faixas, setFaixas] = useState<FaixasDigitadas>(() =>
+    faixasDigitadas(ficha.valoresMedios),
   );
 
   return (
@@ -1073,6 +1117,12 @@ function FormComercial({
           politica || null,
           ficha.heloPodeInformarValor,
         )}
+      />
+
+      <EditorDeValoresMedios
+        faixas={faixas}
+        aoMudar={setFaixas}
+        procedimentos={procedimentos}
       />
     </FormularioDoBloco>
   );
@@ -1236,6 +1286,210 @@ function EditorDeConvenios({
 /* -------------------------------------------------------------------------- */
 /* 4 — Público-alvo                                                           */
 /* -------------------------------------------------------------------------- */
+
+/** O que está nos campos, como texto — um par por procedimento tocado. */
+type FaixasDigitadas = Record<number, { de: string; ate: string }>;
+
+function faixasDigitadas(
+  valores: readonly FaixaDeValorMedio[],
+): FaixasDigitadas {
+  const digitadas: FaixasDigitadas = {};
+  for (const faixa of valores) {
+    digitadas[faixa.especialidadeId] = {
+      de: String(faixa.de),
+      ate: String(faixa.ate),
+    };
+  }
+  return digitadas;
+}
+
+/** Vazia é resposta ("a equipe confirma"); meia e de limites iguais, não. */
+function problemaDaFaixa(par: { de: string; ate: string }): string | null {
+  const de = par.de.trim();
+  const ate = par.ate.trim();
+
+  if (de === "" && ate === "") return null;
+  if (de === "" || ate === "") {
+    return "Falta o outro limite. Uma ponta só vira “a partir de”, que não é média.";
+  }
+
+  const numeroDe = Number(de);
+  const numeroAte = Number(ate);
+
+  if (numeroDe > numeroAte) return "O “de” está acima do “até”.";
+  if (numeroDe === numeroAte) {
+    return "Dois limites iguais é preço fechado, não média. Dê uma margem.";
+  }
+  return null;
+}
+
+function faixaCompleta(par: { de: string; ate: string }): boolean {
+  return (
+    par.de.trim() !== "" &&
+    par.ate.trim() !== "" &&
+    problemaDaFaixa(par) === null
+  );
+}
+
+/**
+ * A faixa de valor médio de cada procedimento.
+ *
+ * É o único lugar do painel onde se digita valor, e digita-se faixa: dois
+ * limites, em reais inteiros. Preço fechado não tem campo em lugar nenhum,
+ * porque o número que a paciente pode tomar como combinado é dito na consulta
+ * de avaliação e não fica guardado — por isso aqui não existe um campo só.
+ *
+ * Em branco é resposta, e a mais comum: sem faixa, a Helô diz que confirma o
+ * valor com a equipe. Quem não quer que ela fale número nenhum não precisa
+ * preencher nada — e quem já escolheu "Não informa antes da avaliação" na
+ * política continua mandando mesmo com faixa cadastrada, porque a política só
+ * aperta a regra, nunca a solta.
+ *
+ * Procedimento pausado não aparece, pela mesma razão dos convênios: oferecer
+ * campo para o que a Helô tem ordem de não oferecer é convite a cadastrar
+ * besteira. Mas se um pausado já tem faixa, ele continua ali para poder ser
+ * apagado — sumir com o campo esconderia um valor que ainda está no banco.
+ */
+function EditorDeValoresMedios({
+  faixas,
+  aoMudar,
+  procedimentos,
+}: {
+  faixas: FaixasDigitadas;
+  aoMudar: (faixas: FaixasDigitadas) => void;
+  procedimentos: ProcedimentoDoCatalogo[];
+}) {
+  const visiveis = procedimentos.filter(
+    (p) =>
+      p.ativa ||
+      (faixas[p.id] !== undefined &&
+        (faixas[p.id].de !== "" || faixas[p.id].ate !== "")),
+  );
+
+  const preenchidas = visiveis.filter(
+    (p) => faixas[p.id] !== undefined && faixaCompleta(faixas[p.id]),
+  ).length;
+
+  function mudar(id: number, qual: "de" | "ate", texto: string) {
+    /*
+      Só aceita o que a gravação aceitaria: vazio ou inteiro de 1 até o teto.
+      Recusar a tecla, e não corrigir depois, é o mesmo cuidado do parcelamento
+      — a prévia nunca mostra uma faixa que o banco vai recusar. Sem centavo de
+      propósito: centavo em cima de uma média é precisão falsa, e precisão falsa
+      é o que faz a estimativa parecer orçamento.
+    */
+    if (texto !== "") {
+      if (!/^\d+$/.test(texto)) return;
+      const numero = Number(texto);
+      if (numero < 1 || numero > VALOR_MEDIO_MAXIMO) return;
+    }
+
+    const atual = faixas[id] ?? { de: "", ate: "" };
+    aoMudar({ ...faixas, [id]: { ...atual, [qual]: texto } });
+  }
+
+  return (
+    <fieldset>
+      <legend className={rotuloBase}>Valor médio por procedimento</legend>
+      <p className="mb-4 text-xs font-medium text-black/45">
+        Faixa aproximada, em reais inteiros, e só se a clínica quiser que a Helô
+        possa dar uma média quando perguntarem. Em branco, ela confirma o valor
+        com a equipe. O valor fechado nunca sai daqui — ele é dito na consulta
+        de avaliação.
+      </p>
+
+      {visiveis.length === 0 ? (
+        <p className="text-sm font-medium text-black/45">
+          Nenhum procedimento ativo no catálogo.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {visiveis.map((procedimento) => {
+            const par = faixas[procedimento.id] ?? { de: "", ate: "" };
+            const problema = problemaDaFaixa(par);
+
+            return (
+              <div
+                key={procedimento.id}
+                className="rounded-card border border-black/10 px-5 py-4"
+              >
+                <div className="flex flex-wrap items-end gap-3">
+                  <span className="min-w-0 flex-1 text-sm font-bold text-herval-preto">
+                    {procedimento.nome}
+                    {!procedimento.ativa && (
+                      <span className="ml-2 text-xs font-medium text-black/45">
+                        pausado
+                      </span>
+                    )}
+                  </span>
+
+                  <CampoDeValorMedio
+                    id={`faixa-${procedimento.id}-de`}
+                    rotulo="De"
+                    valor={par.de}
+                    aoMudar={(texto) => mudar(procedimento.id, "de", texto)}
+                  />
+                  <CampoDeValorMedio
+                    id={`faixa-${procedimento.id}-ate`}
+                    rotulo="Até"
+                    valor={par.ate}
+                    aoMudar={(texto) => mudar(procedimento.id, "ate", texto)}
+                  />
+                </div>
+
+                {problema !== null && (
+                  <p className="mt-2 text-xs font-bold text-herval-vermelho">
+                    {problema}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Consequencia
+        texto={consequenciaDoValorMedio(preenchidas, procedimentos.length)}
+      />
+    </fieldset>
+  );
+}
+
+function CampoDeValorMedio({
+  id,
+  rotulo,
+  valor,
+  aoMudar,
+}: {
+  id: string;
+  rotulo: string;
+  valor: string;
+  aoMudar: (texto: string) => void;
+}) {
+  return (
+    <div>
+      <label
+        className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-black/50"
+        htmlFor={`campo-${id}`}
+      >
+        {rotulo} (R$)
+      </label>
+      <input
+        id={`campo-${id}`}
+        name={id}
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={VALOR_MEDIO_MAXIMO}
+        step={1}
+        placeholder="—"
+        value={valor}
+        onChange={(e) => aoMudar(e.target.value)}
+        className={`${campoBase} w-28`}
+      />
+    </div>
+  );
+}
 
 function BlocoPublico({
   ficha,

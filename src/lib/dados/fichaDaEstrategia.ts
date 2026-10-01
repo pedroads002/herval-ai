@@ -102,6 +102,40 @@ export type ConvenioDaFicha = {
 };
 
 /**
+ * A faixa de valor médio aproximado de um procedimento, nesta clínica.
+ *
+ * Faixa, e não número único, e é a única forma de valor que existe no sistema:
+ * preço fechado não é guardado em lugar nenhum, porque o número que a paciente
+ * pode tomar como combinado só é dito na consulta de avaliação. Um número
+ * solitário seria lido como preço mesmo chamado de média; dois limites se
+ * anunciam como estimativa.
+ *
+ * Sempre em reais inteiros. Centavo em cima de uma aproximação é precisão
+ * falsa, e precisão falsa é o que faz a estimativa parecer orçamento.
+ */
+export type FaixaDeValorMedio = {
+  especialidadeId: number;
+  de: number;
+  ate: number;
+};
+
+/** Os dois limites, como `clinica_especialidades` os guarda. */
+export type LinhaDaFaixaDeValor = {
+  especialidade_id: number;
+  valor_medio_de: number | string | null;
+  valor_medio_ate: number | string | null;
+};
+
+/**
+ * O teto de cada limite da faixa.
+ *
+ * O mesmo da coluna `numeric(10,2)`, arredondado para baixo num número redondo:
+ * não existe procedimento de clínica a um milhão de reais, e um campo sem teto
+ * aceita um zero digitado por engano que viraria frase da Helô.
+ */
+export const VALOR_MEDIO_MAXIMO = 1_000_000;
+
+/**
  * A linha de `clinicas` como o Supabase devolve: nome de coluna do banco, e
  * tudo podendo vir nulo, porque nulo aqui quer dizer "ninguém cadastrou ainda".
  */
@@ -156,6 +190,11 @@ export type FichaDaEstrategia = {
   parcelamentoMaximo: number | null;
   convenios: ConvenioDaFicha[];
   politicaDeValores: PoliticaDeValores | null;
+  /**
+   * Só os procedimentos que têm faixa cadastrada. Procedimento fora desta lista
+   * é "a equipe confirma" — nunca grátis, nunca um número chutado.
+   */
+  valoresMedios: FaixaDeValorMedio[];
 
   // Bloco 4 — Público-alvo
   classes: ClasseEconomica[];
@@ -282,8 +321,58 @@ export function montarConvenios(bruto: unknown): ConvenioDaFicha[] {
   return convenios;
 }
 
+/*
+  As faixas vêm de outra tabela, linha por procedimento, e são lidas com a mesma
+  desconfiança dos convênios.
+
+  O banco já garante os dois limites juntos e na ordem certa, por CHECK. Esta
+  conferência existe para o caso de alguém rodar um `update` direto no SQL
+  Editor antes de o CHECK existir em alguma cópia do banco, e para o detalhe
+  que o Postgres devolve `numeric` como texto: metade de uma faixa, ou um
+  número que não é número, não pode virar frase da Helô — vira "a equipe
+  confirma", que é o que o prompt já sabe dizer.
+*/
+export function montarValoresMedios(bruto: unknown): FaixaDeValorMedio[] {
+  if (!Array.isArray(bruto)) return [];
+
+  const faixas: FaixaDeValorMedio[] = [];
+
+  for (const item of bruto) {
+    if (item === null || typeof item !== "object") continue;
+
+    const linha = item as Partial<LinhaDaFaixaDeValor>;
+    const id = Number(linha.especialidade_id);
+    if (!Number.isInteger(id) || id <= 0) continue;
+    if (faixas.some((faixa) => faixa.especialidadeId === id)) continue;
+
+    const de = numeroPositivo(linha.valor_medio_de);
+    const ate = numeroPositivo(linha.valor_medio_ate);
+
+    // Meia faixa não é faixa: "a partir de" é justamente o que a política mais
+    // estrita proíbe. Ou os dois limites, ou nada. E faixa de limites iguais é
+    // preço fechado com outro nome — "de R$ 950 a R$ 950" é cotação.
+    if (de === null || ate === null || ate <= de) continue;
+
+    faixas.push({ especialidadeId: id, de, ate });
+  }
+
+  return faixas;
+}
+
+function numeroPositivo(bruto: number | string | null | undefined) {
+  if (bruto === null || bruto === undefined) return null;
+  const numero = Number(bruto);
+  if (!Number.isFinite(numero)) return null;
+  if (numero <= 0 || numero > VALOR_MEDIO_MAXIMO) return null;
+  // Reais inteiros: o banco aceita centavo, a tela não oferece, e uma média com
+  // centavo parece orçamento. Centavo que venha de fora é arredondado, não
+  // descartado — descartar apagaria a faixa inteira por causa de dois dígitos.
+  return Math.round(numero);
+}
+
 export function montarFichaDaEstrategia(
   linha: LinhaDaClinica,
+  faixasDeValor: unknown = [],
 ): FichaDaEstrategia {
   return {
     clienteId: linha.id,
@@ -313,6 +402,7 @@ export function montarFichaDaEstrategia(
     ),
     convenios: montarConvenios(linha.convenios),
     politicaDeValores: daLista(linha.politica_de_valores, POLITICAS_DE_VALORES),
+    valoresMedios: montarValoresMedios(faixasDeValor),
 
     classes: listaDaLista(linha.classe_economica, CLASSES_ECONOMICAS),
     faixaEtariaDe: inteiroEntre(

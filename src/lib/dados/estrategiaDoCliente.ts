@@ -121,9 +121,31 @@ export async function carregarEstrategiaDoCliente(
     clienteId === null ? null : linhas.find((l) => l.id === clienteId);
   const linha = pedida ?? linhas[0];
 
-  const ficha = montarFichaDaEstrategia(linha);
-
   const avisos: string[] = [];
+
+  /*
+    As faixas de valor médio, que moram em `clinica_especialidades` — uma linha
+    por procedimento desta clínica, e só para os procedimentos que têm faixa.
+
+    Leitura separada porque é outra tabela, e não um `join`: a ficha é de um
+    cliente só, então é uma consulta pequena por chave primária. Falhar aqui não
+    esconde a estratégia inteira, do mesmo jeito que o catálogo de
+    procedimentos — a ficha abre, as faixas aparecem em branco e o aviso diz
+    que não é "ninguém cadastrou".
+  */
+  const respostaDasFaixas = await supabase
+    .from("clinica_especialidades")
+    .select("especialidade_id, valor_medio_de, valor_medio_ate")
+    .eq("clinica_id", linha.id)
+    .limit(TETO_DE_LINHAS);
+
+  if (respostaDasFaixas.error) {
+    avisos.push(
+      "Não deu para ler as faixas de valor médio. Elas aparecem em branco nesta tela, mas não foram perdidas — não salve o bloco Comercial agora, ou o branco seria gravado em cima.",
+    );
+  }
+
+  const ficha = montarFichaDaEstrategia(linha, respostaDasFaixas.data ?? []);
 
   if (clienteId !== null && !pedida) {
     avisos.push(

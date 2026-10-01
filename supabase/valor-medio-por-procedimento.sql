@@ -34,10 +34,12 @@ alter table clinica_especialidades
   add constraint clinica_especialidades_faixa_completa
     check ((valor_medio_de is null) = (valor_medio_ate is null));
 
+-- E faixa com os dois limites iguais é preço fechado com outro nome: "de
+-- R$ 950 a R$ 950" é uma cotação. O limite de cima tem de ser maior.
 alter table clinica_especialidades
   add constraint clinica_especialidades_faixa_ordenada
     check (valor_medio_de is null or
-           (valor_medio_de > 0 and valor_medio_ate >= valor_medio_de));
+           (valor_medio_de > 0 and valor_medio_ate > valor_medio_de));
 
 comment on column clinica_especialidades.valor_medio_de is
   'Limite inferior da faixa de valor médio aproximado. Nunca preço fechado.';

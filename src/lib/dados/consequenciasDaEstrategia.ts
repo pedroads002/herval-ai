@@ -200,6 +200,30 @@ export function consequenciaDosConvenios(quantos: number): string {
   return `A Helô sabe que ${quantos === 1 ? "há 1 convênio" : `há ${quantos} convênios`} e quais procedimentos cada um cobre. Fora dessa lista, ela confirma com a equipe.`;
 }
 
+/**
+ * O que a faixa de valor médio faz a Helô dizer.
+ *
+ * `quantos` é quantos procedimentos têm faixa; `total`, quantos existem. A
+ * frase precisa dos dois porque "3 com faixa" quer dizer coisas diferentes
+ * quando existem 3 procedimentos e quando existem 23 — e é justamente nos sem
+ * faixa que ela vai dizer que confirma com a equipe.
+ */
+export function consequenciaDoValorMedio(
+  quantos: number,
+  total: number,
+): string {
+  if (quantos === 0) {
+    return "Sem faixa cadastrada, a Helô não tem média nenhuma para dar: se perguntarem quanto custa, ela diz que confirma o valor com a equipe. Ela não inventa número.";
+  }
+
+  const semFaixa = Math.max(total - quantos, 0);
+  const inicio = `Se o paciente perguntar, a Helô pode passar a faixa aproximada ${quantos === 1 ? "desse procedimento" : `desses ${quantos} procedimentos`} — sempre como média, nunca como valor fechado, e nunca por iniciativa dela.`;
+
+  if (semFaixa === 0) return inicio;
+
+  return `${inicio} Nos outros ${semFaixa}, ela confirma o valor com a equipe.`;
+}
+
 export function consequenciaDasClasses(classes: readonly string[]): string {
   if (classes.length === 0) return EM_BRANCO;
   return `A Helô ajusta o tom para o público ${listar(classes)}. É tom, não filtro: ela não recusa ninguém por isso.`;
