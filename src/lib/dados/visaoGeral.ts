@@ -369,7 +369,7 @@ function montarConversao(
  */
 function montarAlertas(
   resumo: ResumoDoPeriodo,
-  aguardandoConfirmacao: number,
+  fatos: { aguardandoConfirmacao: number; semDesfecho: number },
 ): AlertaDaVisao[] {
   const alertas: AlertaDaVisao[] = [];
   const metas = metasPadrao;
@@ -424,12 +424,27 @@ function montarAlertas(
   // Este não é taxa nem comparação com meta: é contagem de fato. Por isso não
   // passa pela amostra mínima — uma consulta sem confirmar já é uma consulta sem
   // confirmar. E não é do período: é o que está em pé daqui para a frente.
-  if (aguardandoConfirmacao > 0) {
+  if (fatos.aguardandoConfirmacao > 0) {
     alertas.push({
       id: "aguardando-confirmacao",
       severidade: "atencao",
-      problema: `${aguardandoConfirmacao} ${aguardandoConfirmacao === 1 ? "consulta marcada ainda não foi confirmada" : "consultas marcadas ainda não foram confirmadas"}.`,
+      problema: `${fatos.aguardandoConfirmacao} ${fatos.aguardandoConfirmacao === 1 ? "consulta marcada ainda não foi confirmada" : "consultas marcadas ainda não foram confirmadas"}.`,
       acao: "Contagem de hoje para frente, independente do período escolhido.",
+      destino: { texto: "Ver fila →", href: "/atendimento" },
+    });
+  }
+
+  // A consulta que passou e ficou em "Agendada" é um buraco: não é
+  // comparecimento, não é falta, e não é futuro — então não aparecia em lugar
+  // nenhum da tela. Nenhuma taxa pode cobrir isso, porque o desfecho não existe
+  // para ser contado. O que existe é o fato de ninguém ter registrado, e é esse
+  // fato que vira alerta.
+  if (fatos.semDesfecho > 0) {
+    alertas.push({
+      id: "sem-desfecho",
+      severidade: "atencao",
+      problema: `${fatos.semDesfecho} ${fatos.semDesfecho === 1 ? "consulta já aconteceu e o status nunca foi atualizado" : "consultas já aconteceram e o status nunca foi atualizado"}.`,
+      acao: "Enquanto o status não for Compareceu, Faltou ou Cancelada, essas consultas ficam fora do no-show e do comparecimento.",
       destino: { texto: "Ver fila →", href: "/atendimento" },
     });
   }
@@ -600,13 +615,25 @@ export async function carregarVisaoGeral(
       consulta.data_consulta >= hoje,
   ).length;
 
+  // O corte é o mesmo do alerta acima, só do outro lado: ontem para trás. Assim
+  // uma consulta nunca aparece nos dois alertas ao mesmo tempo, e a de hoje
+  // conta como pendente de confirmação, não como desfecho atrasado — o dia dela
+  // ainda não acabou.
+  const semDesfecho = agendamentos.filter(
+    (consulta) =>
+      consulta.status === STATUS_AGENDADA && consulta.data_consulta < hoje,
+  ).length;
+
   return {
     atual: resumoAtual,
     anterior: montarResumo(anterior, contexto),
     conversao: montarConversao(periodo.intervalo, contexto),
     motivos,
     totalPerdidos: linhasPerdidas.length,
-    alertas: montarAlertas(resumoAtual, aguardandoConfirmacao),
+    alertas: montarAlertas(resumoAtual, {
+      aguardandoConfirmacao,
+      semDesfecho,
+    }),
     clinicas: (respostaDasClinicas.data ?? []).map((clinica) => ({
       id: clinica.id as number,
       nome: ((clinica.nome as string | null) ?? "").trim() || "Sem nome",
