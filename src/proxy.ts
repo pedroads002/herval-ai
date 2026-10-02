@@ -9,12 +9,31 @@ import {
 const TELA_DE_LOGIN = "/login";
 
 /**
+ * Telas que qualquer pessoa abre sem estar logada, e que também não empurram
+ * quem já está logado para outro lugar.
+ *
+ * A política de privacidade está aqui porque precisa estar: a Meta exige uma
+ * URL de política de privacidade que o revisor dela consiga abrir sem conta e
+ * sem senha. Atrás do login, a URL não serviria para nada.
+ *
+ * Esta lista é a exceção, não a regra — qualquer outra tela nova continua
+ * nascendo protegida sozinha. Só entra aqui o que for público de propósito, e
+ * nada que leia ou grave dado de paciente, lead ou cliente.
+ */
+const TELAS_PUBLICAS: readonly string[] = ["/privacidade"];
+
+/**
  * Roda antes de qualquer tela ser renderizada (no Next 16 este arquivo se chama
  * proxy.ts; era o antigo middleware.ts). Como o matcher pega tudo, qualquer
  * tela nova criada no futuro já nasce protegida, sem precisar mexer aqui.
  */
 export async function proxy(request: NextRequest) {
-  const naTelaDeLogin = request.nextUrl.pathname === TELA_DE_LOGIN;
+  const caminho = request.nextUrl.pathname;
+  const naTelaDeLogin = caminho === TELA_DE_LOGIN;
+
+  // Tela pública passa direto, logado ou não. Nem chega a consultar o Supabase:
+  // não há sessão para validar nem cookie para renovar.
+  if (TELAS_PUBLICAS.includes(caminho)) return NextResponse.next();
 
   // Sem as chaves do Supabase ninguém entra: só a tela de login responde, e ela
   // mostra o aviso de configuração pendente.
