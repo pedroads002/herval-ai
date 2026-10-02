@@ -1,145 +1,183 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import Link from "next/link";
 import {
-  dentroDoPeriodo,
-  descricaoDoPeriodo,
-  faixaDoPeriodo,
-  periodos,
-  type Periodo,
-} from "@/data/visaoGeral";
-import { useLeads } from "@/components/ProvedorLeads";
-import { motivosDePerda } from "@/data/tarefas";
-import {
-  baseDeLeads,
-  faixaAnterior,
-  montarConversao,
-  montarFunil,
-  montarProducao,
-  montarResumo,
-  variacao,
-  type Faixa,
-  type ResumoGeral,
-} from "@/lib/relatorios";
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  TriangleAlert,
+} from "lucide-react";
+import { variacao } from "@/lib/relatorios";
 import { formatarNumero, percentual } from "@/lib/formato";
+import {
+  descricaoDoIntervalo,
+  type PeriodoEscolhido,
+} from "@/lib/visaoGeral/periodo";
+import type { DadosDaVisaoGeral } from "@/lib/dados/visaoGeral";
 
-export default function PainelVisaoGeral() {
-  const [periodo, setPeriodo] = useState<Periodo>("Diário");
-  const { tarefas, agendamentos } = useLeads();
+/**
+ * A Visão Geral.
+ *
+ * Deixou de ser componente de navegador: os números vêm prontos do servidor,
+ * lidos do banco em `lib/dados/visaoGeral.ts`. O que era estado aqui dentro
+ * (período, clínica) virou endereço, e mora em `FiltrosDaVisaoGeral`.
+ *
+ * Nada de aparência mudou: as classes dos cards, das barras e dos selos são as
+ * mesmas de antes.
+ */
+export default function PainelVisaoGeral({
+  dados,
+  periodo,
+}: {
+  dados: DadosDaVisaoGeral;
+  periodo: PeriodoEscolhido;
+}) {
+  if (dados.falha) {
+    return (
+      <div className="rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-6">
+        <p className="text-sm font-medium text-black/60">{dados.falha}</p>
+      </div>
+    );
+  }
 
-  // Os motivos saem dos próprios cards em "Venda Perdida" no Funil, e não de
-  // uma lista fixa: mover um lead para lá muda esta contagem na hora.
-  const perdidos = useMemo(
-    () => tarefas.filter((t) => t.etapa === "Venda Perdida"),
-    [tarefas],
-  );
-
-  const contagemMotivos = useMemo(
-    () =>
-      motivosDePerda
-        .map((motivo) => ({
-          motivo,
-          quantidade: perdidos.filter((t) => t.motivoPerda === motivo).length,
-        }))
-        .sort((a, b) => b.quantidade - a.quantidade),
-    [perdidos],
-  );
-
-  /**
-   * Os números do período e os do período anterior saem das mesmas funções dos
-   * Relatórios — a única diferença entre as duas telas é a faixa de dias que
-   * cada uma monta.
-   */
-  const dados = useMemo(() => {
-    const leads = baseDeLeads(tarefas);
-    const faixa = faixaDoPeriodo(periodo);
-
-    const resumoDe = (recorte: Faixa): ResumoGeral => {
-      const funil = montarFunil({ leads, agendamentos, faixa: recorte });
-      const producao = montarProducao({ agendamentos, faixa: recorte });
-      return montarResumo(funil, producao, agendamentos, recorte);
-    };
-
-    return {
-      atual: resumoDe(faixa),
-      anterior: resumoDe(faixaAnterior(faixa)),
-      conversao: montarConversao({ leads, agendamentos, faixa }),
-    };
-  }, [tarefas, agendamentos, periodo]);
-
-  const { atual, anterior, conversao } = dados;
-  const quando = descricaoDoPeriodo[periodo];
+  const { atual, anterior, conversao, motivos, totalPerdidos, alertas } = dados;
+  const quando = descricaoDoIntervalo(periodo);
 
   const totalFunil = conversao[0]?.quantidade ?? 0;
-  const maiorMotivo = Math.max(1, ...contagemMotivos.map((m) => m.quantidade));
+  const maiorMotivo = Math.max(1, ...motivos.map((m) => m.quantidade));
 
   return (
     <div className="space-y-10">
-      {/* Filtro de período */}
-      <div className="inline-flex rounded-full border border-black/15 bg-herval-branco p-1">
-        {periodos.map((opcao) => {
-          const ativo = opcao === periodo;
-          return (
-            <button
-              key={opcao}
-              type="button"
-              onClick={() => setPeriodo(opcao)}
-              aria-pressed={ativo}
-              className={[
-                "rounded-full px-5 py-2 text-sm font-bold transition-colors",
-                ativo
-                  ? "bg-herval-verde text-herval-preto"
-                  : "text-black/60 hover:bg-black/5 hover:text-herval-preto",
-              ].join(" ")}
-            >
-              {opcao}
-            </button>
-          );
-        })}
-      </div>
-
       {/* KPIs */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Kpi
-          rotulo="Leads de marketing"
-          valor={formatarNumero(atual.leadsMarketing)}
-          variacao={variacao(atual.leadsMarketing, anterior.leadsMarketing)}
-          detalhe={`de campanha paga · ${quando}`}
+          rotulo="Leads"
+          valor={formatarNumero(atual.leads)}
+          variacao={variacao(atual.leads, anterior.leads)}
+          detalhe={`entraram na base ${quando}`}
         />
         <Kpi
           rotulo="Agendamentos"
-          valor={formatarNumero(atual.producao)}
-          variacao={variacao(atual.producao, anterior.producao)}
+          valor={formatarNumero(atual.agendamentos)}
+          variacao={variacao(atual.agendamentos, anterior.agendamentos)}
           detalhe="pelo ato de agendar · remarcação conta de novo"
         />
         <Kpi
-          rotulo="Taxa de reagendamento"
-          valor={comPercentual(atual.taxaReagendamento)}
-          variacao={pontos(atual.taxaReagendamento, anterior.taxaReagendamento)}
-          emPontos
-          // Aqui subir é ruim: é consulta que precisou ser marcada de novo.
-          quantoMaiorPior
-          detalhe={`${formatarNumero(atual.remarcacoes)} de ${formatarNumero(atual.producao)} agendamentos`}
+          rotulo="Comparecimentos"
+          valor={formatarNumero(atual.comparecimentos)}
+          variacao={variacao(atual.comparecimentos, anterior.comparecimentos)}
+          detalhe={`de ${formatarNumero(atual.consultasAteAData)} consultas desses agendamentos que já aconteceram`}
         />
         <Kpi
-          rotulo="Taxa de no-show"
-          valor={comPercentual(atual.taxaNoShow)}
-          variacao={pontos(atual.taxaNoShow, anterior.taxaNoShow)}
-          emPontos
-          quantoMaiorPior
-          detalhe={`${formatarNumero(atual.faltas)} faltas em ${formatarNumero(atual.producaoAteAData)} consultas até a data`}
+          rotulo="Vendas"
+          valor={formatarNumero(atual.vendas)}
+          variacao={variacao(atual.vendas, anterior.vendas)}
+          detalhe="leads do período que hoje estão em Venda Ganha"
         />
-        <Kpi
-          rotulo="Origem do agendamento"
-          valor={`${comPercentual(atual.percentualIa)} IA`}
-          variacao={pontos(atual.percentualIa, anterior.percentualIa)}
-          emPontos
-          detalhe={`${comPercentual(
-            atual.percentualIa === null ? null : 100 - atual.percentualIa,
-          )} CRC · ${formatarNumero(atual.fechadosPelaIa)} × ${formatarNumero(atual.fechadosPeloCrc)}`}
-        />
+        <SemFonteDeDados />
       </div>
+
+      {/* Indicadores secundários */}
+      <section className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
+        <div className="grid gap-7 sm:grid-cols-3">
+          <Indicador
+            rotulo="Taxa de no-show"
+            valor={comPercentual(atual.taxaNoShow)}
+            variacao={pontos(atual.taxaNoShow, anterior.taxaNoShow)}
+            // Aqui subir é ruim: é paciente que marcou e não apareceu.
+            quantoMaiorPior
+            detalhe={`${formatarNumero(atual.faltas)} faltas em ${formatarNumero(atual.consultasAteAData)} consultas até a data`}
+          />
+          <Indicador
+            rotulo="Taxa de reagendamento"
+            valor={comPercentual(atual.taxaReagendamento)}
+            variacao={pontos(
+              atual.taxaReagendamento,
+              anterior.taxaReagendamento,
+            )}
+            quantoMaiorPior
+            detalhe={`${formatarNumero(atual.remarcacoes)} de ${formatarNumero(atual.agendamentos)} agendamentos precisaram ser marcados de novo`}
+          />
+          <Indicador
+            rotulo="Origem dos agendamentos"
+            valor={`${comPercentual(atual.percentualIa)} IA`}
+            variacao={pontos(atual.percentualIa, anterior.percentualIa)}
+            detalhe={`${comPercentual(
+              atual.percentualIa === null ? null : 100 - atual.percentualIa,
+            )} CRC · ${formatarNumero(atual.fechadosPelaIa)} × ${formatarNumero(atual.fechadosPeloCrc)}`}
+          />
+        </div>
+      </section>
+
+      {/* Pontos de atenção */}
+      <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
+            <span className="h-4 w-1 rounded-full bg-herval-verde" />
+            Pontos de atenção
+          </h2>
+          <span
+            className={[
+              "rounded-full px-3 py-1 text-xs font-extrabold",
+              alertas.length > 0
+                ? "bg-herval-preto text-herval-branco"
+                : "border border-black/15 text-black/45",
+            ].join(" ")}
+          >
+            Ação necessária: {alertas.length}
+          </span>
+        </div>
+
+        <p className="mt-2 text-xs font-medium leading-relaxed text-black/50">
+          Comparação entre o que o banco registrou e as metas da operação. Nada
+          aqui é opinião nem leitura de IA: cada ponto é um número batendo em um
+          limiar. Taxa só vira alerta com amostra mínima, para três consultas
+          não gerarem alarme.
+        </p>
+
+        {alertas.length === 0 ? (
+          <p className="mt-6 rounded-controle bg-black/[0.03] px-4 py-4 text-sm font-medium text-black/60">
+            Nenhum ponto crítico identificado neste período.
+          </p>
+        ) : (
+          <ul className="mt-6 space-y-3">
+            {alertas.map((alerta) => {
+              const critico = alerta.severidade === "critico";
+              return (
+                <li
+                  key={alerta.id}
+                  className={[
+                    "flex items-start gap-3 rounded-controle border-l-4 bg-black/[0.02] px-4 py-3.5",
+                    critico
+                      ? "border-l-herval-vermelho"
+                      : "border-l-herval-atencao",
+                  ].join(" ")}
+                >
+                  {critico ? (
+                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-herval-vermelho" />
+                  ) : (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-herval-atencao" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-black/65">
+                      {alerta.problema}
+                    </p>
+                    <p className="mt-1.5 text-sm font-bold text-herval-preto">
+                      {alerta.acao}
+                    </p>
+                    {alerta.destino && (
+                      <Link
+                        href={alerta.destino.href}
+                        className="mt-1.5 inline-block text-sm font-bold text-herval-preto underline decoration-herval-verde decoration-2 underline-offset-2 hover:text-black/70"
+                      >
+                        {alerta.destino.texto}
+                      </Link>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {/* Funil de conversão */}
@@ -150,10 +188,9 @@ export default function PainelVisaoGeral() {
           </h2>
 
           <p className="mt-2 text-xs font-medium leading-relaxed text-black/50">
-            Sempre o mesmo grupo de gente: os leads de campanha que chegaram{" "}
-            {dentroDoPeriodo[periodo]}, acompanhados até onde cada um chegou.
-            Cada degrau está
-            dentro do anterior, por isso a queda é queda de verdade.
+            Sempre o mesmo grupo de gente: os leads que chegaram {quando},
+            acompanhados até onde cada um chegou. Cada degrau está dentro do
+            anterior, por isso a queda é queda de verdade.
           </p>
 
           <div className="mt-7 space-y-5">
@@ -212,17 +249,15 @@ export default function PainelVisaoGeral() {
           <p className="mt-2 text-xs font-medium text-black/50">
             Com base nos{" "}
             <span className="font-extrabold text-herval-preto">
-              {perdidos.length}
+              {totalPerdidos}
             </span>{" "}
-            {perdidos.length === 1
-              ? "lead atualmente em"
-              : "leads atualmente em"}{" "}
+            {totalPerdidos === 1 ? "lead atualmente em" : "leads atualmente em"}{" "}
             &quot;Venda Perdida&quot; no Funil. Não muda com o filtro de
             período, diferente do funil de conversão.
           </p>
 
           <ul className="mt-7 space-y-4">
-            {contagemMotivos.map((motivo) => (
+            {motivos.map((motivo) => (
               <li key={motivo.motivo}>
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="text-sm font-medium text-black/70">
@@ -264,24 +299,50 @@ function pontos(agora: number | null, antes: number | null) {
   return agora - antes;
 }
 
+function Variacao({
+  diferenca,
+  emPontos,
+  quantoMaiorPior,
+}: {
+  diferenca: number;
+  emPontos: boolean;
+  quantoMaiorPior: boolean;
+}) {
+  const subiu = diferenca >= 0;
+  const bom = quantoMaiorPior ? !subiu : subiu;
+
+  return (
+    <span
+      className={[
+        "mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold",
+        bom
+          ? "bg-herval-verde text-herval-preto"
+          : "border border-black/25 text-black/70",
+      ].join(" ")}
+    >
+      {subiu ? (
+        <TrendingUp className="h-3 w-3" />
+      ) : (
+        <TrendingDown className="h-3 w-3" />
+      )}
+      {subiu ? "+" : ""}
+      {diferenca}
+      {emPontos ? " p.p." : "%"} vs. período anterior
+    </span>
+  );
+}
+
 function Kpi({
   rotulo,
   valor,
   variacao: diferenca,
-  emPontos = false,
-  quantoMaiorPior = false,
   detalhe,
 }: {
   rotulo: string;
   valor: string;
   variacao: number | null;
-  emPontos?: boolean;
-  quantoMaiorPior?: boolean;
   detalhe?: string;
 }) {
-  const subiu = (diferenca ?? 0) >= 0;
-  const bom = quantoMaiorPior ? !subiu : subiu;
-
   return (
     <div className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
       <p className="text-xs font-bold uppercase tracking-wide text-black/45">
@@ -292,28 +353,81 @@ function Kpi({
       </p>
 
       {diferenca !== null && (
-        <span
-          className={[
-            "mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold",
-            bom
-              ? "bg-herval-verde text-herval-preto"
-              : "border border-black/25 text-black/70",
-          ].join(" ")}
-        >
-          {subiu ? (
-            <TrendingUp className="h-3 w-3" />
-          ) : (
-            <TrendingDown className="h-3 w-3" />
-          )}
-          {subiu ? "+" : ""}
-          {diferenca}
-          {emPontos ? " p.p." : "%"} vs. período anterior
-        </span>
+        <Variacao
+          diferenca={diferenca}
+          emPontos={false}
+          quantoMaiorPior={false}
+        />
       )}
 
       {detalhe && (
         <p className="mt-3 text-xs font-medium text-black/50">{detalhe}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * O lugar do Faturamento.
+ *
+ * Fica reservado, e vazio, de propósito. Não existe em nenhuma tabela o valor de
+ * uma venda realizada — o único campo de valor do sistema é a faixa aproximada
+ * da tabela de preços da clínica, que é referência, não venda. Então o card não
+ * mostra zero (que seria mentira) nem desaparece (que faria parecer que ninguém
+ * pensou nisso): ele diz o que falta.
+ */
+function SemFonteDeDados() {
+  return (
+    <div className="rounded-card border border-dashed border-black/20 bg-black/[0.02] p-6">
+      <p className="text-xs font-bold uppercase tracking-wide text-black/45">
+        Faturamento
+      </p>
+      <p className="mt-3 text-3xl font-extrabold tracking-tight text-black/25">
+        —
+      </p>
+      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-black/20 px-2.5 py-1 text-[11px] font-bold text-black/50">
+        Sem fonte de dados ainda
+      </span>
+      <p className="mt-3 text-xs font-medium text-black/50">
+        Nenhuma tabela guarda o valor de venda realizada. Enquanto não guardar,
+        este número não existe.
+      </p>
+    </div>
+  );
+}
+
+/** Indicador de segunda linha: mesma linguagem do KPI, em tamanho menor. */
+function Indicador({
+  rotulo,
+  valor,
+  variacao: diferenca,
+  quantoMaiorPior = false,
+  detalhe,
+}: {
+  rotulo: string;
+  valor: string;
+  variacao: number | null;
+  quantoMaiorPior?: boolean;
+  detalhe: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-black/45">
+        {rotulo}
+      </p>
+      <p className="mt-2 text-xl font-extrabold tracking-tight text-herval-preto">
+        {valor}
+      </p>
+
+      {diferenca !== null && (
+        <Variacao
+          diferenca={diferenca}
+          emPontos
+          quantoMaiorPior={quantoMaiorPior}
+        />
+      )}
+
+      <p className="mt-3 text-xs font-medium text-black/50">{detalhe}</p>
     </div>
   );
 }
