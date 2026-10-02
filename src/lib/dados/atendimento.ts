@@ -342,9 +342,11 @@ export type ClinicaDoLead = {
 /**
  * Uma especialidade que a clínica deste lead atende.
  *
- * Sem preço. A tabela `clinica_especialidades` tem uma coluna `valor`, mas o
- * sistema não guarda nem mostra valor de nada — nem aqui, nem em nenhuma outra
- * tela. Nada nesta leitura toca nessa coluna. Ver `especialidadesDaClinica`.
+ * Sem valor. Preço fechado não existe em nenhum campo do sistema; a única forma
+ * de valor que existe é a faixa de valor médio aproximado, que fica em
+ * `clinica_especialidades` e aparece só no bloco Comercial da Estratégia do
+ * Cliente. Nada nesta leitura toca naquela tabela. Ver
+ * `especialidadesDaClinica`.
  */
 export type EspecialidadeDaClinica = {
   id: number;
@@ -366,9 +368,10 @@ export type ConversaDoLead = {
 /**
  * Os procedimentos que a clínica atende: a união do que a equipe dela realiza.
  *
- * Não sai de `clinica_especialidades`. Aquela tabela existe, está vazia e nada
- * no painel escreve nela — enquanto isso, o que a clínica atende já está
- * gravado, procedimento por procedimento, no cadastro de cada profissional.
+ * Não sai de `clinica_especialidades`. Aquela tabela guarda a faixa de valor
+ * médio por procedimento, e só isso: quem escreve nela é o bloco Comercial da
+ * Estratégia do Cliente. Quais procedimentos a clínica atende já está gravado,
+ * procedimento por procedimento, no cadastro de cada profissional.
  * Derivar daí é o que não desatualiza: cadastrar alguém novo já muda a lista,
  * sem depender de alguém lembrar de uma segunda tela.
  *

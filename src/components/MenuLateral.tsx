@@ -33,7 +33,7 @@ const itens = [
   // O endereço segue "/especialidades" porque é o nome da tabela no banco e
   // mudá-lo quebraria qualquer link já salvo. O rótulo é a palavra da agência.
   { href: "/especialidades", rotulo: "Procedimentos", Icone: ClipboardList },
-  { href: "/estrategia", rotulo: "Estratégia da Clínica", Icone: Building2 },
+  { href: "/estrategia", rotulo: "Estratégia do Cliente", Icone: Building2 },
   {
     href: "/objecoes",
     rotulo: "Quebra de Objeções",
