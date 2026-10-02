@@ -62,9 +62,12 @@ export const QUANDO_A_AVALIACAO_E_COBRADA = [
   "Nunca",
 ] as const;
 
+// "Só a partir de" saiu em 01/10/2026. Um piso solitário — "a partir de
+// R$ 800" — é meia faixa, e meia faixa é justamente o que a regra do valor
+// médio proíbe: ou os dois limites, ou nenhum. Enquanto existiu, era uma opção
+// sem efeito nenhum: escolhê-la fazia a Helô responder igual a "Pode informar".
 export const POLITICAS_DE_VALORES = [
   "Pode informar",
-  "Só a partir de",
   "Só se perguntarem",
   "Não informa antes da avaliação",
 ] as const;

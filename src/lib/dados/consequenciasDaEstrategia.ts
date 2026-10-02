@@ -138,12 +138,10 @@ export function consequenciaDoAbatimento(valor: boolean | null): string {
 const POR_POLITICA: Record<PoliticaDeValores, string> = {
   "Pode informar":
     "A Helô pode entrar no assunto valor e, se perguntarem, passar uma média. Fechar o número, não: isso é da consulta de avaliação.",
-  "Só a partir de":
-    "A Helô pode falar em “a partir de”, sem fechar número — quem fecha é a equipe.",
   "Só se perguntarem":
     "A Helô não traz valor por conta própria. Se a pessoa perguntar, ela pode passar uma média; o valor fechado fica para a avaliação.",
   "Não informa antes da avaliação":
-    "A Helô não fala de valor antes da avaliação: nem número, nem faixa, nem “a partir de”. O assunto fica para depois.",
+    "A Helô não fala de valor antes da avaliação: nem número, nem faixa, nem média aproximada. O assunto fica para depois.",
 };
 
 export function consequenciaDaPoliticaDeValores(
