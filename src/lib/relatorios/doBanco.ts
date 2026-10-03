@@ -33,6 +33,8 @@ import {
 
 export type LinhaDeLeadDoBanco = {
   id: number;
+  /** Só a Fila usa: é o nome que aparece em quem está aguardando contato. */
+  nome: string | null;
   clinica_id: number | null;
   etapa: string;
   origem: string | null;

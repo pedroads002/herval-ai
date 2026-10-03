@@ -2,13 +2,16 @@
 
 import { useMemo } from "react";
 import { Info } from "lucide-react";
-import { useLeads } from "@/components/ProvedorLeads";
-import { indexarLigacoes, ligacoesDoLead } from "@/data/ligacoes";
-import { situacaoDaRegua } from "@/lib/regua";
-import { clinicasIniciais, nomeDaClinica } from "@/data/clinicas";
-import { historicoDeEtapasInicial, indexarPorLead } from "@/data/historicoEtapas";
+import type { Ligacao } from "@/data/ligacoes";
 import { metasPadrao } from "@/data/metas";
 import type { Clinica } from "@/data/clinicas";
+import type { Agendamento } from "@/data/agendamentos";
+import type { Lead } from "@/data/leads";
+import {
+  avisoDoHistorico,
+  montarHistoricoDoBanco,
+} from "@/lib/relatorios/historicoDoBanco";
+import type { DadosDosRelatorios } from "@/lib/dados/relatorios";
 import {
   aguardandoContato,
   ESPERA_CRITICA,
@@ -20,6 +23,7 @@ import {
 import { baseDeLeads, type Faixa } from "@/lib/relatorios";
 import { formatarNumero } from "@/lib/formato";
 import { duracao } from "@/lib/tempo";
+import AvisoDeCorte from "@/components/AvisoDeCorte";
 import {
   comPercentual,
   Kpi,
@@ -31,84 +35,109 @@ import {
   type Coluna,
 } from "@/components/PecasDeRelatorio";
 
+/**
+ * Não existe registro de ligação no banco, e é por isso que esta constante é
+ * vazia em vez de ser uma leitura.
+ *
+ * Com ela vazia, tudo que se mede da primeira tentativa de ligação sai `null`:
+ * mediana, média, cauda, e os alertas que dependem delas. `null` é o que a tela
+ * desenha como "não medido" — e é de propósito que não seja zero, porque zero
+ * ali seria lido como "ninguém esperou", que é afirmação sobre dado que não
+ * existe. Ver o mapeamento inteiro em `dados/relatorios.ts`.
+ */
+const SEM_REGISTRO_DE_LIGACAO = new Map<number, Ligacao[]>();
+
+/**
+ * A régua de recuperação (`lib/regua.ts`) conta tentativa por tentativa, com
+ * canal e desfecho, e nada disso existe no banco. Sem fonte, a lista vai vazia
+ * em vez de virar alerta calculado sobre nada.
+ */
+const SEM_RECUPERACOES: never[] = [];
+
 export default function PainelFilaAtendimento({
   faixa,
   clinicas,
   mostrarSemAtividade,
+  dados,
+  leads,
+  agendamentos,
+  agora,
 }: {
   faixa: Faixa;
   clinicas: Clinica[];
   mostrarSemAtividade: boolean;
+  dados: DadosDosRelatorios;
+  /** Os leads já convertidos pela tela, com o relógio dela. */
+  leads: Lead[];
+  agendamentos: Agendamento[];
+  /** O instante de agora: `minutosAtras` conta minutos, não dias. */
+  agora: Date;
 }) {
-  const { tarefas, ligacoes } = useLeads();
+  const calculado = useMemo(() => {
+    const base = baseDeLeads(leads);
 
-  const dados = useMemo(() => {
-    const leads = baseDeLeads(tarefas);
-    // O índice é montado uma vez: são catorze mil mudanças de etapa, e cada
-    // clínica precisa consultar o histórico lead a lead.
-    const indice = indexarPorLead(historicoDeEtapasInicial);
-    const nomes = new Map(tarefas.map((t) => [t.id, t.lead]));
+    // O índice é montado uma vez: cada clínica precisa consultar o histórico
+    // lead a lead.
+    const doBanco = montarHistoricoDoBanco(dados.leads, dados.eventos, agora);
+    const indice = doBanco.historico;
+    const nomes = new Map(
+      dados.leads
+        .filter((l) => (l.nome ?? "").trim() !== "")
+        .map((l) => [l.id, (l.nome as string).trim()]),
+    );
 
-    const porLead = indexarLigacoes(ligacoes);
     const linhas = montarFila({
-      leads,
+      leads: base,
       historico: indice,
-      ligacoes: porLead,
+      ligacoes: SEM_REGISTRO_DE_LIGACAO,
+      agendamentos,
       faixa,
       clinicas,
     });
-    const resumo = montarResumoDaFila(linhas, leads, indice, porLead, faixa);
+    const resumo = montarResumoDaFila(
+      linhas,
+      base,
+      indice,
+      SEM_REGISTRO_DE_LIGACAO,
+      faixa,
+    );
 
     // Ao vivo: não olha o período nem a clínica escolhida, de propósito.
     const esperando = aguardandoContato(
-      leads.filter((l) => l.etapa === "Leads Recebidos"),
+      base.filter((l) => l.etapa === "Leads Recebidos"),
       indice,
       nomes,
     );
 
-    // Também ao vivo: quem esgotou a rajada e está com a tentativa de
-    // recuperação vencida. É estado calculado, não alarme agendado.
-    const recuperacoes = tarefas
-      .map((tarefa) => ({
-        tarefa,
-        situacao: situacaoDaRegua(
-          ligacoesDoLead(porLead, tarefa.id),
-          tarefa.etapa,
-          metasPadrao,
-        ),
-      }))
-      .filter(({ situacao }) => situacao.estado === "recuperacao-devida")
-      .map(({ tarefa, situacao }) => ({
-        id: tarefa.id,
-        clinicaId: tarefa.clinicaId,
-        nome: tarefa.lead,
-        atraso: situacao.atrasoDaRecuperacao ?? 0,
-      }))
-      .sort((a, b) => b.atraso - a.atraso);
+    const nomeDoCliente = (id: number) =>
+      dados.clinicas.find((c) => c.id === id)?.nome ?? "Clínica removida";
 
     return {
       linhas,
       resumo,
       esperando,
+      aviso: avisoDoHistorico(doBanco.desconhecidos),
       alertas: montarAlertasDaFila(
         linhas,
         esperando,
         resumo.percentualNaCauda,
         metasPadrao,
-        nomeDaClinica,
-        recuperacoes,
+        nomeDoCliente,
+        SEM_RECUPERACOES,
       ),
     };
-  }, [tarefas, ligacoes, faixa, clinicas]);
+  }, [dados, leads, agendamentos, agora, faixa, clinicas]);
 
-  const { linhas, resumo, esperando, alertas } = dados;
+  const { linhas, resumo, esperando, alertas } = calculado;
 
   const visiveis = mostrarSemAtividade
     ? linhas
     : linhas.filter((l) => l.recebidos > 0 || l.contatados > 0);
   const escondidas = linhas.length - visiveis.length;
 
-  const esperandoPorClinica = clinicasIniciais
+  // Todos os clientes, e não os filtrados: este bloco é o estado de agora em
+  // todas as clínicas, como o próprio cartão ao lado diz.
+  const esperandoPorClinica = dados.clinicas
     .map((clinica) => ({
       clinica,
       leads: esperando.filter((l) => l.clinicaId === clinica.id),
@@ -125,8 +154,12 @@ export default function PainelFilaAtendimento({
       .map((a) => Number(a.id.replace("cauda-", ""))),
   );
 
+  const semMedidaDeTempo = resumo.resposta.atendidos === 0;
+
   return (
     <div className="space-y-8">
+      <AvisoDeCorte aviso={calculado.aviso} />
+
       {/* KPIs do período */}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
@@ -143,10 +176,10 @@ export default function PainelFilaAtendimento({
         />
         <Kpi
           rotulo="Tempo de resposta"
-          valor={mediana === null ? "sem amostra" : duracao(mediana)}
+          valor={mediana === null ? "não medido" : duracao(mediana)}
           detalhe={
             mediana === null
-              ? "nenhum lead de campanha com ligação registrada no período — o campo fica vazio em vez de mostrar o número de outro recorte"
+              ? "mede da chegada do lead até a primeira tentativa de ligação, e o sistema ainda não registra ligação — o campo fica vazio em vez de mostrar zero, que seria lido como atendimento imediato"
               : `mediana até a primeira tentativa de ligação, sobre ${formatarNumero(
                   resumo.resposta.atendidos,
                 )} ${resumo.resposta.atendidos === 1 ? "lead" : "leads"} com ligação registrada`
@@ -237,14 +270,14 @@ export default function PainelFilaAtendimento({
       <PontosDeAtencao
         alertas={alertas}
         visiveis={metasPadrao.alertasVisiveis}
-        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento.`}
-        vazio="Nenhum lead parado, nenhuma recuperação vencida e nenhuma clínica com cauda fora do padrão da base no período."
+        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento. Dos três, só o primeiro está medido hoje: os outros dois dependem de registro de ligação, que o sistema ainda não tem — então não há como dizer que eles estão em ordem, apenas que não foram verificados.`}
+        vazio="Nenhum lead parado há mais de um dia sem contato. Recuperação vencida e cauda fora do padrão não foram verificadas: dependem de registro de ligação, que o sistema ainda não tem."
       />
 
       {/* Tabela por clínica */}
       <Tabela
         titulo="Atendimento por clínica (leads do período)"
-        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos, contatados e agendados contam a base inteira, e são os mesmos números dos Relatórios. Já a mediana e a média contam só os leads com ligação registrada, porque o tempo de resposta passou a ser medido da chegada até a primeira tentativa de ligação, e o histórico antigo não tem esse registro — por isso as colunas de tempo podem estar vazias onde há volume. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
+        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos, contatados e agendados contam a base inteira, e são os mesmos números dos Relatórios. Já a mediana e a média contam só os leads com ligação registrada, porque o tempo de resposta é medido da chegada até a primeira tentativa de ligação — e o sistema ainda não registra ligação, então essas duas colunas aparecem vazias mesmo onde há volume. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
         cabecalhos={[
           "Clínica",
           "Recebidos",
@@ -299,38 +332,47 @@ export default function PainelFilaAtendimento({
           de automação: primeiro contato em até cinco minutos.
         </p>
 
-        <ul className="mt-7 space-y-4">
-          {resumo.distribuicao.map(({ faixa: faixaDeEspera, quantidade }) => {
-            const maior = Math.max(
-              1,
-              ...resumo.distribuicao.map((d) => d.quantidade),
-            );
-            const largura = Math.round((quantidade / maior) * 100);
-            const ruim = faixaDeEspera.ate > ESPERA_CRITICA;
+        {semMedidaDeTempo ? (
+          <p className="mt-6 text-sm font-medium leading-relaxed text-black/60">
+            Não medido. Esta distribuição conta quanto cada lead esperou até a
+            primeira tentativa de ligação, e o sistema ainda não registra
+            ligação. As faixas ficam em branco em vez de aparecerem zeradas,
+            porque zero aqui seria lido como “ninguém esperou”.
+          </p>
+        ) : (
+          <ul className="mt-7 space-y-4">
+            {resumo.distribuicao.map(({ faixa: faixaDeEspera, quantidade }) => {
+              const maior = Math.max(
+                1,
+                ...resumo.distribuicao.map((d) => d.quantidade),
+              );
+              const largura = Math.round((quantidade / maior) * 100);
+              const ruim = faixaDeEspera.ate > ESPERA_CRITICA;
 
-            return (
-              <li key={faixaDeEspera.id}>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-sm font-medium text-black/70">
-                    {faixaDeEspera.rotulo}
-                  </span>
-                  <span className="text-sm font-extrabold tabular-nums text-herval-preto">
-                    {formatarNumero(quantidade)}
-                  </span>
-                </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/5">
-                  <div
-                    className={[
-                      "h-full rounded-full",
-                      ruim ? "bg-herval-vermelho" : "bg-herval-verde",
-                    ].join(" ")}
-                    style={{ width: `${largura}%` }}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+              return (
+                <li key={faixaDeEspera.id}>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-sm font-medium text-black/70">
+                      {faixaDeEspera.rotulo}
+                    </span>
+                    <span className="text-sm font-extrabold tabular-nums text-herval-preto">
+                      {formatarNumero(quantidade)}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/5">
+                    <div
+                      className={[
+                        "h-full rounded-full",
+                        ruim ? "bg-herval-vermelho" : "bg-herval-verde",
+                      ].join(" ")}
+                      style={{ width: `${largura}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
