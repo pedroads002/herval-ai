@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Info, RefreshCw } from "lucide-react";
-import { useLeads } from "@/components/ProvedorLeads";
-import { clinicasIniciais } from "@/data/clinicas";
 import { metasPadrao } from "@/data/metas";
+import type { DadosDosRelatorios } from "@/lib/dados/relatorios";
+import {
+  avisoDosDesconhecidos,
+  montarAgendamentosDoBanco,
+  montarLeadsDoBanco,
+} from "@/lib/relatorios/doBanco";
+import AvisoDeCorte from "@/components/AvisoDeCorte";
 import {
   baseDeLeads,
   dentroDaFaixa,
@@ -98,9 +103,20 @@ const relogio = new Intl.DateTimeFormat("pt-BR", {
   minute: "2-digit",
 });
 
-export default function PainelRelatorios() {
-  const { tarefas, agendamentos } = useLeads();
-
+/**
+ * Os números vêm do banco, lidos pela página em `dados/relatorios.ts`. A
+ * conversão para dias atrás acontece aqui, e não no servidor, pelo motivo
+ * explicado em `lib/relatorios/doBanco.ts`: é o mesmo `hoje` que monta a faixa
+ * do período.
+ *
+ * A aba "Fila de Atendimento" segue na fonte em memória — ela depende de
+ * registro de ligação, que não existe no banco. Ver `dados/relatorios.ts`.
+ */
+export default function PainelRelatorios({
+  dados,
+}: {
+  dados: DadosDosRelatorios;
+}) {
   const [hoje, setHoje] = useState<Date | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
   const [preset, setPreset] = useState<Preset>("Este mês");
@@ -131,15 +147,39 @@ export default function PainelRelatorios() {
   const clinicasFiltradas = useMemo(
     () =>
       clinicaId === "todas"
-        ? clinicasIniciais
-        : clinicasIniciais.filter((c) => c.id === clinicaId),
-    [clinicaId],
+        ? dados.clinicas
+        : dados.clinicas.filter((c) => c.id === clinicaId),
+    [clinicaId, dados.clinicas],
   );
 
-  const dados = useMemo(() => {
-    if (!faixa) return null;
+  // A conversão das linhas do banco depende de que dia é hoje, e refaz junto
+  // com ele — não com a faixa, que só recorta o que já foi convertido.
+  const doBanco = useMemo(() => {
+    if (!hoje) return null;
 
-    const leads = baseDeLeads(tarefas);
+    const clinicaPorUnidade = new Map(dados.clinicaPorUnidade);
+    const leads = montarLeadsDoBanco(dados.leads, hoje);
+    const agendamentos = montarAgendamentosDoBanco(
+      dados.agendamentos,
+      clinicaPorUnidade,
+      hoje,
+    );
+
+    return {
+      leads: leads.leads,
+      agendamentos: agendamentos.agendamentos,
+      aviso: avisoDosDesconhecidos({
+        ...leads.desconhecidos,
+        ...agendamentos.desconhecidos,
+      }),
+    };
+  }, [dados, hoje]);
+
+  const calculado = useMemo(() => {
+    if (!faixa || !doBanco) return null;
+
+    const agendamentos = doBanco.agendamentos;
+    const leads = baseDeLeads(doBanco.leads);
     const funil = montarFunil({
       leads,
       agendamentos,
@@ -171,9 +211,17 @@ export default function PainelRelatorios() {
       resumo: montarResumo(funil, producao, doPeriodo, faixa),
       alertas: montarAlertas(funil, producao, metasPadrao),
     };
-  }, [faixa, tarefas, agendamentos, clinicasFiltradas]);
+  }, [faixa, doBanco, clinicasFiltradas]);
 
-  if (!hoje || !faixa || !dados) {
+  if (dados.falha) {
+    return (
+      <div className="rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-6">
+        <p className="text-sm font-medium text-black/60">{dados.falha}</p>
+      </div>
+    );
+  }
+
+  if (!hoje || !faixa || !calculado || !doBanco) {
     return (
       <p className="text-sm font-medium text-black/45">
         Carregando os relatórios...
@@ -181,7 +229,7 @@ export default function PainelRelatorios() {
     );
   }
 
-  const { funil, producao, follow, resumo, alertas } = dados;
+  const { funil, producao, follow, resumo, alertas } = calculado;
   const producaoPorId = new Map(producao.map((l) => [l.clinica.id, l]));
 
   const visiveis = (linha: LinhaFunil) =>
@@ -219,6 +267,8 @@ export default function PainelRelatorios() {
 
   return (
     <div className="space-y-8">
+      <AvisoDeCorte aviso={doBanco.aviso} />
+
       {/* Abas */}
       <div className="inline-flex rounded-full border border-black/15 bg-herval-branco p-1">
         {abas.map((opcao) => {
@@ -308,7 +358,7 @@ export default function PainelRelatorios() {
                 className={estiloCampo}
               >
                 <option value="todas">Todas as clínicas</option>
-                {clinicasIniciais.map((c) => (
+                {dados.clinicas.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}
                     {c.ativa ? "" : " (pausada)"}
