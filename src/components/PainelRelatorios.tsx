@@ -177,26 +177,33 @@ export default function PainelRelatorios({
   }, [dados, hoje]);
 
   const calculado = useMemo(() => {
-    if (!faixa || !doBanco) return null;
+    if (!faixa || !doBanco || !hoje) return null;
 
     const agendamentos = doBanco.agendamentos;
     const leads = baseDeLeads(doBanco.leads);
+    // O mesmo relógio que a Fila usa: é ele que decide se a consulta de hoje já
+    // passou do horário dela. Meia-noite de hoje é o piso seguro — por ela,
+    // nenhuma consulta de hoje conta como passada.
+    const agora = atualizadoEm ?? hoje;
     const funil = montarFunil({
       leads,
       agendamentos,
       faixa,
       clinicas: clinicasFiltradas,
+      agora,
     });
     const producao = montarProducao({
       agendamentos,
       faixa,
       clinicas: clinicasFiltradas,
+      agora,
     });
     const follow = montarFollow({
       leads,
       agendamentos,
       faixa,
       clinicas: clinicasFiltradas,
+      agora,
     });
 
     const doPeriodo = agendamentos.filter(
@@ -212,7 +219,7 @@ export default function PainelRelatorios({
       resumo: montarResumo(funil, producao, doPeriodo, faixa),
       alertas: montarAlertas(funil, producao, metasPadrao),
     };
-  }, [faixa, doBanco, clinicasFiltradas]);
+  }, [faixa, doBanco, clinicasFiltradas, atualizadoEm, hoje]);
 
   if (dados.falha) {
     return (
@@ -468,7 +475,12 @@ export default function PainelRelatorios({
             <Kpi
               rotulo="Show-rate da produção"
               valor={comPercentual(resumo.showRateProducao)}
-              detalhe={`${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoAteAData)} consultas até a data`}
+              detalhe={
+                `${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoComDesfecho)} consultas com desfecho registrado` +
+                (resumo.aguardandoBaixa > 0
+                  ? ` · ${formatarNumero(resumo.aguardandoBaixa)} ${resumo.aguardandoBaixa === 1 ? "consulta já aconteceu e está sem baixa, fora da conta" : "consultas já aconteceram e estão sem baixa, fora da conta"}`
+                  : "")
+              }
               alerta={
                 resumo.showRateProducao !== null &&
                 resumo.showRateProducao < metasPadrao.pisoShowRate
@@ -508,7 +520,7 @@ export default function PainelRelatorios({
           <Tabela
             titulo="Funil de marketing (consultas do período)"
             legenda={
-              'Conta os leads pela safra — o mês em que chegaram. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho.' +
+              'Conta os leads pela safra — o mês em que chegaram. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho registrado: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
               (resumo.inalcancaveis > 0
                 ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
                 : "")
@@ -522,6 +534,7 @@ export default function PainelRelatorios({
               "Até a data",
               "Consulta futura",
               "Compareceram",
+              "Sem baixa",
               "% compar.",
               "% agend./qualif.",
             ]}
@@ -543,6 +556,9 @@ export default function PainelRelatorios({
                 <Num>{linha.ateAData}</Num>
                 <Num>{linha.consultaFutura}</Num>
                 <Num>{linha.compareceram}</Num>
+                <Num alerta={linha.aguardandoBaixa > 0}>
+                  {linha.aguardandoBaixa}
+                </Num>
                 <Num>{comPercentual(linha.taxaComparecimento)}</Num>
                 <Num
                   alerta={
@@ -589,7 +605,7 @@ export default function PainelRelatorios({
           <Tabela
             titulo="Produção de agendamentos (pelo ato de agendar)"
             selo="Métrica oficial de comparecimento"
-            legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas dessa produção que já aconteceram; as futuras ficam de fora do cálculo."
+            legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas que já aconteceram e têm desfecho registrado: as futuras e as que estão sem baixa ficam de fora do cálculo. Consulta sem baixa não é falta — é consulta esperando alguém marcar se o paciente veio."
             cabecalhos={[
               "Clínica",
               "Agendamentos",
@@ -597,6 +613,8 @@ export default function PainelRelatorios({
               "Consulta até a data",
               "Consulta futura",
               "Compareceram",
+              "Faltaram",
+              "Sem baixa",
               "Show-rate",
             ]}
             vazio={producaoVisivel.length === 0}
@@ -615,10 +633,14 @@ export default function PainelRelatorios({
                 <Num>{linha.consultaAteAData}</Num>
                 <Num>{linha.consultaFutura}</Num>
                 <Num>{linha.compareceram}</Num>
+                <Num>{linha.faltaram}</Num>
+                <Num alerta={linha.aguardandoBaixa > 0}>
+                  {linha.aguardandoBaixa}
+                </Num>
                 <Num
                   alerta={
                     linha.showRate !== null &&
-                    linha.consultaAteAData >= metasPadrao.amostraMinima &&
+                    linha.comDesfecho >= metasPadrao.amostraMinima &&
                     linha.showRate < metasPadrao.pisoShowRate
                   }
                 >
@@ -686,7 +708,8 @@ const colunasFunil: Coluna<LinhaFunil>[] = [
   { tipo: "soma", valor: (l) => l.ateAData },
   { tipo: "soma", valor: (l) => l.consultaFutura },
   { tipo: "soma", valor: (l) => l.compareceram },
-  { tipo: "taxa", parte: (l) => l.compareceram, total: (l) => l.ateAData },
+  { tipo: "soma", valor: (l) => l.aguardandoBaixa },
+  { tipo: "taxa", parte: (l) => l.compareceram, total: (l) => l.comDesfecho },
   {
     tipo: "taxa",
     parte: (l) => l.agendadosDaSafra,
@@ -705,9 +728,11 @@ const colunasProducao: Coluna<LinhaProducao>[] = [
   { tipo: "soma", valor: (l) => l.consultaAteAData },
   { tipo: "soma", valor: (l) => l.consultaFutura },
   { tipo: "soma", valor: (l) => l.compareceram },
+  { tipo: "soma", valor: (l) => l.faltaram },
+  { tipo: "soma", valor: (l) => l.aguardandoBaixa },
   {
     tipo: "taxa",
     parte: (l) => l.compareceram,
-    total: (l) => l.consultaAteAData,
+    total: (l) => l.comDesfecho,
   },
 ];

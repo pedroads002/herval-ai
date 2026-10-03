@@ -8,19 +8,15 @@ import {
 import type { Metas } from "@/data/metas";
 import { agendamentosIniciais, type Agendamento } from "@/data/agendamentos";
 import { primeiraTentativa, type Ligacoes } from "@/data/ligacoes";
-import {
-  dentroDaFaixa,
-  taxa,
-  type Alerta,
-  type Faixa,
-} from "@/lib/relatorios";
+import { dentroDaFaixa, taxa, type Alerta, type Faixa } from "@/lib/relatorios";
 
 /**
  * O histórico pode chegar como lista ou já agrupado por lead. Medir a base
  * inteira lead a lead numa lista de catorze mil linhas seria varrer tudo três
  * mil vezes; quem faz conta em massa passa o índice.
  */
-export type HistoricoDeEtapas = MudancaDeEtapa[] | Map<number, MudancaDeEtapa[]>;
+export type HistoricoDeEtapas =
+  MudancaDeEtapa[] | Map<number, MudancaDeEtapa[]>;
 
 function doLead(historico: HistoricoDeEtapas, leadId: number) {
   return historico instanceof Map
@@ -197,7 +193,7 @@ export type LinhaFila = {
   contatados: number;
   taxaDeContato: number | null;
   resposta: TempoDeResposta;
-  /** Quantos leads da clínica esperaram 12h ou mais. */
+  /** Quantos leads da clínica esperaram mais de 12h — o corte de `estaNaCauda`. */
   naCauda: number;
   percentualNaCauda: number | null;
   agendados: number;
@@ -325,7 +321,8 @@ export function montarResumoDaFila(
   const medidos = doPeriodo
     .filter(
       (l) =>
-        idsVisiveis.has(l.clinicaId) && primeiraTentativa(ligacoes, l.id) !== null,
+        idsVisiveis.has(l.clinicaId) &&
+        primeiraTentativa(ligacoes, l.id) !== null,
     )
     .map((l) => minutosAteAPrimeiraTentativa(indice, ligacoes, l.id));
 
@@ -336,7 +333,10 @@ export function montarResumoDaFila(
   return {
     recebidos: soma((l) => l.recebidos),
     contatados: soma((l) => l.contatados),
-    taxaDeContato: taxa(soma((l) => l.contatados), soma((l) => l.recebidos)),
+    taxaDeContato: taxa(
+      soma((l) => l.contatados),
+      soma((l) => l.recebidos),
+    ),
     resposta,
     agendados: soma((l) => l.agendados),
     distribuicao: faixasDeResposta.map((f) => ({
@@ -467,4 +467,3 @@ export function montarAlertasDaFila(
       a.clinica.localeCompare(b.clinica),
   );
 }
-
