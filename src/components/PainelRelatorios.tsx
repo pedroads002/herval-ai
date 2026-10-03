@@ -109,8 +109,9 @@ const relogio = new Intl.DateTimeFormat("pt-BR", {
  * explicado em `lib/relatorios/doBanco.ts`: é o mesmo `hoje` que monta a faixa
  * do período.
  *
- * A aba "Fila de Atendimento" segue na fonte em memória — ela depende de
- * registro de ligação, que não existe no banco. Ver `dados/relatorios.ts`.
+ * A aba "Fila de Atendimento" lê o mesmo pacote, mais as mudanças de etapa. O
+ * que ela não consegue medir — tempo de resposta e cauda, que dependem de
+ * registro de ligação — aparece lá como não medido. Ver `dados/relatorios.ts`.
  */
 export default function PainelRelatorios({
   dados,
@@ -425,6 +426,12 @@ export default function PainelRelatorios({
           faixa={faixa}
           clinicas={clinicasFiltradas}
           mostrarSemAtividade={mostrarSemAtividade}
+          dados={dados}
+          leads={doBanco.leads}
+          agendamentos={doBanco.agendamentos}
+          // O instante de agora, e não a meia-noite de hoje: a espera pelo
+          // primeiro contato é contada em minutos.
+          agora={atualizadoEm ?? hoje}
         />
       ) : (
         <div className="space-y-8">

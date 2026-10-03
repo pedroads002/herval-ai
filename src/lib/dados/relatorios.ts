@@ -10,11 +10,19 @@
  * mesmas tabelas e com os mesmos campos: nenhum segundo jeito de buscar lead,
  * consulta ou cliente.
  *
- * O que NÃO vem daqui: a aba "Fila de Atendimento". Ela se sustenta em registro
- * de ligação (canal, tentativa, desfecho, minutos até a primeira tentativa), e
- * não existe tabela de ligações no banco. Enquanto não existir, aquela aba
- * continua na fonte em memória — número de tempo de resposta saído de tabela
- * que não existe seria invenção com cara de medição.
+ * A aba "Fila de Atendimento" vem daqui pela metade, e a metade importa:
+ *
+ * - **Vem:** recebidos, contatados, % de contato, agendados, quem está
+ *   aguardando contato e o alerta de lead parado. Tudo isso sai de
+ *   `lead_etapa_eventos`, que guarda a entrada do lead em "Em Contato" — a
+ *   definição oficial de primeiro contato, intocada.
+ * - **Não vem:** tempo de resposta (mediana, média), a cauda, o alerta de cauda
+ *   desproporcional e o alerta de recuperação vencida. Esses quatro medem da
+ *   chegada até a *primeira tentativa de ligação*, e não existe registro de
+ *   ligação no banco: `mensagens` guarda conversa, não telefone, e não tem
+ *   canal, número de tentativa nem desfecho. Na tela eles aparecem como não
+ *   medidos, nunca como zero — número de ligação saído de tabela que não
+ *   registra ligação seria invenção com cara de medição.
  *
  * Roda apenas no servidor.
  */
@@ -27,10 +35,13 @@ import {
   type LinhaDeClinicaDoBanco,
   type LinhaDeLeadDoBanco,
 } from "@/lib/relatorios/doBanco";
+import type { LinhaDeEventoDeEtapaDoBanco } from "@/lib/relatorios/historicoDoBanco";
 
 export type DadosDosRelatorios = {
   leads: LinhaDeLeadDoBanco[];
   agendamentos: LinhaDeAgendamentoDoBanco[];
+  /** As mudanças de etapa, de onde sai a espera pelo primeiro contato. */
+  eventos: LinhaDeEventoDeEtapaDoBanco[];
   /** Qual cliente é dono de cada unidade, como pares para cruzar o mar de ids. */
   clinicaPorUnidade: [number, number | null][];
   clinicas: Clinica[];
@@ -44,13 +55,20 @@ const TETO_DE_LINHAS = 1000;
 const SEM_DADOS: DadosDosRelatorios = {
   leads: [],
   agendamentos: [],
+  eventos: [],
   clinicaPorUnidade: [],
   clinicas: [],
   falha: null,
   aviso: null,
 };
 
-const CAMPOS_DO_LEAD = "id, clinica_id, etapa, origem, criado_em, motivo_perda";
+// `nome` entra para a lista de quem está aguardando contato e para o alerta de
+// lead parado: os dois nomeiam o lead, e sem isso diriam só "Lead 30".
+const CAMPOS_DO_LEAD =
+  "id, nome, clinica_id, etapa, origem, criado_em, motivo_perda";
+
+const CAMPOS_DO_EVENTO =
+  "id, lead_id, de_etapa, para_etapa, autor_nome, criado_em";
 
 const CAMPOS_DO_AGENDAMENTO =
   "id, lead_id, unidade_id, profissional_id, especialidade_id, data_consulta, hora_consulta, status, confirmada, fechado_por, observacao, criado_em";
@@ -75,6 +93,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
   const [
     respostaDosLeads,
     respostaDosAgendamentos,
+    respostaDosEventos,
     respostaDasUnidades,
     respostaDasClinicas,
   ] = await Promise.all([
@@ -86,6 +105,14 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     supabase
       .from("agendamentos")
       .select(CAMPOS_DO_AGENDAMENTO)
+      .order("criado_em", { ascending: false })
+      .limit(TETO_DE_LINHAS),
+    // As mudanças de etapa. Sem corte por data pelo mesmo motivo dos outros: a
+    // espera de um lead se mede da chegada dele, que pode ser de antes do
+    // período escolhido.
+    supabase
+      .from("lead_etapa_eventos")
+      .select(CAMPOS_DO_EVENTO)
       .order("criado_em", { ascending: false })
       .limit(TETO_DE_LINHAS),
     // `agendamentos` guarda a unidade, não a clínica. O relatório é por
@@ -103,6 +130,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
   const erro =
     respostaDosLeads.error ??
     respostaDosAgendamentos.error ??
+    respostaDosEventos.error ??
     respostaDasUnidades.error ??
     respostaDasClinicas.error;
 
@@ -116,6 +144,9 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
   const leads = (respostaDosLeads.data ?? []) as LinhaDeLeadDoBanco[];
   const agendamentos = (respostaDosAgendamentos.data ??
     []) as LinhaDeAgendamentoDoBanco[];
+
+  const eventos = (respostaDosEventos.data ??
+    []) as LinhaDeEventoDeEtapaDoBanco[];
 
   const unidades = (respostaDasUnidades.data ?? []) as {
     id: number;
@@ -140,14 +171,15 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
   return {
     leads,
     agendamentos,
+    eventos,
     clinicaPorUnidade: unidades.map((u) => [u.id, u.clinica_id]),
     clinicas,
     falha: null,
-    aviso: montarAviso(leads.length, agendamentos.length),
+    aviso: montarAviso(leads.length, agendamentos.length, eventos.length),
   };
 }
 
-function montarAviso(leads: number, agendamentos: number) {
+function montarAviso(leads: number, agendamentos: number, eventos: number) {
   const avisos: string[] = [];
 
   if (leads >= TETO_DE_LINHAS) {
@@ -159,6 +191,12 @@ function montarAviso(leads: number, agendamentos: number) {
   if (agendamentos >= TETO_DE_LINHAS) {
     avisos.push(
       `O relatório está contando no máximo ${TETO_DE_LINHAS} consultas, as marcadas mais recentemente. Nada foi perdido no banco, mas estes números não cobrem a base inteira.`,
+    );
+  }
+
+  if (eventos >= TETO_DE_LINHAS) {
+    avisos.push(
+      `A Fila de Atendimento está lendo no máximo ${TETO_DE_LINHAS} mudanças de etapa, as mais recentes. Lead cuja entrada em "Em Contato" ficou fora desse corte aparece como ainda não contatado.`,
     );
   }
 
