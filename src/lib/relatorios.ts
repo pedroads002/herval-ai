@@ -92,6 +92,35 @@ export function baseDeLeads(daFila: Lead[]): Lead[] {
   return [...daFila, ...leadsHistoricos];
 }
 
+/**
+ * Se a consulta já aconteceu no instante `agora`.
+ *
+ * O dia não basta: a consulta de hoje às 14h não aconteceu às 8h da manhã, e
+ * tratá-la como passada a jogava para dentro das contas de comparecimento antes
+ * da hora. Agendamento sem hora marcada só conta como passado depois que o dia
+ * inteiro terminou — é o mais tarde que ele poderia ter acontecido, e errar para
+ * esse lado não inventa desfecho nenhum.
+ */
+export function jaAconteceu(agendamento: Agendamento, agora: Date): boolean {
+  if (agendamento.consultaEmDias > 0) return true;
+  if (agendamento.consultaEmDias < 0) return false;
+
+  if (agendamento.hora === null) return false;
+  const [hora, minuto] = agendamento.hora.split(":").map(Number);
+  if (!Number.isFinite(hora) || !Number.isFinite(minuto)) return false;
+
+  return agora.getHours() * 60 + agora.getMinutes() >= hora * 60 + minuto;
+}
+
+/**
+ * O desfecho de uma consulta que já aconteceu, do ponto de vista de quem mede
+ * comparecimento. "Agendada" depois da hora não é desfecho: é consulta sem
+ * baixa, e ela fica de fora das taxas em vez de virar falta por eliminação.
+ */
+function temDesfecho(agendamento: Agendamento) {
+  return agendamento.status === "Compareceu" || agendamento.status === "Faltou";
+}
+
 export const percentualCru = (parte: number, total: number) =>
   total === 0 ? 0 : (parte / total) * 100;
 
@@ -113,6 +142,14 @@ export type LinhaFunil = {
   ateAData: number;
   consultaFutura: number;
   compareceram: number;
+  /**
+   * Consultas que já aconteceram e têm desfecho registrado (compareceu ou
+   * faltou). É o denominador de "% compar.": consulta sem baixa não tem como
+   * entrar numa taxa de presença.
+   */
+  comDesfecho: number;
+  /** Já aconteceram e ninguém registrou o desfecho. Trabalho pendente, não falta. */
+  aguardandoBaixa: number;
   taxaComparecimento: number | null;
   /**
    * Quantos dos qualificados desta safra chegaram a marcar consulta. É outro
@@ -146,6 +183,12 @@ export type LinhaProducao = {
   consultaAteAData: number;
   consultaFutura: number;
   compareceram: number;
+  /** Só quem está marcado "Faltou". Consulta sem baixa não é falta. */
+  faltaram: number;
+  /** Compareceu + faltou: o denominador honesto do show-rate. */
+  comDesfecho: number;
+  /** Já aconteceram e continuam sem baixa. Ficam fora de toda taxa. */
+  aguardandoBaixa: number;
   showRate: number | null;
 };
 
@@ -154,6 +197,12 @@ type Entrada = {
   agendamentos?: Agendamento[];
   faixa: Faixa;
   clinicas?: Clinica[];
+  /**
+   * O instante em que a tela está medindo. Vem de fora pelo mesmo motivo dos
+   * campos de dia: quem sabe que horas são no fuso do usuário é a tela, não o
+   * servidor. Só decide se a consulta de hoje já passou do horário dela.
+   */
+  agora: Date;
 };
 
 function porClinica<T>(
@@ -172,6 +221,7 @@ export function montarFunil({
   agendamentos = agendamentosIniciais,
   faixa,
   clinicas = clinicasIniciais,
+  agora,
 }: Entrada): LinhaFunil[] {
   return porClinica(clinicas, (clinica) => {
     const daClinica = leads.filter(
@@ -193,9 +243,10 @@ export function montarFunil({
         dentroDaFaixa(a.consultaEmDias, faixa),
     );
 
-    const jaAconteceram = consultas.filter((a) => a.consultaEmDias >= 0);
-    const futuras = consultas.filter((a) => a.consultaEmDias < 0);
+    const jaAconteceram = consultas.filter((a) => jaAconteceu(a, agora));
+    const futuras = consultas.filter((a) => !jaAconteceu(a, agora));
     const compareceram = jaAconteceram.filter((a) => a.status === "Compareceu");
+    const comDesfecho = jaAconteceram.filter(temDesfecho).length;
 
     const comConsulta = new Set(
       agendamentos.filter((a) => a.status !== "Cancelada").map((a) => a.leadId),
@@ -213,7 +264,9 @@ export function montarFunil({
       ateAData: jaAconteceram.length,
       consultaFutura: futuras.length,
       compareceram: compareceram.length,
-      taxaComparecimento: taxa(compareceram.length, jaAconteceram.length),
+      comDesfecho,
+      aguardandoBaixa: jaAconteceram.length - comDesfecho,
+      taxaComparecimento: taxa(compareceram.length, comDesfecho),
       agendadosDaSafra,
       taxaAgendamento: taxa(agendadosDaSafra, qualificados),
       inalcancaveis: daClinica.filter(
@@ -260,6 +313,7 @@ export function montarProducao({
   agendamentos = agendamentosIniciais,
   faixa,
   clinicas = clinicasIniciais,
+  agora,
 }: Omit<Entrada, "leads"> & { leads?: Lead[] }): LinhaProducao[] {
   // Calculado sobre a lista inteira, e não só sobre o período: o agendamento
   // que falhou antes pode estar fora da faixa e mesmo assim é ele que faz o
@@ -273,9 +327,11 @@ export function montarProducao({
 
     const cancelados = doPeriodo.filter((a) => a.status === "Cancelada");
     const vivos = doPeriodo.filter((a) => a.status !== "Cancelada");
-    const ateAData = vivos.filter((a) => a.consultaEmDias >= 0);
-    const futuras = vivos.filter((a) => a.consultaEmDias < 0);
+    const ateAData = vivos.filter((a) => jaAconteceu(a, agora));
+    const futuras = vivos.filter((a) => !jaAconteceu(a, agora));
     const compareceram = ateAData.filter((a) => a.status === "Compareceu");
+    const faltaram = ateAData.filter((a) => a.status === "Faltou");
+    const comDesfecho = compareceram.length + faltaram.length;
 
     return {
       clinica,
@@ -285,7 +341,10 @@ export function montarProducao({
       consultaAteAData: ateAData.length,
       consultaFutura: futuras.length,
       compareceram: compareceram.length,
-      showRate: taxa(compareceram.length, ateAData.length),
+      faltaram: faltaram.length,
+      comDesfecho,
+      aguardandoBaixa: ateAData.length - comDesfecho,
+      showRate: taxa(compareceram.length, comDesfecho),
     };
   });
 }
@@ -303,6 +362,10 @@ export type ResumoGeral = {
   producao: number;
   producaoCompareceu: number;
   producaoAteAData: number;
+  /** Das consultas acima, quantas têm desfecho. É a base do show-rate e do no-show. */
+  producaoComDesfecho: number;
+  /** Já aconteceram e continuam sem baixa: não são falta nem presença. */
+  aguardandoBaixa: number;
   showRateProducao: number | null;
   /** Agendamentos do período que são remarcação, e o percentual deles. */
   remarcacoes: number;
@@ -337,8 +400,11 @@ export function montarResumo(
 
   const totalProducao = soma(producao, (l) => l.agendamentos);
   const remarcacoes = soma(producao, (l) => l.remarcacoes);
-  // No-show é o avesso do show-rate, sobre as consultas que já aconteceram.
-  const faltas = producaoAteAData - producaoCompareceu;
+  const producaoComDesfecho = soma(producao, (l) => l.comDesfecho);
+  // Falta é só o que foi registrado como falta. Antes isto era "já aconteceu
+  // menos quem compareceu", e aí toda consulta que ninguém deu baixa virava
+  // falta: o no-show subia sozinho por trabalho pendente, não por ausência.
+  const faltas = soma(producao, (l) => l.faltaram);
 
   return {
     leadsMarketing: soma(funil, (l) => l.leads),
@@ -350,11 +416,13 @@ export function montarResumo(
     producao: totalProducao,
     producaoCompareceu,
     producaoAteAData,
-    showRateProducao: taxa(producaoCompareceu, producaoAteAData),
+    producaoComDesfecho,
+    aguardandoBaixa: soma(producao, (l) => l.aguardandoBaixa),
+    showRateProducao: taxa(producaoCompareceu, producaoComDesfecho),
     remarcacoes,
     taxaReagendamento: taxa(remarcacoes, totalProducao),
     faltas,
-    taxaNoShow: taxa(faltas, producaoAteAData),
+    taxaNoShow: taxa(faltas, producaoComDesfecho),
     fechadosPelaIa: pelaIa,
     fechadosPeloCrc: doPeriodo.length - pelaIa,
     percentualIa: taxa(pelaIa, doPeriodo.length),
@@ -457,7 +525,9 @@ export function montarAlertas(
     if (
       prod &&
       prod.showRate !== null &&
-      prod.consultaAteAData >= metas.amostraMinima &&
+      // A amostra do show-rate é o que tem desfecho, não tudo que já passou:
+      // alerta em cima de uma consulta com baixa seria alarme falso.
+      prod.comDesfecho >= metas.amostraMinima &&
       prod.showRate < metas.pisoShowRate
     ) {
       const critico = prod.showRate < metas.showRateCritico;
