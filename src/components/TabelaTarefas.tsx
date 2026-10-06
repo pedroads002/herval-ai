@@ -48,12 +48,29 @@ function estiloScore(nivel: NivelScore) {
     : "border border-black/20 text-black/70";
 }
 
+/**
+ * O nome do cliente da agência vem do banco, junto da tarefa.
+ * `nomeDaClinica` é o caminho antigo, do cadastro fixo em `clinicas.ts`, que
+ * está vazio e responderia "Clínica removida" para todo lead real.
+ */
+function nomeDoCliente(tarefa: { cliente?: string | null; clinicaId: number }) {
+  return tarefa.cliente ?? nomeDaClinica(tarefa.clinicaId);
+}
+
 export default function TabelaTarefas() {
   // A base é a mesma do Funil: mover um card lá muda esta tabela na hora.
-  const { tarefas, mensagens, definirStatus } = useLeads();
+  const { tarefas, avisoDaFila, mensagens, definirStatus } = useLeads();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroDeSituacao>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
+  // O que o banco recusou na última decisão. Sem isto o clique falharia em
+  // silêncio e o CRC acharia que registrou.
+  const [recusa, setRecusa] = useState<string | null>(null);
+
+  /** Grava a decisão e mostra o motivo quando o banco não aceita. */
+  function decidir(id: number, status: StatusTarefa) {
+    void definirStatus(id, status).then(setRecusa);
+  }
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -61,9 +78,10 @@ export default function TabelaTarefas() {
     // O nome da clínica é resolvido aqui: os filtros passaram a receber o nome
     // pronto, para servirem também ao Atendimento, que lê a clínica do banco.
     return tarefas.filter((t) => {
-      const comClinica = { ...t, clinica: nomeDaClinica(t.clinicaId) };
+      const comClinica = { ...t, clinica: nomeDoCliente(t) };
       return (
-        combinaComBusca(comClinica, termo) && combinaComFiltro(comClinica, filtro)
+        combinaComBusca(comClinica, termo) &&
+        combinaComFiltro(comClinica, filtro)
       );
     });
   }, [tarefas, busca, filtro]);
@@ -81,7 +99,10 @@ export default function TabelaTarefas() {
   );
 
   // Os cards saem das mesmas tarefas da tabela, então nunca divergem dela.
-  const indicadores = useMemo(() => calcularIndicadoresFila(tarefas), [tarefas]);
+  const indicadores = useMemo(
+    () => calcularIndicadoresFila(tarefas),
+    [tarefas],
+  );
 
   // A conversa não vem mais junto da tarefa: é buscada por lead, uma vez só.
   const conversas = useMemo(() => indexarMensagens(mensagens), [mensagens]);
@@ -100,6 +121,13 @@ export default function TabelaTarefas() {
 
   return (
     <div className="space-y-8">
+      {/* O que a leitura do banco não entregou, ou a última decisão recusada. */}
+      {(avisoDaFila !== null || recusa !== null) && (
+        <p className="rounded-card border border-black/15 bg-black/[0.03] px-5 py-4 text-sm font-medium text-herval-preto">
+          {recusa ?? avisoDaFila}
+        </p>
+      )}
+
       {/* Indicadores */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {indicadores.map((indicador) => (
@@ -207,210 +235,228 @@ export default function TabelaTarefas() {
                   </tr>
 
                   {secao.itens.map((tarefa) => {
-                const alerta = tarefa.tipo === "alerta-humano";
-                const aberta = expandida === tarefa.id;
-                const conversa = aberta ? conversaDoLead(conversas, tarefa.id) : [];
+                    const alerta = tarefa.tipo === "alerta-humano";
+                    const aberta = expandida === tarefa.id;
+                    const conversa = aberta
+                      ? conversaDoLead(conversas, tarefa.id)
+                      : [];
 
-                return (
-                  <Fragment key={tarefa.id}>
-                    <tr
-                      className={
-                        alerta
-                          ? "bg-herval-verde/[0.07]"
-                          : "transition-colors hover:bg-herval-verde/[0.06]"
-                      }
-                    >
-                      <td className="px-6 py-5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandida(aberta ? null : tarefa.id)
+                    return (
+                      <Fragment key={tarefa.id}>
+                        <tr
+                          className={
+                            alerta
+                              ? "bg-herval-verde/[0.07]"
+                              : "transition-colors hover:bg-herval-verde/[0.06]"
                           }
-                          aria-expanded={aberta}
-                          className="flex items-start gap-2 text-left"
                         >
-                          {aberta ? (
-                            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-black/50" />
-                          ) : (
-                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-black/50" />
-                          )}
-                          <span>
-                            <span className="block font-bold text-herval-preto">
-                              {tarefa.lead}
-                            </span>
-                            <span className="mt-0.5 block text-xs font-medium text-black/45">
-                              {tarefa.telefone} · {nomeDaClinica(tarefa.clinicaId)}
-                            </span>
-                          </span>
-                        </button>
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <span className="block text-black/65">
-                          {tarefa.regra}
-                        </span>
-                        <span
-                          className={[
-                            "mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold",
-                            tarefa.prazoEmHoras < 0
-                              ? "text-herval-preto"
-                              : "text-black/45",
-                          ].join(" ")}
-                        >
-                          <Clock className="h-3 w-3" />
-                          {descricaoPrazo(tarefa.prazoEmHoras)}
-                        </span>
-                      </td>
-
-                      <td className="px-6 py-5">
-                        {alerta ? (
-                          <span className="inline-flex items-start gap-2 font-bold text-herval-preto">
-                            <Bell className="mt-0.5 h-4 w-4 shrink-0" />
-                            {tarefa.acao}
-                          </span>
-                        ) : (
-                          <span className="text-black/65">{tarefa.acao}</span>
-                        )}
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <EtiquetaResponsavel
-                          responsavel={tarefa.responsavel}
-                          destacado={alerta}
-                        />
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${estiloScore(
-                            tarefa.score.nivel,
-                          )}`}
-                        >
-                          {tarefa.score.percentual}% para agendar ·{" "}
-                          {tarefa.score.nivel}
-                        </span>
-                        <span className="mt-1.5 block text-xs font-medium text-black/45">
-                          {tarefa.score.motivo}
-                        </span>
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <Etiqueta
-                          texto={tarefa.status}
-                          tom={tomDoStatus[tarefa.status]}
-                        />
-                      </td>
-
-                      <td className="px-6 py-5">
-                        {alerta ? (
-                          // Alerta humano: não há o que aprovar, só registrar
-                          // que o CRC foi avisado.
-                          <button
-                            type="button"
-                            onClick={() =>
-                              definirStatus(
-                                tarefa.id,
-                                tarefa.status === "Avisado"
-                                  ? "Pendente"
-                                  : "Avisado",
-                              )
-                            }
-                            className={[
-                              "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
-                              tarefa.status === "Avisado"
-                                ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
-                                : "bg-herval-preto text-herval-branco hover:bg-black/85",
-                            ].join(" ")}
-                          >
-                            <PhoneCall className="h-3.5 w-3.5" />
-                            {tarefa.status === "Avisado"
-                              ? "CRC avisado"
-                              : "Avisar CRC"}
-                          </button>
-                        ) : (
-                          <div className="flex gap-2">
+                          <td className="px-6 py-5">
                             <button
                               type="button"
-                              aria-pressed={tarefa.status === "Aprovado"}
                               onClick={() =>
-                                definirStatus(tarefa.id, "Aprovado")
+                                setExpandida(aberta ? null : tarefa.id)
                               }
+                              aria-expanded={aberta}
+                              className="flex items-start gap-2 text-left"
+                            >
+                              {aberta ? (
+                                <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-black/50" />
+                              ) : (
+                                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-black/50" />
+                              )}
+                              <span>
+                                <span className="block font-bold text-herval-preto">
+                                  {tarefa.lead}
+                                </span>
+                                <span className="mt-0.5 block text-xs font-medium text-black/45">
+                                  {tarefa.telefone} · {nomeDoCliente(tarefa)}
+                                </span>
+                              </span>
+                            </button>
+                          </td>
+
+                          <td className="px-6 py-5">
+                            <span className="block text-black/65">
+                              {tarefa.regra}
+                            </span>
+                            <span
                               className={[
-                                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
-                                tarefa.status === "Aprovado"
-                                  ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
-                                  : "border border-black/15 text-black/70 hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto",
+                                "mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold",
+                                tarefa.prazoEmHoras < 0
+                                  ? "text-herval-preto"
+                                  : "text-black/45",
                               ].join(" ")}
                             >
-                              <Check className="h-3.5 w-3.5" />
-                              Aprovar
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={tarefa.status === "Rejeitado"}
-                              onClick={() =>
-                                definirStatus(tarefa.id, "Rejeitado")
-                              }
-                              className={[
-                                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
-                                tarefa.status === "Rejeitado"
-                                  ? "bg-herval-preto text-herval-branco hover:bg-black/85"
-                                  : "border border-black/15 text-black/70 hover:border-herval-preto hover:bg-black/5 hover:text-herval-preto",
-                              ].join(" ")}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                              Rejeitar
-                            </button>
-                          </div>
+                              <Clock className="h-3 w-3" />
+                              {descricaoPrazo(tarefa.prazoEmHoras)}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-5">
+                            {alerta ? (
+                              <span className="inline-flex items-start gap-2 font-bold text-herval-preto">
+                                <Bell className="mt-0.5 h-4 w-4 shrink-0" />
+                                {tarefa.acao}
+                              </span>
+                            ) : (
+                              <span className="text-black/65">
+                                {tarefa.acao}
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-6 py-5">
+                            <EtiquetaResponsavel
+                              responsavel={tarefa.responsavel}
+                              destacado={alerta}
+                            />
+                          </td>
+
+                          {/*
+                        Sem modelo de pontuação, não há score: a tarefa vem do
+                        banco sem esse campo e a célula diz "não medido" — o
+                        mesmo caminho da Fila de Atendimento nos Relatórios.
+                        Um percentual escolhido para preencher a coluna
+                        afirmaria uma previsão que ninguém fez, e o CRC
+                        priorizaria a fila por ela.
+                      */}
+                          <td className="px-6 py-5">
+                            {tarefa.score === undefined ? (
+                              <span className="text-xs font-medium text-black/45">
+                                não medido
+                              </span>
+                            ) : (
+                              <>
+                                <span
+                                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${estiloScore(
+                                    tarefa.score.nivel,
+                                  )}`}
+                                >
+                                  {tarefa.score.percentual}% para agendar ·{" "}
+                                  {tarefa.score.nivel}
+                                </span>
+                                <span className="mt-1.5 block text-xs font-medium text-black/45">
+                                  {tarefa.score.motivo}
+                                </span>
+                              </>
+                            )}
+                          </td>
+
+                          <td className="px-6 py-5">
+                            <Etiqueta
+                              texto={tarefa.status}
+                              tom={tomDoStatus[tarefa.status]}
+                            />
+                          </td>
+
+                          <td className="px-6 py-5">
+                            {alerta ? (
+                              // Alerta humano: não há o que aprovar, só registrar
+                              // que o CRC foi avisado.
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  decidir(
+                                    tarefa.id,
+                                    tarefa.status === "Avisado"
+                                      ? "Pendente"
+                                      : "Avisado",
+                                  )
+                                }
+                                className={[
+                                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
+                                  tarefa.status === "Avisado"
+                                    ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                                    : "bg-herval-preto text-herval-branco hover:bg-black/85",
+                                ].join(" ")}
+                              >
+                                <PhoneCall className="h-3.5 w-3.5" />
+                                {tarefa.status === "Avisado"
+                                  ? "CRC avisado"
+                                  : "Avisar CRC"}
+                              </button>
+                            ) : (
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  aria-pressed={tarefa.status === "Aprovado"}
+                                  onClick={() => decidir(tarefa.id, "Aprovado")}
+                                  className={[
+                                    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
+                                    tarefa.status === "Aprovado"
+                                      ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                                      : "border border-black/15 text-black/70 hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto",
+                                  ].join(" ")}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  Aprovar
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-pressed={tarefa.status === "Rejeitado"}
+                                  onClick={() =>
+                                    decidir(tarefa.id, "Rejeitado")
+                                  }
+                                  className={[
+                                    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
+                                    tarefa.status === "Rejeitado"
+                                      ? "bg-herval-preto text-herval-branco hover:bg-black/85"
+                                      : "border border-black/15 text-black/70 hover:border-herval-preto hover:bg-black/5 hover:text-herval-preto",
+                                  ].join(" ")}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  Rejeitar
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Histórico do lead */}
+                        {aberta && (
+                          <tr className="bg-black/[0.02]">
+                            <td colSpan={7} className="px-6 py-6">
+                              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-black/50">
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                Conversa com {tarefa.lead}
+                              </h3>
+
+                              {conversa.length === 0 ? (
+                                <p className="mt-4 text-sm font-medium text-black/55">
+                                  Ainda não houve nenhuma mensagem com este
+                                  lead. O primeiro contato é feito pelo CRC.
+                                </p>
+                              ) : (
+                                <ol className="mt-4 space-y-4 border-l-2 border-herval-verde pl-5">
+                                  {conversa.map((mensagem) => (
+                                    <li key={mensagem.id}>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-extrabold text-herval-preto">
+                                          {tempoRelativo(mensagem.minutosAtras)}
+                                        </span>
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+                                          {ehDoLead(mensagem)
+                                            ? tarefa.lead.split(" ")[0]
+                                            : mensagem.remetente.tipo}
+                                        </span>
+                                        {mensagem.regra && (
+                                          <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
+                                            {mensagem.regra}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="mt-1.5 max-w-3xl text-sm text-black/70">
+                                        {mensagem.texto}
+                                      </p>
+                                    </li>
+                                  ))}
+                                </ol>
+                              )}
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                    </tr>
-
-                    {/* Histórico do lead */}
-                    {aberta && (
-                      <tr className="bg-black/[0.02]">
-                        <td colSpan={7} className="px-6 py-6">
-                          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-black/50">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            Conversa com {tarefa.lead}
-                          </h3>
-
-                          {conversa.length === 0 ? (
-                            <p className="mt-4 text-sm font-medium text-black/55">
-                              Ainda não houve nenhuma mensagem com este lead. O
-                              primeiro contato é feito pelo CRC.
-                            </p>
-                          ) : (
-                            <ol className="mt-4 space-y-4 border-l-2 border-herval-verde pl-5">
-                              {conversa.map((mensagem) => (
-                                <li key={mensagem.id}>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-xs font-extrabold text-herval-preto">
-                                      {tempoRelativo(mensagem.minutosAtras)}
-                                    </span>
-                                    <span className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-                                      {ehDoLead(mensagem)
-                                        ? tarefa.lead.split(" ")[0]
-                                        : mensagem.remetente.tipo}
-                                    </span>
-                                    {mensagem.regra && (
-                                      <span className="rounded-full border border-black/20 px-2.5 py-0.5 text-[11px] font-bold text-black/60">
-                                        {mensagem.regra}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="mt-1.5 max-w-3xl text-sm text-black/70">
-                                    {mensagem.texto}
-                                  </p>
-                                </li>
-                              ))}
-                            </ol>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
+                      </Fragment>
+                    );
                   })}
                 </Fragment>
               ))}

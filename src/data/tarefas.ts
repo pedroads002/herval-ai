@@ -49,6 +49,13 @@ export type NivelScore = "Alta" | "Média" | "Baixa";
 export type Tarefa = Lead & {
   lead: string;
   telefone: string;
+  /**
+   * Nome do cliente da agência, lido de `clinicas` no banco. `clinicasIniciais`
+   * está vazio, então `nomeDaClinica` responderia "Clínica removida" para todo
+   * lead real — nome errado na tela é pior que nome nenhum. Nulo quando o lead
+   * não tem cliente.
+   */
+  cliente?: string | null;
   regra: string;
   acao: string;
   tipo: TipoTarefa;
@@ -61,7 +68,14 @@ export type Tarefa = Lead & {
    * É relativo (e não uma data fixa) para o exemplo não envelhecer.
    */
   prazoEmHoras: number;
-  score: {
+  /**
+   * Chance de o lead agendar. **Opcional porque não existe modelo que calcule
+   * isso.** Enquanto era obrigatório, qualquer tarefa real precisava inventar
+   * um percentual para existir, e a coluna "Score" afirmava uma previsão que
+   * ninguém fez. Sem valor, a tela diz "não medido" — o mesmo caminho da Fila
+   * de Atendimento nos Relatórios.
+   */
+  score?: {
     percentual: number;
     nivel: NivelScore;
     motivo: string;
