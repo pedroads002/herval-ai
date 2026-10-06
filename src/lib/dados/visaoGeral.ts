@@ -67,6 +67,7 @@ type LinhaDeAgendamento = {
   lead_id: number;
   unidade_id: number;
   data_consulta: string;
+  hora_consulta: string | null;
   status: string;
   fechado_por: string;
   confirmada: boolean;
@@ -223,6 +224,15 @@ function dentroDoIntervalo(dia: string, { de, ate }: IntervaloDeDatas) {
   return dia >= de && dia <= ate;
 }
 
+/** A hora atual no fuso de Brasília, "HH:MM" — comparável com `hora_consulta`. */
+function horaDeAgora() {
+  return new Date().toLocaleTimeString("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /** O dia de calendário de um `timestamptz`, no fuso de Brasília. */
 function diaDoInstante(instante: string) {
   return new Date(instante).toLocaleDateString("en-CA", {
@@ -236,7 +246,25 @@ type Contexto = {
   agendamentos: LinhaDeAgendamento[];
   remarcacoes: Set<number>;
   hoje: string;
+  /** A hora atual em Brasília, "HH:MM". Só decide a consulta de hoje. */
+  agora: string;
 };
+
+/**
+ * Se a consulta já aconteceu.
+ *
+ * O dia não basta: a consulta de hoje às 14h não aconteceu às 8h da manhã, e
+ * tratá-la como passada a jogava para dentro das contas de comparecimento antes
+ * da hora. Consulta sem hora marcada só conta como passada depois que o dia
+ * inteiro terminou — é o mais tarde que ela poderia ter acontecido, e errar para
+ * esse lado não inventa desfecho nenhum.
+ */
+function jaAconteceu(consulta: LinhaDeAgendamento, contexto: Contexto) {
+  if (consulta.data_consulta < contexto.hoje) return true;
+  if (consulta.data_consulta > contexto.hoje) return false;
+  if (consulta.hora_consulta === null) return false;
+  return consulta.hora_consulta.slice(0, 5) <= contexto.agora;
+}
 
 function montarResumo(
   intervalo: IntervaloDeDatas,
@@ -254,9 +282,10 @@ function montarResumo(
   );
 
   // Consultas dessa produção que já aconteceram. Agendamento marcado para a
-  // semana que vem não pode entrar na conta de falta nem de presença.
-  const jaAconteceram = producao.filter(
-    (consulta) => consulta.data_consulta <= contexto.hoje,
+  // semana que vem — ou para mais tarde hoje — não pode entrar na conta de
+  // falta nem de presença.
+  const jaAconteceram = producao.filter((consulta) =>
+    jaAconteceu(consulta, contexto),
   );
 
   const faltas = jaAconteceram.filter(
@@ -523,7 +552,7 @@ export async function carregarVisaoGeral(
     supabase
       .from("agendamentos")
       .select(
-        "id, lead_id, unidade_id, data_consulta, status, fechado_por, confirmada, criado_em",
+        "id, lead_id, unidade_id, data_consulta, hora_consulta, status, fechado_por, confirmada, criado_em",
       )
       .order("criado_em", { ascending: false })
       .limit(TETO_DE_LINHAS),
@@ -591,6 +620,7 @@ export async function carregarVisaoGeral(
     // período: é a consulta anterior do lead que decide, e ela pode ser de antes.
     remarcacoes: idsDeRemarcacao(agendamentos),
     hoje,
+    agora: horaDeAgora(),
   };
 
   const linhasPerdidas = (respostaDosPerdidos.data ?? []) as {
