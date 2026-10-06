@@ -25,6 +25,7 @@ import {
   type StatusTarefa,
   type Tarefa,
 } from "@/data/tarefas";
+import { decidirTarefa } from "@/lib/acoes/tarefas";
 import {
   AGENTE_AUTOMATICO,
   historicoDeEtapasInicial,
@@ -69,12 +70,24 @@ export type DadosDaConsulta = {
 
 type ValorContexto = {
   tarefas: Tarefa[];
+  /**
+   * O que a leitura da fila não conseguiu entregar: banco fora do ar, teto de
+   * linhas atingido, tarefa que não pôde ser desenhada. Nulo quando veio tudo.
+   */
+  avisoDaFila: string | null;
   agendamentos: Agendamento[];
   historicoDeEtapas: MudancaDeEtapa[];
   mensagens: Mensagem[];
   ligacoes: Ligacao[];
   notas: Nota[];
-  definirStatus: (id: number, status: StatusTarefa) => void;
+  /**
+   * Grava a decisão da tarefa no banco e devolve um aviso em português quando
+   * não deu — `null` quando gravou. A tela só muda depois que o banco
+   * confirmou: marcar "avisado" na tela e falhar no banco faria o CRC acreditar
+   * que registrou, e ninguém confere o banco para saber se a tela disse a
+   * verdade. É o mesmo raciocínio de `enviarMensagem`.
+   */
+  definirStatus: (id: number, status: StatusTarefa) => Promise<string | null>;
   moverEtapa: (
     id: number,
     etapa: EtapaFunil,
@@ -119,18 +132,36 @@ const ContextoLeads = createContext<ValorContexto | null>(null);
  * de Tarefas, e que marcar uma falta na Agenda empurra o lead para
  * "Reagendamento" sem ninguém arrastar nada.
  *
- * Continua sendo só memória do navegador: nada é enviado nem salvo, e ao
- * recarregar a página tudo volta ao estado inicial.
+ * As tarefas chegam prontas do servidor (`dados/tarefas.ts`), e a decisão de
+ * cada uma é gravada no banco. O resto — agendamentos, mensagens, ligações,
+ * notas — continua sendo só memória do navegador: nada é enviado nem salvo, e
+ * ao recarregar a página volta ao estado inicial.
  */
 export default function ProvedorLeads({
   usuario,
+  tarefasDoBanco,
+  avisoDaFila = null,
   children,
 }: {
   /** Nome de quem está logado, vindo de `perfil.ts`. Assina as ações manuais. */
   usuario?: string;
+  /**
+   * A fila lida do banco. Ausente (o exemplo aberto, sem Supabase) cai no array
+   * do código, que é vazio — a tela mostra fila zerada em vez de quebrar.
+   *
+   * É o valor inicial do estado: tarefa nova no banco (inserida à mão ou pelo
+   * n8n) aparece quando a página é recarregada. O painel não fica escutando o
+   * banco, e não ficar escutando é melhor que uma lista que se reescreve
+   * sozinha por baixo de quem está decidindo.
+   */
+  tarefasDoBanco?: Tarefa[];
+  /** O que a leitura da fila não conseguiu entregar. A Fila mostra na tela. */
+  avisoDaFila?: string | null;
   children: React.ReactNode;
 }) {
-  const [tarefas, setTarefas] = useState<Tarefa[]>(tarefasIniciais);
+  const [tarefas, setTarefas] = useState<Tarefa[]>(
+    tarefasDoBanco ?? tarefasIniciais,
+  );
   const [agendamentos, setAgendamentos] =
     useState<Agendamento[]>(agendamentosIniciais);
   const [historicoDeEtapas, setHistoricoDeEtapas] = useState<MudancaDeEtapa[]>(
@@ -150,13 +181,21 @@ export default function ProvedorLeads({
     [usuario],
   );
 
-  const definirStatus = useCallback((id: number, status: StatusTarefa) => {
-    setTarefas((atuais) =>
-      atuais.map((tarefa) =>
-        tarefa.id === id ? { ...tarefa, status } : tarefa,
-      ),
-    );
-  }, []);
+  const definirStatus = useCallback(
+    async (id: number, status: StatusTarefa): Promise<string | null> => {
+      const resultado = await decidirTarefa(id, status);
+      if (!resultado.ok) return resultado.mensagem;
+
+      setTarefas((atuais) =>
+        atuais.map((tarefa) =>
+          tarefa.id === id ? { ...tarefa, status } : tarefa,
+        ),
+      );
+
+      return null;
+    },
+    [],
+  );
 
   /**
    * Grava a mudança de etapa. Sem isto a base só sabe onde o lead está agora,
@@ -488,6 +527,7 @@ export default function ProvedorLeads({
   const valor = useMemo(
     () => ({
       tarefas,
+      avisoDaFila,
       agendamentos,
       historicoDeEtapas,
       mensagens,
@@ -503,6 +543,7 @@ export default function ProvedorLeads({
     }),
     [
       tarefas,
+      avisoDaFila,
       agendamentos,
       historicoDeEtapas,
       mensagens,

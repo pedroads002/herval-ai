@@ -2,6 +2,7 @@ import MenuLateral from "@/components/MenuLateral";
 import CabecalhoTopo from "@/components/CabecalhoTopo";
 import ProvedorLeads from "@/components/ProvedorLeads";
 import { carregarPerfil } from "@/lib/perfil";
+import { carregarFilaDeTarefas } from "@/lib/dados/tarefas";
 
 /**
  * Moldura das telas internas: cabeçalho fixo e menu lateral. A tela de login
@@ -23,7 +24,13 @@ import { carregarPerfil } from "@/lib/perfil";
 export default async function LayoutPainel({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const perfil = await carregarPerfil();
+  // A fila é lida aqui, e não na página da Fila de Tarefas, porque quem guarda
+  // as tarefas é o provedor, que mora neste layout. As duas leituras não
+  // dependem uma da outra.
+  const [perfil, fila] = await Promise.all([
+    carregarPerfil(),
+    carregarFilaDeTarefas(),
+  ]);
 
   return (
     <>
@@ -40,7 +47,13 @@ export default async function LayoutPainel({
         borda, não repetir esse respiro.
       */}
       <main className="ml-56 mt-16 h-[calc(100dvh-4rem)] overflow-y-auto p-3 md:ml-64">
-        <ProvedorLeads usuario={perfil?.nomeCompleto}>{children}</ProvedorLeads>
+        <ProvedorLeads
+          usuario={perfil?.nomeCompleto}
+          tarefasDoBanco={fila.tarefas}
+          avisoDaFila={fila.falha ?? fila.aviso}
+        >
+          {children}
+        </ProvedorLeads>
       </main>
     </>
   );
