@@ -51,7 +51,7 @@ const SEM_DADOS: DadosDaFila = {
 };
 
 const CAMPOS_DA_TAREFA =
-  "id, lead_id, tipo, regra, acao_sugerida, status, prazo_em_minutos, criado_em, decidido_em, prazo_em, descricao, atribuido_a, criado_por";
+  "id, lead_id, tipo, regra, acao_sugerida, status, prazo_em_minutos, criado_em, decidido_em, prazo_em, descricao, atribuido_a, criado_por, motivo_devolucao";
 
 const CAMPOS_DO_LEAD =
   "id, nome, telefone, etapa, origem, criado_em, motivo_perda, clinica_id";

@@ -13,6 +13,7 @@ import {
   PhoneCall,
   AlertTriangle,
   Clock,
+  Undo2,
 } from "lucide-react";
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
 import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
@@ -335,6 +336,24 @@ export default function TabelaTarefas() {
                             ) : (
                               <span className="text-black/65">
                                 {tarefa.acao}
+                              </span>
+                            )}
+                            {/*
+                              A tarefa que a Helô devolveu já aparece como do
+                              CRC, e o pedido original continua escrito acima.
+                              Sem este texto, o CRC encontraria como sua uma
+                              tarefa que ele havia passado para a Helô e não
+                              teria como saber por quê.
+                            */}
+                            {tarefa.motivoDevolucao && (
+                              <span className="mt-2 flex items-start gap-1.5 rounded-controle bg-black/[0.04] px-2.5 py-1.5 text-xs font-medium text-black/60">
+                                <Undo2 className="mt-0.5 h-3 w-3 shrink-0" />
+                                <span>
+                                  <strong className="font-bold text-herval-preto">
+                                    A Helô devolveu:
+                                  </strong>{" "}
+                                  {tarefa.motivoDevolucao}
+                                </span>
                               </span>
                             )}
                           </td>
