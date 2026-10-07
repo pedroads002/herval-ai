@@ -13,11 +13,9 @@ import {
   PhoneCall,
   AlertTriangle,
   Clock,
-  Plus,
 } from "lucide-react";
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
 import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
-import FormularioDeTarefa from "@/components/FormularioDeTarefa";
 import {
   dataEHoraDoPrazo,
   descricaoPrazo,
@@ -71,7 +69,6 @@ export default function TabelaTarefas() {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroDeSituacao>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
-  const [criando, setCriando] = useState(false);
   // O que o banco recusou na última decisão. Sem isto o clique falharia em
   // silêncio e o CRC acharia que registrou.
   const [recusa, setRecusa] = useState<string | null>(null);
@@ -168,34 +165,14 @@ export default function TabelaTarefas() {
             </option>
           ))}
         </select>
-
-        {/*
-          A fila existia só com entrada automática: as cinco sinalizações do
-          cérebro da Helô. Metade do trabalho do CRC é o que ninguém programou,
-          e sem este botão não havia como registrá-lo em lugar nenhum.
-        */}
-        <button
-          type="button"
-          onClick={() => setCriando((aberto) => !aberto)}
-          aria-expanded={criando}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-herval-preto px-5 py-3 text-sm font-extrabold text-herval-branco transition-colors hover:bg-black/85"
-        >
-          <Plus className="h-4 w-4" />
-          Nova tarefa
-        </button>
       </div>
 
-      {criando && (
-        <div className="max-w-xl">
-          <FormularioDeTarefa
-            // O filtro padrão é "Ativos", pela etapa do lead: sem isto, uma
-            // tarefa criada para um lead já agendado não apareceria na lista
-            // que está logo abaixo do formulário.
-            aoCriar={() => setFiltro("Todos")}
-            aoFechar={() => setCriando(false)}
-          />
-        </div>
-      )}
+      {/*
+        A tarefa não é criada aqui, de propósito. Esta tela administra: ver,
+        filtrar, marcar como feita. Criar é na conversa do Atendimento, onde o
+        lead e a clínica já estão na tela — com vários clientes cadastrados,
+        escolher um lead numa lista solta não diz de quem ele é.
+      */}
 
       <p className="text-sm font-medium text-black/55">
         <span className="font-extrabold text-herval-preto">

@@ -424,17 +424,17 @@ export default function ConversaReal({
 
           <div className="flex flex-wrap items-center gap-3">
             {/*
-              O caminho rápido: aqui o lead e a clínica já estão decididos pela
-              tela, então criar a tarefa é escolher de quem ela é, para quando e
-              por quê. Pela Fila dá no mesmo, com um campo a mais para achar o
-              lead — e é no meio da conversa que se descobre que precisa
-              retornar na quinta às 14:30.
+              O único lugar onde a tarefa é criada: aqui o lead e a clínica já
+              estão decididos pela tela, então criar a tarefa é escolher de quem
+              ela é, para quando e por quê. Com vários clientes cadastrados, uma
+              lista de leads solta não diz de quem é o lead — e é no meio da
+              conversa que se descobre que precisa retornar na quinta às 14:30.
             */}
             <button
               type="button"
               onClick={() => setCriandoTarefa((aberto) => !aberto)}
               aria-expanded={criandoTarefa}
-              className="inline-flex items-center gap-1.5 rounded-full bg-herval-preto px-4 py-2 text-xs font-extrabold text-herval-branco transition-colors hover:bg-black/85"
+              className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
             >
               <ListPlus className="h-3.5 w-3.5" />
               Criar tarefa
