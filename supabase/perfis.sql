@@ -2,6 +2,9 @@
 -- Herval AI · tabela de perfis dos usuários
 -- Cole este arquivo inteiro no SQL Editor do Supabase e clique em "Run".
 -- Pode rodar mais de uma vez sem quebrar nada.
+--
+-- >>> EXECUTADO em 07/10/2026 no projeto hkmehycruprsqprwgeco.
+-- >>> É repetível: rodar de novo não recria a tabela e não apaga nada.
 -- ============================================================================
 
 -- 1) Tabela ligada aos usuários de autenticação do Supabase.
@@ -27,6 +30,15 @@ create policy "Usuario atualiza o proprio perfil"
   on public.profiles
   for update
   using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+-- A tela de Perfil grava com upsert, e não com update: quem entrou antes do
+-- gatilho do item 3 não tem linha, e um update sem linha não falha — ele grava
+-- zero linhas e a tela diz que salvou. A política continua presa ao próprio id.
+drop policy if exists "Usuario cria o proprio perfil" on public.profiles;
+create policy "Usuario cria o proprio perfil"
+  on public.profiles
+  for insert
   with check (auth.uid() = id);
 
 -- 3) Ao criar um usuário em Authentication > Users, a linha do perfil já nasce

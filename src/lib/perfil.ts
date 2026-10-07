@@ -5,6 +5,14 @@ export type Perfil = {
   nomeCompleto: string;
   iniciais: string;
   email: string;
+  /**
+   * Nome e sobrenome como estão guardados, sem a substituição pelo e-mail.
+   * A tela de Perfil precisa deles separados para preencher os campos — e
+   * precisa do vazio como vazio, senão o e-mail apareceria dentro do campo
+   * "Nome" como se alguém o tivesse digitado.
+   */
+  nome: string;
+  sobrenome: string;
 };
 
 function primeiraLetra(texto: string | null | undefined) {
@@ -42,12 +50,16 @@ export async function carregarPerfil(): Promise<Perfil | null> {
     .join(" ")
     .trim();
 
-  const iniciais =
-    primeiraLetra(perfil?.nome) + primeiraLetra(perfil?.sobrenome);
+  // Uma letra só, a primeira do nome — é o "E" que já está no círculo hoje,
+  // vindo do e-mail. Com o perfil preenchido ele continua sendo uma letra: a de
+  // "Equipe", a de "Pedro". Duas iniciais trocariam o que está na tela.
+  const iniciais = primeiraLetra(perfil?.nome);
 
   return {
     nomeCompleto: nomeCompleto || email,
     iniciais: iniciais || primeiraLetra(email) || "?",
     email,
+    nome: (perfil?.nome ?? "").trim(),
+    sobrenome: (perfil?.sobrenome ?? "").trim(),
   };
 }
