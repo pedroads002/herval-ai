@@ -6,7 +6,12 @@
  * Tarefas e no Atendimento. Enquanto a regra estava escrita duas vezes, nada
  * impedia as telas de discordarem sobre o mesmo lead.
  */
-import { situacaoDaEtapa, situacoesAtivas } from "@/data/tarefas";
+import {
+  situacaoDaEtapa,
+  situacoesAtivas,
+  type StatusTarefa,
+  type TipoTarefa,
+} from "@/data/tarefas";
 import type { EtapaFunil } from "@/data/leads";
 
 /**
@@ -54,7 +59,10 @@ export function combinaComBusca(lead: LeadFiltravel, termo: string) {
  * A situação sai da etapa do Funil, e não de um campo próprio — por isso
  * mover um card no Funil muda o que estas listas mostram, na hora.
  */
-export function combinaComFiltro(lead: LeadFiltravel, filtro: FiltroDeSituacao) {
+export function combinaComFiltro(
+  lead: LeadFiltravel,
+  filtro: FiltroDeSituacao,
+) {
   if (filtro === "Todos") return true;
 
   const situacao = situacaoDaEtapa(lead.etapa);
@@ -74,4 +82,33 @@ export function combinaComFiltro(lead: LeadFiltravel, filtro: FiltroDeSituacao) 
       // "Em Atendimento" e "Aguardando Resposta" têm o mesmo nome da situação.
       return situacao === filtro;
   }
+}
+
+/**
+ * Tarefa criada à mão e ainda não feita: trabalho em aberto, seja qual for a
+ * etapa do lead.
+ *
+ * Existe porque o filtro de situação pergunta pelo **lead**, e tarefa à mão não
+ * segue a etapa dele. "Ligar para confirmar a consulta" é tarefa de lead
+ * *agendado*, e por isso ela nascia fora do filtro padrão ("Ativos", que quer
+ * dizer lead em Pendente, Em Atendimento ou Aguardando Resposta): alguém
+ * registrava o trabalho, voltava à fila e não encontrava nada.
+ *
+ * Só vale para o filtro padrão. Quando a pessoa escolhe "Agendados" ou
+ * "Ganhos", ela está perguntando pelo lead de propósito — a resposta é a que
+ * ela pediu. E tarefa concluída não volta: feita não é trabalho em aberto.
+ *
+ * Fica junto de `combinaComFiltro` porque é a mesma pergunta — o que a lista
+ * mostra — e separar as duas deixaria metade da regra fora do lugar onde se vai
+ * procurar por ela.
+ */
+export function tarefaEmAberto(
+  tarefa: { tipo: TipoTarefa; status: StatusTarefa },
+  filtro: FiltroDeSituacao,
+) {
+  return (
+    filtro === "Ativos" &&
+    tarefa.tipo === "manual" &&
+    tarefa.status !== "Concluída"
+  );
 }
