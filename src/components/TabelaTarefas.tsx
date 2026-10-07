@@ -36,6 +36,7 @@ import {
   combinaComBusca,
   combinaComFiltro,
   filtrosDeSituacao,
+  tarefaEmAberto,
   type FiltroDeSituacao,
 } from "@/lib/filtros";
 
@@ -87,7 +88,7 @@ export default function TabelaTarefas() {
       const comClinica = { ...t, clinica: nomeDoCliente(t) };
       return (
         combinaComBusca(comClinica, termo) &&
-        combinaComFiltro(comClinica, filtro)
+        (combinaComFiltro(comClinica, filtro) || tarefaEmAberto(t, filtro))
       );
     });
   }, [tarefas, busca, filtro]);
