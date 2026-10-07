@@ -50,6 +50,7 @@ export default async function LayoutPainel({
         <ProvedorLeads
           usuario={perfil?.nomeCompleto}
           tarefasDoBanco={fila.tarefas}
+          leadsParaTarefa={fila.leads}
           avisoDaFila={fila.falha ?? fila.aviso}
         >
           {children}

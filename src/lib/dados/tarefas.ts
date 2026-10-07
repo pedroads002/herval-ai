@@ -21,12 +21,21 @@
  */
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
-import type { Tarefa } from "@/data/tarefas";
+import type { OpcaoDeLead, Tarefa } from "@/data/tarefas";
 import type { LinhaDeLead } from "@/lib/dados/linhaDoFunil";
 import { montarTarefa, type LinhaDeTarefa } from "@/lib/dados/linhaDeTarefa";
 
 export type DadosDaFila = {
   tarefas: Tarefa[];
+  /**
+   * Os leads que o formulário de criar tarefa oferece.
+   *
+   * Saem desta mesma leitura, e não de uma consulta própria: os leads já são
+   * lidos aqui para montar a tarefa, então a lista não custa nenhuma ida extra
+   * ao banco. Lista separada também discordaria da fila na hora em que um lead
+   * fosse apagado.
+   */
+  leads: OpcaoDeLead[];
   falha: string | null;
   aviso: string | null;
 };
@@ -34,10 +43,15 @@ export type DadosDaFila = {
 /** Ver o mesmo raciocínio em `dados/agenda.ts`. */
 const TETO_DE_LINHAS = 1000;
 
-const SEM_DADOS: DadosDaFila = { tarefas: [], falha: null, aviso: null };
+const SEM_DADOS: DadosDaFila = {
+  tarefas: [],
+  leads: [],
+  falha: null,
+  aviso: null,
+};
 
 const CAMPOS_DA_TAREFA =
-  "id, lead_id, tipo, regra, acao_sugerida, status, prazo_em_minutos, criado_em, decidido_em";
+  "id, lead_id, tipo, regra, acao_sugerida, status, prazo_em_minutos, criado_em, decidido_em, prazo_em, descricao, atribuido_a, criado_por";
 
 const CAMPOS_DO_LEAD =
   "id, nome, telefone, etapa, origem, criado_em, motivo_perda, clinica_id";
@@ -92,6 +106,18 @@ export async function carregarFilaDeTarefas(): Promise<DadosDaFila> {
 
   const contexto = { agora: new Date(), leads, clientes };
 
+  const opcoesDeLead: OpcaoDeLead[] = [...leads.values()]
+    .map((lead) => ({
+      id: lead.id,
+      nome: (lead.nome ?? "").trim() || "Lead sem nome",
+      telefone: (lead.telefone ?? "").trim(),
+      cliente:
+        lead.clinica_id === null
+          ? null
+          : (clientes.get(lead.clinica_id) ?? null),
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
   const tarefas: Tarefa[] = [];
   let foraDaFila = 0;
 
@@ -106,6 +132,7 @@ export async function carregarFilaDeTarefas(): Promise<DadosDaFila> {
 
   return {
     tarefas,
+    leads: opcoesDeLead,
     falha: null,
     aviso: montarAviso(linhas.length, foraDaFila),
   };

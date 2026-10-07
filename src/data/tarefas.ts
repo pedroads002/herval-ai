@@ -1,15 +1,49 @@
-/** Decisão tomada sobre a tarefa. "Avisado" só vale para alertas humanos. */
-export type StatusTarefa = "Pendente" | "Aprovado" | "Rejeitado" | "Avisado";
+/**
+ * Decisão tomada sobre a tarefa.
+ *
+ * "Avisado" só vale para alertas humanos; "Concluída" só para tarefa criada à
+ * mão. São decisões diferentes de propósito: "avisei o CRC" é passar o
+ * trabalho adiante, "concluída" é o trabalho ter sido feito.
+ */
+export type StatusTarefa =
+  "Pendente" | "Aprovado" | "Rejeitado" | "Avisado" | "Concluída";
 
 /**
  * "acao-ia" é uma ação que a IA executa e o humano aprova ou rejeita.
  * "alerta-humano" é um aviso para a equipe agir por conta própria — a IA
  * nunca executa esse contato. É o caso do primeiro contato de lead novo.
+ * "manual" é tarefa que uma pessoa do painel criou: a decisão já foi tomada
+ * por quem criou, e o que falta é fazer.
  */
-export type TipoTarefa = "acao-ia" | "alerta-humano";
+export type TipoTarefa = "acao-ia" | "alerta-humano" | "manual";
 
 /** Quem executa a ação depois de decidida. */
 export type Responsavel = "IA" | "Humano" | "Automática";
+
+/**
+ * Para quem a tarefa criada à mão foi atribuída.
+ *
+ * Só existe na tarefa manual. Nas automáticas quem executa continua saindo do
+ * `tipo`, que é a única fonte — ver `supabase/criar-tarefa-a-mao.sql`.
+ */
+export type AtribuicaoTarefa = "CRC" | "IA";
+
+export const atribuicoesDeTarefa: AtribuicaoTarefa[] = ["CRC", "IA"];
+
+/**
+ * Um lead na lista de escolha do formulário de tarefa.
+ *
+ * É de propósito menor que `Tarefa`: para escolher o lead basta reconhecê-lo.
+ * O formulário mora na Fila de Tarefas e no Atendimento, e no Atendimento o
+ * lead já está decidido — então este formato existe só para a lista.
+ */
+export type OpcaoDeLead = {
+  id: number;
+  nome: string;
+  telefone: string;
+  /** Nome do cliente da agência. Nulo quando o lead não tem clínica. */
+  cliente: string | null;
+};
 
 import {
   type EtapaFunil,
@@ -61,6 +95,18 @@ export type Tarefa = Lead & {
   tipo: TipoTarefa;
   responsavel: Responsavel;
   status: StatusTarefa;
+  /** Para quem a tarefa à mão foi atribuída. Ausente nas automáticas. */
+  atribuidoA?: AtribuicaoTarefa;
+  /** Quem criou. Ausente quando foi o n8n. */
+  criadoPor?: string;
+  /**
+   * O prazo como data e hora, em ISO.
+   *
+   * Vem de `prazo_em` na tarefa à mão; na tarefa do n8n é calculado a partir de
+   * `criado_em` mais `prazo_em_minutos`. As duas chegam à tela no mesmo
+   * formato, porque na tela são a mesma pergunta: para quando é isto.
+   */
+  prazoEm: string;
   /** Há quantos minutos a tarefa está sem nenhuma ação. */
   minutosSemAcao: number;
   /**

@@ -6,7 +6,7 @@ export default function PaginaFilaDeTarefas() {
     <>
       <Cabecalho
         titulo="Fila de Tarefas"
-        descricao="Ações sugeridas pela IA aguardando aprovação humana."
+        descricao="O que a Helô sinalizou e o que a equipe marcou para fazer, com prazo."
       />
       <TabelaTarefas />
     </>
