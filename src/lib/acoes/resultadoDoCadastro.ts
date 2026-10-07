@@ -15,6 +15,8 @@
  * saber em qual unidade marcar. Esperar a página recarregar para descobrir isso
  * deixaria o passo seguinte com a lista de lugares vazia.
  */
+import type { Tarefa } from "@/data/tarefas";
+
 export type ClienteCriado = {
   id: number;
   nome: string;
@@ -33,6 +35,15 @@ export type ResultadoDoCadastro = {
   envio: number;
   /** Só vem preenchido quando a gravação criou um cliente. */
   cliente?: ClienteCriado;
+  /**
+   * Só vem preenchido quando a gravação criou uma tarefa.
+   *
+   * Volta pronta para a tela pelo mesmo motivo de `cliente`: a fila é estado do
+   * navegador, inicializado com o que o servidor leu. Sem a tarefa de volta,
+   * quem acabou de criar não a veria até recarregar a página — e acharia que o
+   * botão não funcionou.
+   */
+  tarefa?: Tarefa;
 };
 
 export const RESULTADO_INICIAL: ResultadoDoCadastro = {

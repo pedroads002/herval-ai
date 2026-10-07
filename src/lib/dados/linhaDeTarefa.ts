@@ -20,11 +20,13 @@ import {
   type MotivoPerda,
   type OrigemContato,
 } from "@/data/leads";
-import type {
-  Responsavel,
-  StatusTarefa,
-  Tarefa,
-  TipoTarefa,
+import {
+  atribuicoesDeTarefa,
+  type AtribuicaoTarefa,
+  type Responsavel,
+  type StatusTarefa,
+  type Tarefa,
+  type TipoTarefa,
 } from "@/data/tarefas";
 import { diasDesde, type LinhaDeLead } from "@/lib/dados/linhaDoFunil";
 
@@ -39,6 +41,11 @@ export type LinhaDeTarefa = {
   prazo_em_minutos: number;
   criado_em: string;
   decidido_em: string | null;
+  /** Só na tarefa criada à mão. Ver `supabase/criar-tarefa-a-mao.sql`. */
+  prazo_em?: string | null;
+  descricao?: string | null;
+  atribuido_a?: string | null;
+  criado_por?: string | null;
 };
 
 export type ContextoDasTarefas = {
@@ -50,14 +57,28 @@ export type ContextoDasTarefas = {
   clientes: Map<number, string>;
 };
 
-const tiposDeTarefa: TipoTarefa[] = ["acao-ia", "alerta-humano"];
+const tiposDeTarefa: TipoTarefa[] = ["acao-ia", "alerta-humano", "manual"];
 
 const statusDeTarefa: StatusTarefa[] = [
   "Pendente",
   "Aprovado",
   "Rejeitado",
   "Avisado",
+  "Concluída",
 ];
+
+/**
+ * A `regra` de toda tarefa criada à mão.
+ *
+ * A coluna é NOT NULL e guarda "qual sinal disparou a tarefa", no mesmo
+ * vocabulário que o n8n grava em `mensagens.regra`. Tarefa à mão não tem sinal:
+ * o que a disparou foi uma pessoa, e é isso que fica escrito. O motivo dela
+ * mora em `descricao`.
+ */
+export const REGRA_MANUAL = "Tarefa criada à mão";
+
+/** Teto do texto do motivo. O mesmo limite vale na tela e aqui. */
+export const LIMITE_DA_DESCRICAO = 500;
 
 /**
  * Texto da coluna "Ação sugerida" quando o banco não tem nenhuma.
@@ -100,7 +121,18 @@ export function montarTarefa(
 
   const motivo = motivosDePerda.find((nome) => nome === lead.motivo_perda);
 
+  // Tarefa à mão sem atribuição válida não pode ser desenhada: a tela afirmaria
+  // de quem é o trabalho sem ninguém ter escolhido. O CHECK do banco impede que
+  // essa linha exista, e aqui ela fica de fora em vez de virar "Humano".
+  const atribuidoA = atribuicoesDeTarefa.find(
+    (nome) => nome === (linha.atribuido_a ?? "").trim(),
+  );
+  if (tipo === "manual" && atribuidoA === undefined) return null;
+
   const minutosDeVida = minutosDesde(linha.criado_em, contexto.agora);
+  const prazoEm = instanteDoPrazo(linha, minutosDeVida, contexto.agora);
+  const descricao = (linha.descricao ?? "").trim();
+  const criadoPor = (linha.criado_por ?? "").trim();
 
   return {
     id: linha.id,
@@ -116,23 +148,63 @@ export function montarTarefa(
     lead: (lead.nome ?? "").trim() || "Lead sem nome",
     telefone: (lead.telefone ?? "").trim() || "Sem telefone",
     regra: linha.regra,
-    acao: (linha.acao_sugerida ?? "").trim() || SEM_ACAO_SUGERIDA,
+    // Na tarefa à mão, o que fazer é o motivo que a pessoa escreveu: ele ocupa
+    // a mesma coluna da tela, em vez de um segundo campo com o mesmo texto.
+    acao:
+      (tipo === "manual" ? descricao : (linha.acao_sugerida ?? "").trim()) ||
+      SEM_ACAO_SUGERIDA,
     tipo,
-    responsavel: responsavelDoTipo(tipo),
+    responsavel: responsavelDaTarefa(tipo, atribuidoA),
     status,
+    ...(atribuidoA === undefined ? {} : { atribuidoA }),
+    ...(criadoPor === "" ? {} : { criadoPor }),
     // "Sem nenhuma ação" é tempo de tarefa pendente. Tarefa já decidida não
     // está parada esperando ninguém, então não entra no alerta do card.
     minutosSemAcao: status === "Pendente" ? minutosDeVida : 0,
-    prazoEmHoras: (linha.prazo_em_minutos - minutosDeVida) / 60,
+    prazoEm: prazoEm.toISOString(),
+    prazoEmHoras: (prazoEm.getTime() - contexto.agora.getTime()) / 3_600_000,
   };
 }
 
 /**
- * Quem executa sai do tipo, e não de uma coluna própria: alerta humano é, por
- * definição, trabalho que a IA nunca faz. Coluna separada seria um segundo
- * lugar onde a mesma verdade poderia passar a discordar de si mesma.
+ * O prazo como instante, venha ele da data marcada ou da contagem em minutos.
+ *
+ * As duas formas existem porque respondem a coisas diferentes no banco — ver
+ * `supabase/criar-tarefa-a-mao.sql`. Na tela são a mesma pergunta, "para quando
+ * é isto", e por isso a diferença morre aqui.
+ *
+ * Data inválida cai na contagem em minutos: é o caminho que toda tarefa tem,
+ * porque `prazo_em_minutos` é NOT NULL com default.
  */
-function responsavelDoTipo(tipo: TipoTarefa): Responsavel {
+function instanteDoPrazo(
+  linha: LinhaDeTarefa,
+  minutosDeVida: number,
+  agora: Date,
+) {
+  const marcado = linha.prazo_em ?? null;
+  if (marcado !== null) {
+    const quando = new Date(marcado);
+    if (!Number.isNaN(quando.getTime())) return quando;
+  }
+
+  const faltam = linha.prazo_em_minutos - minutosDeVida;
+  return new Date(agora.getTime() + faltam * 60_000);
+}
+
+/**
+ * Quem executa sai do tipo nas tarefas automáticas, e não de uma coluna
+ * própria: alerta humano é, por definição, trabalho que a IA nunca faz. Coluna
+ * separada ali seria um segundo lugar onde a mesma verdade poderia passar a
+ * discordar de si mesma.
+ *
+ * Na tarefa à mão é o contrário: a mesma tarefa pode ser do CRC ou da Helô, e
+ * só quem criou sabe. Aí a resposta vem da coluna.
+ */
+function responsavelDaTarefa(
+  tipo: TipoTarefa,
+  atribuidoA: AtribuicaoTarefa | undefined,
+): Responsavel {
+  if (tipo === "manual") return atribuidoA === "IA" ? "IA" : "Humano";
   return tipo === "alerta-humano" ? "Humano" : "IA";
 }
 
@@ -166,4 +238,97 @@ export function conferirDecisao(
   }
 
   return { status: conferido };
+}
+
+/** O que a tela manda para criar uma tarefa à mão. */
+export type NovaTarefa = {
+  leadId: number;
+  /** O motivo, em texto livre. */
+  descricao: string;
+  /** "CRC" ou "IA". */
+  atribuidoA: string;
+  /**
+   * O prazo em ISO, com fuso.
+   *
+   * A conversão para ISO é feita no navegador, de propósito: quem escolhe
+   * "08/10 às 14:30" está pensando no relógio da mesa dele, e o servidor roda
+   * em UTC. Montar o instante aqui transformaria 14:30 de Brasília em 14:30 de
+   * Londres, três horas antes — prazo errado sem nenhum erro aparecer.
+   */
+  prazoEm: string;
+};
+
+/** A linha pronta para o insert, nos nomes das colunas do banco. */
+export type LinhaNovaTarefa = {
+  lead_id: number;
+  tipo: "manual";
+  regra: string;
+  descricao: string;
+  atribuido_a: AtribuicaoTarefa;
+  prazo_em: string;
+};
+
+/** Limites do prazo aceito, para barrar data digitada errada. */
+const ANO_MINIMO_DO_PRAZO = 2020;
+const ANOS_A_FRENTE_NO_PRAZO = 5;
+
+/**
+ * Confere a tarefa que a tela quer criar, antes de qualquer gravação.
+ *
+ * Os CHECK da tabela já fecham a porta no banco; a recusa aqui é o que dá uma
+ * frase em português em vez de um erro de constraint na cara de quem clicou —
+ * o mesmo raciocínio de `conferirDecisao`.
+ *
+ * Prazo no passado é aceito de propósito: o CRC registra na segunda algo que
+ * devia ter sido feito no sábado, e recusar isso obrigaria a mentir a data para
+ * conseguir registrar. O que é recusado é data impossível — 0208 em vez de 2026
+ * é erro de digitação, não registro atrasado.
+ */
+export function conferirNovaTarefa(
+  entrada: NovaTarefa,
+  agora: Date,
+): { erro: string } | { linha: LinhaNovaTarefa } {
+  if (!Number.isInteger(entrada.leadId) || entrada.leadId <= 0) {
+    return { erro: "Escolha o lead desta tarefa." };
+  }
+
+  const descricao = (entrada.descricao ?? "").trim();
+  if (descricao === "") {
+    return { erro: "Escreva o motivo da tarefa." };
+  }
+  if (descricao.length > LIMITE_DA_DESCRICAO) {
+    return {
+      erro: `O motivo passou de ${LIMITE_DA_DESCRICAO} caracteres. Resuma em uma ou duas frases.`,
+    };
+  }
+
+  const atribuidoA = atribuicoesDeTarefa.find(
+    (nome) => nome === entrada.atribuidoA,
+  );
+  if (atribuidoA === undefined) {
+    return { erro: "Escolha se a tarefa é do CRC ou da IA." };
+  }
+
+  const prazo = new Date(entrada.prazoEm ?? "");
+  if (Number.isNaN(prazo.getTime())) {
+    return { erro: "Escolha a data e a hora do prazo." };
+  }
+
+  const tetoDoPrazo = new Date(agora);
+  tetoDoPrazo.setFullYear(tetoDoPrazo.getFullYear() + ANOS_A_FRENTE_NO_PRAZO);
+
+  if (prazo.getFullYear() < ANO_MINIMO_DO_PRAZO || prazo > tetoDoPrazo) {
+    return { erro: "Essa data não parece certa. Confira o ano." };
+  }
+
+  return {
+    linha: {
+      lead_id: entrada.leadId,
+      tipo: "manual",
+      regra: REGRA_MANUAL,
+      descricao,
+      atribuido_a: atribuidoA,
+      prazo_em: prazo.toISOString(),
+    },
+  };
 }

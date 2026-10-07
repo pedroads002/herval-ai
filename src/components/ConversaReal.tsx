@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Image as ImagemIcone,
+  ListPlus,
   Mic,
   MicOff,
   Paperclip,
@@ -21,6 +22,7 @@ import {
   type FormatoDeMidia,
 } from "@/data/mensagens";
 import { useLeads } from "@/components/ProvedorLeads";
+import FormularioDeTarefa from "@/components/FormularioDeTarefa";
 import {
   duracaoEmMinutos,
   useGravadorDeAudio,
@@ -158,6 +160,7 @@ export default function ConversaReal({
   }
   const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
+  const [criandoTarefa, setCriandoTarefa] = useState(false);
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [nota, setNota] = useState("");
@@ -419,10 +422,38 @@ export default function ConversaReal({
             </p>
           </div>
 
-          <span className="rounded-full bg-herval-verde/15 px-3 py-1.5 text-xs font-bold text-herval-preto">
-            {lead.etapa}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {/*
+              O caminho rápido: aqui o lead e a clínica já estão decididos pela
+              tela, então criar a tarefa é escolher de quem ela é, para quando e
+              por quê. Pela Fila dá no mesmo, com um campo a mais para achar o
+              lead — e é no meio da conversa que se descobre que precisa
+              retornar na quinta às 14:30.
+            */}
+            <button
+              type="button"
+              onClick={() => setCriandoTarefa((aberto) => !aberto)}
+              aria-expanded={criandoTarefa}
+              className="inline-flex items-center gap-1.5 rounded-full bg-herval-preto px-4 py-2 text-xs font-extrabold text-herval-branco transition-colors hover:bg-black/85"
+            >
+              <ListPlus className="h-3.5 w-3.5" />
+              Criar tarefa
+            </button>
+
+            <span className="rounded-full bg-herval-verde/15 px-3 py-1.5 text-xs font-bold text-herval-preto">
+              {lead.etapa}
+            </span>
+          </div>
         </div>
+
+        {criandoTarefa && (
+          <div className="mt-4 max-w-xl">
+            <FormularioDeTarefa
+              leadFixo={{ id: lead.id, nome: lead.lead }}
+              aoFechar={() => setCriandoTarefa(false)}
+            />
+          </div>
+        )}
       </div>
 
       {/*

@@ -22,10 +22,12 @@ import {
 } from "@/data/leads";
 import {
   tarefasIniciais,
+  type OpcaoDeLead,
   type StatusTarefa,
   type Tarefa,
 } from "@/data/tarefas";
-import { decidirTarefa } from "@/lib/acoes/tarefas";
+import { criarTarefa, decidirTarefa } from "@/lib/acoes/tarefas";
+import type { NovaTarefa } from "@/lib/dados/linhaDeTarefa";
 import {
   AGENTE_AUTOMATICO,
   historicoDeEtapasInicial,
@@ -88,6 +90,18 @@ type ValorContexto = {
    * verdade. É o mesmo raciocínio de `enviarMensagem`.
    */
   definirStatus: (id: number, status: StatusTarefa) => Promise<string | null>;
+  /** Os leads que o formulário de criar tarefa oferece, já em ordem de nome. */
+  leadsParaTarefa: OpcaoDeLead[];
+  /**
+   * Cria uma tarefa à mão. Devolve um aviso em português quando não deu, e
+   * `null` quando gravou — o mesmo contrato de `definirStatus`.
+   *
+   * A tarefa nova entra na fila na hora, com o que o servidor devolveu. Quando
+   * a releitura no servidor não vem (lead apagado no meio do caminho), a tarefa
+   * está criada e aparece no próximo carregamento: é por isso que o sucesso não
+   * depende de ela voltar.
+   */
+  criarTarefaNaFila: (dados: NovaTarefa) => Promise<string | null>;
   moverEtapa: (
     id: number,
     etapa: EtapaFunil,
@@ -140,6 +154,7 @@ const ContextoLeads = createContext<ValorContexto | null>(null);
 export default function ProvedorLeads({
   usuario,
   tarefasDoBanco,
+  leadsParaTarefa = [],
   avisoDaFila = null,
   children,
 }: {
@@ -155,6 +170,12 @@ export default function ProvedorLeads({
    * sozinha por baixo de quem está decidindo.
    */
   tarefasDoBanco?: Tarefa[];
+  /**
+   * Os leads do banco, para o formulário de criar tarefa. Vazio no exemplo
+   * aberto — e aí o formulário diz que não há lead para escolher, em vez de
+   * oferecer uma lista vazia sem explicação.
+   */
+  leadsParaTarefa?: OpcaoDeLead[];
   /** O que a leitura da fila não conseguiu entregar. A Fila mostra na tela. */
   avisoDaFila?: string | null;
   children: React.ReactNode;
@@ -191,6 +212,20 @@ export default function ProvedorLeads({
           tarefa.id === id ? { ...tarefa, status } : tarefa,
         ),
       );
+
+      return null;
+    },
+    [],
+  );
+
+  const criarTarefaNaFila = useCallback(
+    async (dados: NovaTarefa): Promise<string | null> => {
+      const resultado = await criarTarefa(dados);
+      if (!resultado.ok) return resultado.mensagem;
+
+      const nova = resultado.tarefa;
+      // A mais nova primeiro, como a leitura do servidor devolve.
+      if (nova) setTarefas((atuais) => [nova, ...atuais]);
 
       return null;
     },
@@ -534,6 +569,8 @@ export default function ProvedorLeads({
       ligacoes,
       notas,
       definirStatus,
+      leadsParaTarefa,
+      criarTarefaNaFila,
       moverEtapa,
       definirStatusDoAgendamento,
       definirConsulta,
@@ -544,6 +581,8 @@ export default function ProvedorLeads({
     [
       tarefas,
       avisoDaFila,
+      leadsParaTarefa,
+      criarTarefaNaFila,
       agendamentos,
       historicoDeEtapas,
       mensagens,

@@ -13,10 +13,17 @@ import {
   PhoneCall,
   AlertTriangle,
   Clock,
+  Plus,
 } from "lucide-react";
 import Etiqueta, { type TomEtiqueta } from "@/components/Etiqueta";
 import EtiquetaResponsavel from "@/components/EtiquetaResponsavel";
-import { descricaoPrazo, grupoDoPrazo, gruposPrazo } from "@/lib/prazo";
+import FormularioDeTarefa from "@/components/FormularioDeTarefa";
+import {
+  dataEHoraDoPrazo,
+  descricaoPrazo,
+  grupoDoPrazo,
+  gruposPrazo,
+} from "@/lib/prazo";
 import { tempoRelativo } from "@/lib/tempo";
 import CartaoIndicador from "@/components/CartaoIndicador";
 import { calcularIndicadoresFila } from "@/data/indicadores";
@@ -39,6 +46,7 @@ const tomDoStatus: Record<StatusTarefa, TomEtiqueta> = {
   Aprovado: "verde",
   Rejeitado: "preto",
   Avisado: "verde",
+  Concluída: "verde",
 };
 
 /** O verde marca a chance alta; os demais níveis usam contorno preto. */
@@ -63,6 +71,7 @@ export default function TabelaTarefas() {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroDeSituacao>("Ativos");
   const [expandida, setExpandida] = useState<number | null>(null);
+  const [criando, setCriando] = useState(false);
   // O que o banco recusou na última decisão. Sem isto o clique falharia em
   // silêncio e o CRC acharia que registrou.
   const [recusa, setRecusa] = useState<string | null>(null);
@@ -159,7 +168,34 @@ export default function TabelaTarefas() {
             </option>
           ))}
         </select>
+
+        {/*
+          A fila existia só com entrada automática: as cinco sinalizações do
+          cérebro da Helô. Metade do trabalho do CRC é o que ninguém programou,
+          e sem este botão não havia como registrá-lo em lugar nenhum.
+        */}
+        <button
+          type="button"
+          onClick={() => setCriando((aberto) => !aberto)}
+          aria-expanded={criando}
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-herval-preto px-5 py-3 text-sm font-extrabold text-herval-branco transition-colors hover:bg-black/85"
+        >
+          <Plus className="h-4 w-4" />
+          Nova tarefa
+        </button>
       </div>
+
+      {criando && (
+        <div className="max-w-xl">
+          <FormularioDeTarefa
+            // O filtro padrão é "Ativos", pela etapa do lead: sem isto, uma
+            // tarefa criada para um lead já agendado não apareceria na lista
+            // que está logo abaixo do formulário.
+            aoCriar={() => setFiltro("Todos")}
+            aoFechar={() => setCriando(false)}
+          />
+        </div>
+      )}
 
       <p className="text-sm font-medium text-black/55">
         <span className="font-extrabold text-herval-preto">
@@ -236,6 +272,7 @@ export default function TabelaTarefas() {
 
                   {secao.itens.map((tarefa) => {
                     const alerta = tarefa.tipo === "alerta-humano";
+                    const manual = tarefa.tipo === "manual";
                     const aberta = expandida === tarefa.id;
                     const conversa = aberta
                       ? conversaDoLead(conversas, tarefa.id)
@@ -279,16 +316,35 @@ export default function TabelaTarefas() {
                             <span className="block text-black/65">
                               {tarefa.regra}
                             </span>
+                            {/*
+                              Quem criou só aparece na tarefa à mão: nas
+                              automáticas a coluna é nula no banco, e escrever
+                              "Helô" ali seria inventar um autor.
+                            */}
+                            {tarefa.criadoPor && (
+                              <span className="mt-0.5 block text-xs font-medium text-black/45">
+                                por {tarefa.criadoPor}
+                              </span>
+                            )}
+                            {/*
+                              A data e a contagem juntas, porque respondem a
+                              perguntas diferentes: "quinta às 14:30" é o que
+                              importa num retorno marcado, "vence em 20 min" é
+                              o que importa numa trava.
+                            */}
                             <span
                               className={[
-                                "mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold",
+                                "mt-1.5 inline-flex flex-wrap items-center gap-1.5 text-xs font-bold",
                                 tarefa.prazoEmHoras < 0
-                                  ? "text-herval-preto"
+                                  ? "text-herval-vermelho"
                                   : "text-black/45",
                               ].join(" ")}
                             >
                               <Clock className="h-3 w-3" />
-                              {descricaoPrazo(tarefa.prazoEmHoras)}
+                              {dataEHoraDoPrazo(tarefa.prazoEm)}
+                              <span className="font-medium opacity-80">
+                                · {descricaoPrazo(tarefa.prazoEmHoras)}
+                              </span>
                             </span>
                           </td>
 
@@ -350,7 +406,36 @@ export default function TabelaTarefas() {
                           </td>
 
                           <td className="px-6 py-5">
-                            {alerta ? (
+                            {manual ? (
+                              /*
+                                Tarefa à mão não se aprova nem se rejeita: a
+                                decisão já foi tomada por quem a criou, e o que
+                                falta é fazer. Também não se "avisa o CRC" uma
+                                tarefa que o próprio CRC escreveu.
+                              */
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  decidir(
+                                    tarefa.id,
+                                    tarefa.status === "Concluída"
+                                      ? "Pendente"
+                                      : "Concluída",
+                                  )
+                                }
+                                className={[
+                                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
+                                  tarefa.status === "Concluída"
+                                    ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                                    : "bg-herval-preto text-herval-branco hover:bg-black/85",
+                                ].join(" ")}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                {tarefa.status === "Concluída"
+                                  ? "Feita"
+                                  : "Marcar como feita"}
+                              </button>
+                            ) : alerta ? (
                               // Alerta humano: não há o que aprovar, só registrar
                               // que o CRC foi avisado.
                               <button
