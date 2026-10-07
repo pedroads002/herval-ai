@@ -100,6 +100,13 @@ export type Tarefa = Lead & {
   /** Quem criou. Ausente quando foi o n8n. */
   criadoPor?: string;
   /**
+   * Por que a Helô não executou a tarefa e a devolveu ao CRC.
+   *
+   * Ausente na imensa maioria das tarefas: só existe em tarefa que foi
+   * atribuída à IA e voltou. Ver `supabase/helo-executa-tarefa.sql`.
+   */
+  motivoDevolucao?: string;
+  /**
    * O prazo como data e hora, em ISO.
    *
    * Vem de `prazo_em` na tarefa à mão; na tarefa do n8n é calculado a partir de

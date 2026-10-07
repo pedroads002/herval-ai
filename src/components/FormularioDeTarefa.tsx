@@ -199,14 +199,23 @@ export default function FormularioDeTarefa({
             </div>
 
             {/*
-              A IA ainda não executa tarefa criada à mão: o n8n escreve nesta
-              tabela, nunca lê. Dizer isto aqui é o que impede o CRC de achar
-              que passou o trabalho adiante e ir embora.
+              A Helô passou a ler esta fila: um workflow de relógio no n8n busca
+              as tarefas dela a cada 5 minutos. O que estava escrito aqui antes
+              ("a Helô ainda não executa") virou o contrário, e aviso errado é
+              pior que aviso nenhum.
+
+              As duas condições ditas aqui são as que mais surpreendem quem
+              marca a tarefa — a janela de horário e a devolução — e as duas
+              moram no workflow, não neste código. Ver
+              `supabase/helo-executa-tarefa.sql`.
             */}
             {atribuidoA === "IA" && (
               <p className="mt-2 rounded-controle bg-black/[0.04] px-3 py-2 text-xs font-medium text-black/60">
-                A Helô ainda não executa tarefa criada à mão. A tarefa fica
-                registrada e pendente na fila até isso existir no cérebro dela.
+                A Helô envia a mensagem no horário do prazo, entre 8h e 20h —
+                marcada fora desse intervalo, a tarefa espera a janela abrir. Se
+                alguma trava do atendimento barrar, ou se o prazo vencer há mais
+                de 3 horas, ela não envia nada e devolve a tarefa para o CRC com
+                o motivo escrito na linha.
               </p>
             )}
           </div>

@@ -46,6 +46,8 @@ export type LinhaDeTarefa = {
   descricao?: string | null;
   atribuido_a?: string | null;
   criado_por?: string | null;
+  /** Só quando a Helô devolveu. Ver `supabase/helo-executa-tarefa.sql`. */
+  motivo_devolucao?: string | null;
 };
 
 export type ContextoDasTarefas = {
@@ -133,6 +135,7 @@ export function montarTarefa(
   const prazoEm = instanteDoPrazo(linha, minutosDeVida, contexto.agora);
   const descricao = (linha.descricao ?? "").trim();
   const criadoPor = (linha.criado_por ?? "").trim();
+  const motivoDevolucao = (linha.motivo_devolucao ?? "").trim();
 
   return {
     id: linha.id,
@@ -158,6 +161,9 @@ export function montarTarefa(
     status,
     ...(atribuidoA === undefined ? {} : { atribuidoA }),
     ...(criadoPor === "" ? {} : { criadoPor }),
+    // A tarefa que a Helô devolveu continua Pendente e já está como "CRC": sem
+    // este texto na tela, ela teria trocado de dono em silêncio.
+    ...(motivoDevolucao === "" ? {} : { motivoDevolucao }),
     // "Sem nenhuma ação" é tempo de tarefa pendente. Tarefa já decidida não
     // está parada esperando ninguém, então não entra no alerta do card.
     minutosSemAcao: status === "Pendente" ? minutosDeVida : 0,
