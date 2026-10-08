@@ -18,6 +18,7 @@
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 import { etapasFunil, type EtapaFunil } from "@/data/leads";
+import { horaDaPausa, iaEstaPausada } from "@/lib/pausaDaIa";
 import {
   tiposDeRemetente,
   type FormatoMensagem,
@@ -54,6 +55,17 @@ export type LeadEmAtendimento = {
   origem: string;
   /** Há quantos minutos o lead chegou, na convenção de `lib/tempo.ts`. */
   minutosAtras: number;
+  /** Se a Helô está pausada neste lead. Ver `lib/pausaDaIa.ts`. */
+  iaPausada: boolean;
+  /**
+   * Quem pausou e quando, para o Log.
+   *
+   * Nulo quando a IA está ativa — e também quando ela está pausada sem autor
+   * registrado, que é a pausa feita pelo n8n antes destas colunas existirem.
+   * Por isso é um campo separado de `iaPausada`, e não o que decide a pausa:
+   * se decidisse, aquela pausa antiga apareceria na tela como IA ativa.
+   */
+  pausa: { por: string; minutosAtras: number; horas: string | null } | null;
 };
 
 /**
@@ -143,6 +155,30 @@ export function telefoneLegivel(bruto: string) {
  * tela de atendimento por causa de um texto estranho na etapa é pior que
  * aparecer na primeira coluna.
  */
+/**
+ * Os dois campos de pausa do lead, a partir da linha do banco.
+ *
+ * Uma função só porque as duas leituras desta tela — a lista e a conversa —
+ * montam o mesmo `LeadEmAtendimento`. Duas cópias desta conversão seriam duas
+ * chances de a lista e a conversa discordarem sobre o mesmo lead estar pausado.
+ */
+function pausaDoLead(linha: LinhaLead, agora: number) {
+  const pausada = iaEstaPausada(linha.atendimento_ia);
+  const por = (linha.ia_pausada_por ?? "").trim();
+
+  return {
+    iaPausada: pausada,
+    pausa:
+      pausada && linha.ia_pausada_em
+        ? {
+            por: por || "Equipe",
+            minutosAtras: minutosDesde(linha.ia_pausada_em, agora),
+            horas: horaDaPausa(linha.ia_pausada_em),
+          }
+        : null,
+  };
+}
+
 function etapaConhecida(valor: string | null): EtapaFunil {
   const etapa = (valor ?? "").trim();
   return (etapasFunil as string[]).includes(etapa)
@@ -190,6 +226,9 @@ type LinhaLead = {
   etapa: string | null;
   origem: string | null;
   criado_em: string;
+  atendimento_ia?: string | null;
+  ia_pausada_em?: string | null;
+  ia_pausada_por?: string | null;
 };
 
 type LinhaMensagem = {
@@ -242,7 +281,9 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
     await Promise.all([
       supabase
         .from("leads")
-        .select("id, nome, telefone, clinica_id, etapa, origem, criado_em")
+        .select(
+          "id, nome, telefone, clinica_id, etapa, origem, criado_em, atendimento_ia, ia_pausada_em, ia_pausada_por",
+        )
         .order("criado_em", { ascending: false }),
       supabase
         .from("mensagens")
@@ -291,6 +332,7 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
       etapa: etapaConhecida(linha.etapa),
       origem: (linha.origem ?? "").trim() || "Origem não informada",
       minutosAtras: minutosDesde(linha.criado_em, agora),
+      ...pausaDoLead(linha, agora),
     } satisfies LeadEmAtendimento;
   });
 
@@ -485,7 +527,7 @@ export async function carregarConversa(
   const { data: linhaLead, error: erroLead } = await supabase
     .from("leads")
     .select(
-      "id, nome, telefone, clinica_id, especialidade_interesse_id, etapa, origem, criado_em",
+      "id, nome, telefone, clinica_id, especialidade_interesse_id, etapa, origem, criado_em, atendimento_ia, ia_pausada_em, ia_pausada_por",
     )
     .eq("id", leadId)
     .maybeSingle();
@@ -580,6 +622,7 @@ export async function carregarConversa(
       etapa: etapaConhecida(lidoLead.etapa),
       origem: (lidoLead.origem ?? "").trim() || "Origem não informada",
       minutosAtras: minutosDesde(lidoLead.criado_em, agora),
+      ...pausaDoLead(lidoLead, agora),
     },
     mensagens: ((respostaMensagens.data ?? []) as LinhaMensagem[]).map(
       (linha) => {
