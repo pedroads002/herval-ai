@@ -18,18 +18,18 @@ import { carregarFunil } from "@/lib/dados/funil";
  * dinâmica.
  */
 export default async function PaginaFunil() {
-  const { leads, falha, aviso } = await carregarFunil();
+  const { leads, clientes, falha, aviso } = await carregarFunil();
 
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0">
         <Cabecalho
           titulo="Funil"
-          descricao="Todos os leads da base distribuídos pelas etapas do pipeline. Mover um card grava a etapa e entra no histórico do lead."
+          descricao="Os leads distribuídos pelas etapas do pipeline. Escolha o cliente para ver só o funil dele. Mover um card grava a etapa e entra no histórico do lead."
         />
         <AvisoDeCorte aviso={aviso} />
       </div>
-      <PainelFunil leads={leads} falha={falha} />
+      <PainelFunil leads={leads} clientes={clientes} falha={falha} />
     </div>
   );
 }

@@ -17,10 +17,21 @@ import { moverLeadDeEtapa } from "@/lib/acoes/funil";
 import { etapasFunil, type EtapaFunil } from "@/data/leads";
 // Do módulo puro, e não de `dados/funil.ts`: aquele importa o cliente de
 // servidor do Supabase, e nada disso tem o que fazer no pacote do navegador.
-import type { LeadDoFunil } from "@/lib/dados/linhaDoFunil";
+import type { ClienteDoFunil, LeadDoFunil } from "@/lib/dados/linhaDoFunil";
 
 const periodos = ["Todos", "Este mês", "Chegaram hoje"] as const;
 type Periodo = (typeof periodos)[number];
+
+/**
+ * O cliente escolhido no filtro: todos, um cliente pelo id, ou os leads que não
+ * têm cliente nenhum.
+ *
+ * "sem" existe porque lead com `clinica_id` vazio não pertence a cliente algum,
+ * e sem essa opção ele só apareceria em "Todos os clientes" — um lead que o
+ * quadro mostra mas que nenhum funil de cliente explica. A opção só aparece
+ * quando existe lead assim.
+ */
+type FiltroDeCliente = "todos" | "sem" | number;
 
 function dentroDoPeriodo(dias: number, periodo: Periodo) {
   if (periodo === "Chegaram hoje") return dias === 0;
@@ -28,15 +39,28 @@ function dentroDoPeriodo(dias: number, periodo: Periodo) {
   return true;
 }
 
+function doClienteEscolhido(lead: LeadDoFunil, escolhido: FiltroDeCliente) {
+  if (escolhido === "todos") return true;
+  if (escolhido === "sem") return lead.clinicaId === null;
+  return lead.clinicaId === escolhido;
+}
+
 export default function PainelFunil({
   leads,
+  clientes,
   falha,
 }: {
   leads: LeadDoFunil[];
+  clientes: ClienteDoFunil[];
   falha: string | null;
 }) {
   const [busca, setBusca] = useState("");
   const [periodo, setPeriodo] = useState<Periodo>("Todos");
+  /**
+   * Começa em "todos" de propósito: é o que a tela sempre mostrou, e ninguém
+   * perde de vista um lead só porque abriu o funil sem escolher cliente.
+   */
+  const [cliente, setCliente] = useState<FiltroDeCliente>("todos");
   // Card com o menu "Mover para" aberto.
   const [movendo, setMovendo] = useState<number | null>(null);
   /**
@@ -48,17 +72,27 @@ export default function PainelFunil({
   const [gravando, setGravando] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
+  /**
+   * Há lead sem cliente na base? Só então o filtro oferece "Sem cliente". Se a
+   * opção estivesse sempre lá, ela levaria a um quadro vazio sem motivo.
+   */
+  const temLeadSemCliente = useMemo(
+    () => leads.some((lead) => lead.clinicaId === null),
+    [leads],
+  );
+
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
     return leads.filter(
       (lead) =>
+        doClienteEscolhido(lead, cliente) &&
         dentroDoPeriodo(lead.diasAtras, periodo) &&
         (termo === "" ||
           lead.nome.toLowerCase().includes(termo) ||
           lead.telefone.toLowerCase().includes(termo)),
     );
-  }, [leads, busca, periodo]);
+  }, [leads, busca, periodo, cliente]);
 
   const colunas = useMemo(
     () =>
@@ -113,8 +147,25 @@ export default function PainelFunil({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-7">
-      {/* Busca e período */}
+      {/* Cliente, busca e período */}
       <div className="flex shrink-0 flex-col gap-4 lg:flex-row lg:items-center">
+        <label className="inline-flex shrink-0 items-center gap-2">
+          <span className="sr-only">Cliente</span>
+          <select
+            value={String(cliente)}
+            onChange={(e) => setCliente(valorDoFiltro(e.target.value))}
+            className="rounded-full border border-black/15 bg-herval-branco px-4 py-2.5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
+          >
+            <option value="todos">Todos os clientes</option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+            {temLeadSemCliente && <option value="sem">Sem cliente</option>}
+          </select>
+        </label>
+
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
           <input
@@ -338,6 +389,12 @@ function Cartao({
       )}
     </article>
   );
+}
+
+/** O `<select>` devolve texto; o id do cliente volta a ser número aqui. */
+function valorDoFiltro(valor: string): FiltroDeCliente {
+  if (valor === "todos" || valor === "sem") return valor;
+  return Number(valor);
 }
 
 function textoDaChegada(dias: number) {

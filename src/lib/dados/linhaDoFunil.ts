@@ -28,12 +28,27 @@ export type LeadDoFunil = {
   origem: string | null;
   /** Nome do cliente da agência a que o lead pertence. */
   cliente: string | null;
+  /**
+   * Id do cliente, do jeito que está em `leads.clinica_id`. É por ele que o
+   * filtro de cliente do quadro escolhe, e não pelo nome: dois clientes podem
+   * ter o mesmo nome, e nome é campo que muda.
+   */
+  clinicaId: number | null;
   /** Dias inteiros de calendário desde que o lead chegou. Hoje é 0. */
   diasAtras: number;
   motivoPerda: MotivoPerda | null;
   /** Quantas vezes a consulta deste lead foi remarcada depois de uma falta. */
   remarcacoes: number;
 };
+
+/**
+ * Um cliente da agência, como o filtro do quadro precisa dele.
+ *
+ * A lista vem do cadastro inteiro, não dos leads lidos: cliente sem lead nenhum
+ * também aparece no filtro, e escolher ele mostra um quadro vazio — que é a
+ * resposta certa, e bem diferente de o cliente não estar lá.
+ */
+export type ClienteDoFunil = { id: number; nome: string };
 
 /** A linha de `leads` como o PostgREST devolve: tudo texto, tudo anulável. */
 export type LinhaDeLead = {
@@ -80,6 +95,7 @@ export function montarLeadDoFunil(
       linha.clinica_id === null
         ? null
         : (contexto.clientes.get(linha.clinica_id) ?? null),
+    clinicaId: linha.clinica_id,
     diasAtras: diasDesde(linha.criado_em, contexto.hoje),
     motivoPerda: motivoValido(linha.motivo_perda),
     remarcacoes: contexto.faltas.get(linha.id) ?? 0,
