@@ -29,14 +29,17 @@ import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 import {
   montarLeadDoFunil,
+  type ClienteDoFunil,
   type LeadDoFunil,
   type LinhaDeLead,
 } from "@/lib/dados/linhaDoFunil";
 
-export type { LeadDoFunil };
+export type { LeadDoFunil, ClienteDoFunil };
 
 export type DadosDoFunil = {
   leads: LeadDoFunil[];
+  /** Para o filtro de cliente do quadro, em ordem de nome. */
+  clientes: ClienteDoFunil[];
   falha: string | null;
   aviso: string | null;
 };
@@ -44,7 +47,12 @@ export type DadosDoFunil = {
 /** Ver o mesmo raciocínio em `dados/agenda.ts`. */
 const TETO_DE_LINHAS = 1000;
 
-const SEM_DADOS: DadosDoFunil = { leads: [], falha: null, aviso: null };
+const SEM_DADOS: DadosDoFunil = {
+  leads: [],
+  clientes: [],
+  falha: null,
+  aviso: null,
+};
 
 const CAMPOS_DO_LEAD =
   "id, nome, telefone, etapa, origem, criado_em, motivo_perda, clinica_id";
@@ -125,6 +133,10 @@ export async function carregarFunil(): Promise<DadosDoFunil> {
 
   return {
     leads,
+    // Ordem de nome, e não de id: o filtro é uma lista para ler.
+    clientes: [...clientes]
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
     falha: null,
     aviso: montarAviso(linhas.length, foraDoQuadro),
   };
