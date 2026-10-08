@@ -339,8 +339,8 @@ export default function PainelAgenda({
               Nada foi sincronizado com sistema de fora.
             </p>
             <p className="mt-1.5">
-              As consultas desta tela são as que a equipe e a Helô marcam aqui,
-              e ficam gravadas. A sincronização com Clinicorp, Simples Dental ou
+              As consultas desta tela são as que o CRC e a Helô marcam aqui, e
+              ficam gravadas. A sincronização com Clinicorp, Simples Dental ou
               Dental Office fica disponível quando a integração for conectada na
               tela de Integrações.
             </p>

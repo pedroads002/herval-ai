@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ListFilter, MessageSquare, Search } from "lucide-react";
+import { BotOff, ListFilter, MessageSquare, Search } from "lucide-react";
 import {
   ehAtendimento,
   ehDoLead,
@@ -114,7 +114,8 @@ export default function ListaAtendimentos({
           // "Você: recebi seu áudio" faria o CRC achar que já respondeu.
           // `ultima` existe sempre que `fala` existe, mas o compilador não
           // tem como saber: o `?? fala` é só para ele, e nunca é usado.
-          trecho: prefixoDoTrecho(ultima ?? fala) + textoVisivel(ultima ?? fala),
+          trecho:
+            prefixoDoTrecho(ultima ?? fala) + textoVisivel(ultima ?? fala),
           quando: (ultima ?? fala).minutosAtras,
           // Quem espera é quem ainda não foi atendido por gente ou pela IA.
           // Mensagem automática não tira o lead da fila: ela é o aviso de que
@@ -229,7 +230,7 @@ export default function ListaAtendimentos({
 
       <Secao
         titulo="Aguardando resposta"
-        descricao="Ninguém da equipe nem a IA respondeu ainda. Aviso automático não conta como resposta."
+        descricao="Nem o CRC nem a Helô responderam ainda. Aviso automático não conta como resposta."
         conversas={aguardando}
         vazio="Nenhum lead esperando resposta agora."
         destacado
@@ -335,9 +336,38 @@ function LinhaDaConversa({ conversa }: { conversa: Conversa }) {
           <span className="text-xs font-bold text-black/45">
             {tempoRelativo(quando)}
           </span>
-          <span className="rounded-full bg-herval-verde/15 px-2.5 py-1 text-[11px] font-bold text-herval-preto">
-            {lead.etapa}
-          </span>
+
+          <div className="flex items-center gap-1.5">
+            {/*
+              A pausa da Helô, só quando há uma valendo.
+
+              O cinza é o mesmo do botão na tela do lead, e não é falta de
+              destaque: pausa é a Helô desligada, não defeito, e vermelho neste
+              painel significa erro. Quem avisa é a etiqueta existir — num lead
+              normal não existe nada aqui.
+
+              Vale mais em "Aguardando resposta": lá o lead pausado é o único
+              que ninguém vai atender se o CRC não abrir, e sem isto a linha
+              dele é idêntica à de quem a Helô já está respondendo.
+            */}
+            {lead.iaPausada && (
+              <span
+                title={
+                  lead.pausa
+                    ? `Helô pausada por ${lead.pausa.por}${lead.pausa.horas ? ` às ${lead.pausa.horas}` : ""}`
+                    : "Helô pausada neste lead"
+                }
+                className="inline-flex items-center gap-1 rounded-full bg-black/[0.06] px-2.5 py-1 text-[11px] font-bold text-black/55"
+              >
+                <BotOff className="h-3 w-3" />
+                Helô pausada
+              </span>
+            )}
+
+            <span className="rounded-full bg-herval-verde/15 px-2.5 py-1 text-[11px] font-bold text-herval-preto">
+              {lead.etapa}
+            </span>
+          </div>
         </div>
       </Link>
     </li>

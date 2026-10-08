@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { carregarPerfil } from "@/lib/perfil";
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
-import { IA_PAUSADA, horaDaPausa, iaEstaPausada } from "@/lib/pausaDaIa";
+import {
+  IA_PAUSADA,
+  QUEM_PAUSOU_SEM_NOME,
+  horaDaPausa,
+  iaEstaPausada,
+} from "@/lib/pausaDaIa";
 
 /**
  * Pausa ou reativa o atendimento da Helô num lead.
@@ -100,7 +105,7 @@ export async function POST(request: Request) {
     pausa:
       pausada && gravado.ia_pausada_em
         ? {
-            por: (gravado.ia_pausada_por ?? "").trim() || "Equipe",
+            por: (gravado.ia_pausada_por ?? "").trim() || QUEM_PAUSOU_SEM_NOME,
             minutosAtras: 0,
             horas: horaDaPausa(gravado.ia_pausada_em),
           }

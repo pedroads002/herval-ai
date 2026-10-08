@@ -6,7 +6,7 @@ export default function PaginaFilaDeTarefas() {
     <>
       <Cabecalho
         titulo="Fila de Tarefas"
-        descricao="O que a Helô sinalizou e o que a equipe marcou para fazer, com prazo."
+        descricao="O que a Helô sinalizou e o que o CRC marcou para fazer, com prazo."
       />
       <TabelaTarefas />
     </>
