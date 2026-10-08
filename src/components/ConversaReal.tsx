@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Bot,
+  BotOff,
   Image as ImagemIcone,
   ListPlus,
   Mic,
@@ -151,12 +153,23 @@ export default function ConversaReal({
    * A mensagem que acabou de ser enviada não pisca: ela só entra na lista
    * depois que o n8n confirma que gravou, então já está no banco quando a
    * próxima leitura acontece.
+   *
+   * A pausa da Helô entra no mesmo espelho, e pelo mesmo motivo: quem pausa num
+   * computador precisa ver a pausa aparecer no outro. O clique também só troca
+   * este estado depois de a rota confirmar que gravou.
    */
+  const [iaPausada, setIaPausada] = useState(lead?.iaPausada ?? false);
+  const [pausa, setPausa] = useState(lead?.pausa ?? null);
+  const [mudandoIa, setMudandoIa] = useState(false);
+  const [avisoDaIa, setAvisoDaIa] = useState<string | null>(null);
+
   const [ultimaLeitura, setUltimaLeitura] = useState(mensagens);
   if (mensagens !== ultimaLeitura) {
     setUltimaLeitura(mensagens);
     setConversa(mensagens);
     setNotas(notasIniciais);
+    setIaPausada(lead?.iaPausada ?? false);
+    setPausa(lead?.pausa ?? null);
   }
   const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
@@ -203,12 +216,33 @@ export default function ConversaReal({
         titulo: `Nota · ${n.autor}`,
         detalhe: n.texto,
       })),
+      /**
+       * A pausa da Helô, quando há uma valendo.
+       *
+       * Entra como um evento só, e não como um par pausou/reativou: o banco
+       * guarda a pausa que está valendo agora, não a série de todas elas.
+       * Reativar limpa o registro, e o evento sai da lista junto — o Log
+       * mostra "a Helô está pausada desde", que é o que o CRC precisa saber
+       * antes de responder. Histórico de todas as pausas é outra decisão.
+       */
+      ...(pausa
+        ? [
+            {
+              chave: "pausa",
+              minutosAtras: pausa.minutosAtras,
+              titulo: "Helô pausada",
+              detalhe: pausa.horas
+                ? `por ${pausa.por} às ${pausa.horas}`
+                : `por ${pausa.por}`,
+            },
+          ]
+        : []),
     ];
 
     // Do mais recente para o mais antigo: quem abre a tela quer saber o que
     // acabou de acontecer, não como começou.
     return eventos.sort((a, b) => a.minutosAtras - b.minutosAtras);
-  }, [lead, conversa, notas]);
+  }, [lead, conversa, notas, pausa]);
 
   /**
    * Agenda e Ligações continuam lendo a base de exemplo, pelo id do lead. Um
@@ -388,6 +422,51 @@ export default function ConversaReal({
     }
   }
 
+  /**
+   * Liga e desliga a Helô neste lead.
+   *
+   * Só troca o botão depois de a rota confirmar a gravação. Trocar antes — o
+   * chamado estado otimista — deixaria o CRC lendo "Helô pausada" com a Helô
+   * ativa no banco, e é justo nesse botão que a tela não pode estar mentindo.
+   */
+  async function alternarIa() {
+    if (!lead || mudandoIa) return;
+
+    const pausar = !iaPausada;
+    setMudandoIa(true);
+    setAvisoDaIa(null);
+
+    try {
+      const resposta = await fetch("/api/crc/ia", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        // Quem pausou não vai daqui: quem assina é o servidor, pela sessão.
+        body: JSON.stringify({ leadId: lead.id, pausar }),
+      });
+      const resultado = (await resposta.json().catch(() => null)) as {
+        gravado?: boolean;
+        motivo?: string;
+        iaPausada?: boolean;
+        pausa?: LeadEmAtendimento["pausa"];
+      } | null;
+
+      if (!resultado?.gravado) {
+        setAvisoDaIa(
+          resultado?.motivo ??
+            (pausar ? "A Helô não foi pausada." : "A Helô não foi reativada."),
+        );
+        return;
+      }
+
+      setIaPausada(resultado.iaPausada ?? pausar);
+      setPausa(resultado.pausa ?? null);
+    } catch {
+      setAvisoDaIa("Não deu para falar com o servidor. Tente de novo.");
+    } finally {
+      setMudandoIa(false);
+    }
+  }
+
   return (
     /*
       A tela inteira cabe na altura disponível: o cabeçalho do lead fica preso
@@ -440,11 +519,53 @@ export default function ConversaReal({
               Criar tarefa
             </button>
 
+            {/*
+              Ligar e desligar a Helô neste lead.
+
+              O rótulo diz o estado, e não a ação: "Helô ativa" com o botão
+              verde é o que está acontecendo agora, e clicar pausa. Um botão
+              escrito "Pausar" diria a ação e deixaria o estado por adivinhar —
+              e aqui o estado é a informação que importa antes de responder.
+
+              Quem pausou e a que horas não fica aqui: fica no Log, que é onde
+              o histórico do atendimento mora.
+            */}
+            <button
+              type="button"
+              onClick={alternarIa}
+              disabled={mudandoIa}
+              aria-pressed={iaPausada}
+              title={
+                iaPausada
+                  ? "A Helô está pausada neste lead. Clique para reativar."
+                  : "A Helô está atendendo este lead. Clique para pausar."
+              }
+              className={[
+                "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-colors disabled:opacity-60",
+                iaPausada
+                  ? "bg-black/[0.06] text-black/55 hover:bg-black/[0.1]"
+                  : "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro",
+              ].join(" ")}
+            >
+              {iaPausada ? (
+                <BotOff className="h-3.5 w-3.5" />
+              ) : (
+                <Bot className="h-3.5 w-3.5" />
+              )}
+              {iaPausada ? "Helô pausada" : "Helô ativa"}
+            </button>
+
             <span className="rounded-full bg-herval-verde/15 px-3 py-1.5 text-xs font-bold text-herval-preto">
               {lead.etapa}
             </span>
           </div>
         </div>
+
+        {avisoDaIa && (
+          <p className="mt-3 rounded-controle bg-herval-vermelho/10 px-3 py-2 text-xs font-bold text-herval-vermelho">
+            {avisoDaIa}
+          </p>
+        )}
 
         {criandoTarefa && (
           <div className="mt-4 max-w-xl">
