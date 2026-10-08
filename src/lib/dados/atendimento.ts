@@ -18,7 +18,11 @@
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 import { etapasFunil, type EtapaFunil } from "@/data/leads";
-import { horaDaPausa, iaEstaPausada } from "@/lib/pausaDaIa";
+import {
+  QUEM_PAUSOU_SEM_NOME,
+  horaDaPausa,
+  iaEstaPausada,
+} from "@/lib/pausaDaIa";
 import {
   tiposDeRemetente,
   type FormatoMensagem,
@@ -171,7 +175,7 @@ function pausaDoLead(linha: LinhaLead, agora: number) {
     pausa:
       pausada && linha.ia_pausada_em
         ? {
-            por: por || "Equipe",
+            por: por || QUEM_PAUSOU_SEM_NOME,
             minutosAtras: minutosDesde(linha.ia_pausada_em, agora),
             horas: horaDaPausa(linha.ia_pausada_em),
           }

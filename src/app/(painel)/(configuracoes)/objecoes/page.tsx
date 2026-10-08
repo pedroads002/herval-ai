@@ -6,7 +6,7 @@ export default function PaginaObjecoes() {
     <>
       <Cabecalho
         titulo="Quebra de Objeções"
-        descricao="Respostas padrão usadas pela IA e pela equipe no atendimento."
+        descricao="Respostas padrão usadas pela Helô e pelo CRC no atendimento."
       />
       <GerenciadorObjecoes />
     </>

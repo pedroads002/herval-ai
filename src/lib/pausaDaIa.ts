@@ -33,6 +33,20 @@ export function iaEstaPausada(valor: string | null | undefined) {
 }
 
 /**
+ * Quem pausou, quando não há nome para mostrar.
+ *
+ * O nome vem de `perfis.nome_completo`, e perfil em branco ainda existe hoje.
+ * Quem pausa pelo painel é sempre um CRC, então é isso que o Log diz — e não
+ * "Equipe", que era o texto antigo: no atendimento só existem o CRC e a Helô,
+ * e um rótulo genérico some com a diferença entre os dois.
+ *
+ * Mora aqui, e não nos dois lados, porque a rota que grava a pausa e a leitura
+ * que desenha a tela escrevem este mesmo texto. Duas cópias seriam duas
+ * chances de o Log mostrar nomes diferentes para a mesma pausa.
+ */
+export const QUEM_PAUSOU_SEM_NOME = "um CRC";
+
+/**
  * O relógio da pausa, "14:32", sempre no fuso de Brasília.
  *
  * Mesmo motivo de `dataEHoraDoPrazo`: a operação é toda no Brasil, e deixar o
