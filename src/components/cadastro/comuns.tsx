@@ -1010,7 +1010,20 @@ export function useQuandoDerCerto(
   const ultimoEnvio = useRef(0);
   /** O aviso muda de identidade a cada desenho; a referência não. */
   const guardado = useRef(aoConcluir);
-  guardado.current = aoConcluir;
+
+  /**
+   * A guarda mora num efeito, e não no corpo da função, porque escrever numa
+   * referência durante o desenho é efeito colateral no lugar errado: o React
+   * pode desenhar e descartar, ou desenhar duas vezes, e a caixinha acabaria
+   * com uma versão que não é a última.
+   *
+   * Vem declarado antes do efeito de baixo de propósito. O React roda os
+   * efeitos na ordem em que foram declarados, então quando o de baixo for
+   * chamar `guardado.current` a função já é a desta renderização.
+   */
+  useEffect(() => {
+    guardado.current = aoConcluir;
+  });
 
   useEffect(() => {
     if (estado.ok && estado.envio !== ultimoEnvio.current) {
