@@ -74,6 +74,18 @@ export default function ListaAtendimentos({
    * abertura tiraria conversa de vista sem a pessoa ter pedido.
    */
   const [filtro, setFiltro] = useState<FiltroDeSituacao>("Todos");
+  /**
+   * Fica fora do filtro de situação de propósito, e não como mais uma opção
+   * daquela lista.
+   *
+   * Dois motivos. O primeiro é que aquela lista é compartilhada com a Fila de
+   * Tarefas, que não tem dado de pausa nenhum — uma opção lá significaria uma
+   * opção que não funciona na outra tela. O segundo é que escolher na lista é
+   * trocar uma pergunta por outra, e aqui as duas se somam: "aguardando
+   * resposta E com a Helô pausada" é o lead que ninguém vai atender se o CRC
+   * não abrir, e é esse o cruzamento que faz este botão existir.
+   */
+  const [soPausadas, setSoPausadas] = useState(false);
 
   // A conversa inteira é varrida uma vez, e não uma vez por linha da lista.
   const porLead = useMemo(() => indexarMensagens(mensagens), [mensagens]);
@@ -131,15 +143,27 @@ export default function ListaAtendimentos({
     [leads, porLead],
   );
 
+  /**
+   * Quantos leads estão com a Helô pausada, na base inteira e não no que a
+   * tela mostra agora. É o número do botão, e ele precisa valer antes de
+   * qualquer filtro: contar só o que está visível faria o botão mostrar zero
+   * justamente quando a busca escondeu o lead que a pessoa procura.
+   */
+  const pausadas = useMemo(
+    () => conversas.filter(({ lead }) => lead.iaPausada).length,
+    [conversas],
+  );
+
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return conversas.filter(({ lead }) => {
+      if (soPausadas && !lead.iaPausada) return false;
       const filtravel = { ...lead, clinica: lead.nomeDaClinica };
       return (
         combinaComBusca(filtravel, termo) && combinaComFiltro(filtravel, filtro)
       );
     });
-  }, [conversas, busca, filtro]);
+  }, [conversas, busca, filtro, soPausadas]);
 
   /**
    * Quem espera há mais tempo aparece primeiro — e não quem falou por último.
@@ -215,6 +239,42 @@ export default function ListaAtendimentos({
             ))}
           </select>
         </div>
+
+        {/*
+          Só fica apagado quando não há nenhum lead pausado E o filtro está
+          desligado. A segunda metade da condição não é zelo à toa: sem ela,
+          reativar a Helô do último lead pausado com o filtro ligado apagaria o
+          botão com ele ainda ligado — a lista ficaria vazia e sem nada para
+          clicar que a trouxesse de volta.
+        */}
+        <button
+          type="button"
+          onClick={() => setSoPausadas((antes) => !antes)}
+          disabled={pausadas === 0 && !soPausadas}
+          aria-pressed={soPausadas}
+          title={
+            pausadas === 0
+              ? "Nenhum lead está com a Helô pausada agora."
+              : "Mostrar só os leads que estão esperando um CRC responder."
+          }
+          className={[
+            "inline-flex shrink-0 items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold transition-colors",
+            soPausadas
+              ? "border-herval-preto bg-herval-preto text-herval-branco"
+              : "border-black/15 bg-herval-branco text-black/60 hover:text-herval-preto enabled:hover:border-black/30 disabled:opacity-45",
+          ].join(" ")}
+        >
+          <BotOff className="h-4 w-4" />
+          Helô pausada
+          <span
+            className={[
+              "rounded-full px-2 py-0.5 text-xs font-extrabold",
+              soPausadas ? "bg-white/20" : "bg-black/[0.07] text-black/55",
+            ].join(" ")}
+          >
+            {pausadas}
+          </span>
+        </button>
       </div>
 
       <p className="text-sm font-medium text-black/55">
