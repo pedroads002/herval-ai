@@ -51,7 +51,10 @@ export default function PaginaLogin() {
         </div>
 
         <p className="mt-6 text-center text-xs font-medium text-black/45">
-          Acesso restrito à equipe. As contas são criadas pelo administrador.
+          Ainda não tem conta?{" "}
+          <a href="/cadastro" className="font-bold text-herval-preto underline">
+            Criar conta
+          </a>
         </p>
 
         <Rodape className="mt-4" />
