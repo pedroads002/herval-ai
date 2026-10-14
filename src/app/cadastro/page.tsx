@@ -22,7 +22,7 @@ export default function PaginaCadastro() {
               Criar conta
             </h1>
             <p className="mt-1 text-sm font-medium text-black/55">
-              Use o CPF ou CNPJ da sua clínica já cadastrada com a Herval.
+              Use o CPF/CNPJ e o código de acesso que a Herval te passou.
             </p>
           </div>
         </div>

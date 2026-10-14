@@ -7,6 +7,7 @@ export default function FormularioCadastro() {
   const [nomeCompleto, setNomeCompleto] = useState("");
   const [email, setEmail] = useState("");
   const [cpfCnpj, setCpfCnpj] = useState("");
+  const [codigoAcesso, setCodigoAcesso] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -27,7 +28,7 @@ export default function FormularioCadastro() {
     const resposta = await fetch("/api/cadastro", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nomeCompleto, email, cpfCnpj, senha, confirmarSenha }),
+      body: JSON.stringify({ nomeCompleto, email, cpfCnpj, codigoAcesso, senha, confirmarSenha }),
     }).catch(() => null);
 
     const corpo = await resposta?.json().catch(() => null);
@@ -107,6 +108,22 @@ export default function FormularioCadastro() {
           value={cpfCnpj}
           onChange={(e) => setCpfCnpj(e.target.value)}
           placeholder="Só números ou com pontuação"
+          className={campo}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="codigoAcesso" className={rotulo}>
+          Código de acesso
+        </label>
+        <input
+          id="codigoAcesso"
+          type="text"
+          autoComplete="off"
+          required
+          value={codigoAcesso}
+          onChange={(e) => setCodigoAcesso(e.target.value)}
+          placeholder="O código que a Herval te passou"
           className={campo}
         />
       </div>

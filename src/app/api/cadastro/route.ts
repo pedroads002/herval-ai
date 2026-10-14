@@ -10,17 +10,25 @@ import { normalizarDocumento, validarCpfCnpj } from "@/lib/documento";
  *
  * Esta rota, assim como `provisionar-cliente`, NÃO cria clínica — a clínica
  * já existe, cadastrada pela Herval com todos os campos de negócio (ver
- * comentário daquela rota). A diferença é só quem aperta o botão: lá é a
- * Herval escolhendo a clínica da lista; aqui é a própria pessoa, e por isso
- * o documento (CPF/CNPJ) faz o papel que lá era a escolha manual — é como a
- * rota encontra a clínica certa sem pedir confiança em mais nada que vem do
- * corpo do pedido.
+ * comentário daquela rota).
  *
- * Não existe aprovação nem plano/pagamento aqui de propósito: quem já tem
- * CNPJ/CPF cadastrado em `clinicas` já é cliente pagante da agência (decisão
- * comercial, tomada fora deste código) — este formulário só liga a pessoa a
- * esse acesso que já é dela. Documento sem clínica correspondente é
- * recusado (fail-closed): ninguém cria o próprio acesso do nada.
+ * O cadastro exige DOIS dados batendo na mesma clínica: cpf_cnpj (identifica
+ * qual clínica) e codigo_acesso (prova que a pessoa tem relação com ela).
+ * CPF/CNPJ sozinho não bastaria — é dado público (Receita, nota fiscal,
+ * Google), e usá-lo como única chave deixaria qualquer um que descobrisse o
+ * documento de um cliente virar cliente_admin daquela clínica, com acesso às
+ * conversas e mídia dos pacientes — as mesmas que as rotas de mídia e envio
+ * trancaram contra quem é de fora da operação. O código é gerado pela Herval
+ * e entregue ao cliente por fora deste sistema (telefone, e-mail do
+ * contrato); é ele que prova a relação, não o documento.
+ *
+ * Não existe aprovação nem plano/pagamento aqui de propósito: quem tem os
+ * dois dados batendo já é cliente pagante da agência (decisão comercial,
+ * tomada fora deste código) — este formulário só liga a pessoa a esse acesso
+ * que já é dela. Qualquer um dos dois não encontrado é recusado com a MESMA
+ * mensagem genérica (fail-closed e sem diferenciar "documento certo, código
+ * errado" de "documento não encontrado" — isso evitaria que alguém usasse a
+ * rota para confirmar que um CNPJ é cliente da Herval).
  *
  * Pública de propósito (sem `carregarAutorizacao()`) — é o único jeito de um
  * cliente novo, que ainda não tem sessão nenhuma, conseguir criar a conta.
@@ -30,6 +38,7 @@ type Corpo = {
   nomeCompleto?: unknown;
   email?: unknown;
   cpfCnpj?: unknown;
+  codigoAcesso?: unknown;
   senha?: unknown;
   confirmarSenha?: unknown;
 };
@@ -39,6 +48,8 @@ function recusar(motivo: string, status: number) {
 }
 
 const EMAIL_RAZOAVEL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOTIVO_NAO_ENCONTRADO =
+  "CPF/CNPJ ou código de acesso não conferem. Fale com a Herval para liberar seu acesso.";
 
 export async function POST(request: Request) {
   const clienteAdmin = criarClienteAdmin();
@@ -69,6 +80,14 @@ export async function POST(request: Request) {
     return recusar("CPF ou CNPJ inválido.", 400);
   }
 
+  const codigoAcesso =
+    typeof corpo.codigoAcesso === "string"
+      ? corpo.codigoAcesso.trim().toUpperCase()
+      : "";
+  if (codigoAcesso.length < 4) {
+    return recusar("Informe o código de acesso que a Herval te passou.", 400);
+  }
+
   const senha = typeof corpo.senha === "string" ? corpo.senha : "";
   const confirmarSenha =
     typeof corpo.confirmarSenha === "string" ? corpo.confirmarSenha : "";
@@ -83,13 +102,11 @@ export async function POST(request: Request) {
     .from("clinicas")
     .select("id, nome")
     .eq("cpf_cnpj", cpfCnpj)
+    .eq("codigo_acesso", codigoAcesso)
     .maybeSingle();
 
   if (erroDaClinica || !clinica) {
-    return recusar(
-      "CPF/CNPJ não encontrado em nosso cadastro de clientes. Fale com a Herval para liberar seu acesso.",
-      404,
-    );
+    return recusar(MOTIVO_NAO_ENCONTRADO, 404);
   }
 
   const origem = request.headers.get("origin") ?? new URL(request.url).origin;
@@ -129,15 +146,15 @@ export async function POST(request: Request) {
 
   await clienteAdmin.from("profiles").update({ nome, sobrenome }).eq("id", usuarioId);
 
-  // Primeiro cadastro da clínica vira cliente_admin; os próximos (outro
-  // profissional da mesma clínica se cadastrando depois) entram como
-  // cliente_operacional. Ajustável depois se a Herval quiser outro critério.
+  // Primeiro cadastro da clínica vira cliente_admin; os próximos entram como
+  // cliente_operacional. Em erro de leitura (count null), o padrão é o papel
+  // de MENOR privilégio — uma falha de rede nunca deve virar admin.
   const { count } = await clienteAdmin
     .from("autorizacoes")
     .select("usuario_id", { count: "exact", head: true })
     .eq("clinica_id", clinica.id);
 
-  const papel = count && count > 0 ? PAPEIS.CLIENTE_OPERACIONAL : PAPEIS.CLIENTE_ADMIN;
+  const papel = count === 0 ? PAPEIS.CLIENTE_ADMIN : PAPEIS.CLIENTE_OPERACIONAL;
 
   const { error: erroDaAutorizacao } = await clienteAdmin.from("autorizacoes").insert({
     usuario_id: usuarioId,
