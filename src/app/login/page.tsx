@@ -51,10 +51,8 @@ export default function PaginaLogin() {
         </div>
 
         <p className="mt-6 text-center text-xs font-medium text-black/45">
-          Ainda não tem conta?{" "}
-          <a href="/cadastro" className="font-bold text-herval-preto underline">
-            Criar conta
-          </a>
+          Acesso por convite. Recebeu um link da Herval? Use-o para concluir o
+          cadastro antes de entrar por aqui.
         </p>
 
         <Rodape className="mt-4" />

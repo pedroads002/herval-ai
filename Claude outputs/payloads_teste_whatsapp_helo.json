@@ -1,0 +1,150 @@
+{
+  "_leia_primeiro": "Payloads de teste no formato REAL usado pelo workflow 'Helô - base' (n8n, ID gDP9Cy9pPeRGaRS5), extraído diretamente dos nós Webhook EVO1 / Dados1 / ROTA Mensagens1 / ROTA Entrando ou Saindo1. Servem para: (1) o Code testar as mudanças sem precisar de um WhatsApp real conectado, e (2) eu usar depois para verificar de forma independente se cada cenário foi tratado corretamente (mensagem gravada certa no Supabase, resposta certa disparada, etc). Envie cada objeto do array 'cenarios' como body de um POST para a URL do Webhook EVO1.",
+
+  "cenarios": [
+    {
+      "nome": "01_texto_simples_recebido",
+      "descricao": "Mensagem de texto simples (tipo 'conversation') recebida de um lead novo, número ainda não existe em leads/chats.",
+      "esperado": "Deve criar registro em 'leads' (Criar Cliente1) e em 'chats' (Adiciona CHAT), roteando pela saída 'text' do ROTA Mensagens1 e pela saída 'incoming' do ROTA Entrando ou Saindo1.",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511988887777@s.whatsapp.net", "fromMe": false, "id": "TESTE-MSG-001" },
+          "pushName": "Maria Teste",
+          "messageType": "conversation",
+          "messageTimestamp": 1758470400,
+          "message": { "conversation": "Oi, gostaria de saber sobre o tratamento de harmonização facial" }
+        }
+      }
+    },
+    {
+      "nome": "02_texto_estendido_recebido",
+      "descricao": "Mensagem de texto tipo 'extendedTextMessage' (ex: resposta a uma mensagem, ou contém link) — mesma rota de saída 'text' que o cenário 01.",
+      "esperado": "Mesmo tratamento do cenário 01, mas o texto deve vir de body.data.message.extendedTextMessage.text, não de .conversation.",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511988887777@s.whatsapp.net", "fromMe": false, "id": "TESTE-MSG-002" },
+          "pushName": "Maria Teste",
+          "messageType": "extendedTextMessage",
+          "messageTimestamp": 1758470460,
+          "message": { "extendedTextMessage": { "text": "Vocês atendem aos sábados?" } }
+        }
+      }
+    },
+    {
+      "nome": "03_audio_recebido",
+      "descricao": "Mensagem de áudio recebida.",
+      "esperado": "Deve rotear pela saída 'audio', passar por Converter Audio1, e gravar em 'mensagens' com formato compatível (hoje o CHECK constraint já aceita 'audio').",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511988887777@s.whatsapp.net", "fromMe": false, "id": "TESTE-MSG-003" },
+          "pushName": "Maria Teste",
+          "messageType": "audioMessage",
+          "messageTimestamp": 1758470520,
+          "message": {
+            "base64": "BASE64_FAKE_AUDIO_CONTENT_PARA_TESTE",
+            "audioMessage": { "url": "https://exemplo-teste.invalid/audio-teste.ogg", "mimetype": "audio/ogg; codecs=opus", "seconds": 8 }
+          }
+        }
+      }
+    },
+    {
+      "nome": "04_imagem_recebida_com_legenda",
+      "descricao": "Mensagem de imagem com legenda (caption).",
+      "esperado": "Deve rotear pela saída 'image', passar por Converter Foto1. ATENÇÃO: hoje o CHECK constraint de mensagens.formato só aceita ('texto','audio') — gravar essa mensagem em 'mensagens' provavelmente falha até esse ponto ser corrigido.",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511988887777@s.whatsapp.net", "fromMe": false, "id": "TESTE-MSG-004" },
+          "pushName": "Maria Teste",
+          "messageType": "imageMessage",
+          "messageTimestamp": 1758470580,
+          "message": {
+            "base64": "BASE64_FAKE_IMAGE_CONTENT_PARA_TESTE",
+            "imageMessage": { "url": "https://exemplo-teste.invalid/imagem-teste.jpg", "mimetype": "image/jpeg", "caption": "Foto de antes, gostaria de saber se dá pra fazer algo assim" }
+          }
+        }
+      }
+    },
+    {
+      "nome": "05_video_recebido",
+      "descricao": "Mensagem de vídeo recebida. GAP CONFIRMADO: o ROTA Mensagens1 atual não tem nenhuma saída para 'videoMessage' — essa mensagem hoje cai sem rota definida (provavelmente sem tratamento nenhum). Use este payload para confirmar que a correção foi aplicada.",
+      "esperado": "Depois da correção: deve existir uma nova saída 'video' no ROTA Mensagens1 (mesmo padrão da saída 'image'), e mensagens.formato precisa aceitar o valor usado para vídeo.",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511988887777@s.whatsapp.net", "fromMe": false, "id": "TESTE-MSG-005" },
+          "pushName": "Maria Teste",
+          "messageType": "videoMessage",
+          "messageTimestamp": 1758470640,
+          "message": {
+            "base64": "BASE64_FAKE_VIDEO_CONTENT_PARA_TESTE",
+            "videoMessage": { "url": "https://exemplo-teste.invalid/video-teste.mp4", "mimetype": "video/mp4", "caption": "Vídeo de um procedimento que vi no Instagram" }
+          }
+        }
+      }
+    },
+    {
+      "nome": "06_mensagem_saindo_humano_ou_ia",
+      "descricao": "Mensagem marcada como enviada por nós (fromMe: true) — testa a rota 'outcoming' do ROTA Entrando ou Saindo1 (ex: quando alguém da equipe responde direto pelo celular/WhatsApp Web, fora da Helô).",
+      "esperado": "Deve rotear pela saída 'outcoming', sem disparar resposta automática da IA.",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511988887777@s.whatsapp.net", "fromMe": true, "id": "TESTE-MSG-006" },
+          "pushName": "Maria Teste",
+          "messageType": "conversation",
+          "messageTimestamp": 1758470700,
+          "message": { "conversation": "Oi Maria! Sim, atendemos sim, me conta um pouco mais sobre o que você procura" }
+        }
+      }
+    },
+    {
+      "nome": "07_texto_recebido_via_anuncio_CTWA",
+      "descricao": "Lead clicando em anúncio 'Clique para o WhatsApp' e abrindo a conversa pela primeira vez. IMPORTANTE — NÃO CONFIRMADO: o campo 'contextInfo.externalAdReply' abaixo é minha melhor estimativa técnica baseada no protocolo Baileys (mesma família de nomes que já vemos em todo o resto do workflow: messageType, remoteJid, etc.), mas NÃO foi validado contra um payload real do Evolution API da Herval. Antes de codificar em cima disso, o Code precisa mandar uma mensagem de teste real clicando num anúncio de verdade (ou visualizar a doc do Evolution API) para confirmar o nome exato do campo.",
+      "esperado": "Se o campo existir como esperado: leads.origem deve ser preenchido com dados reais do anúncio (não mais a string fixa 'WhatsApp' que o Criar Cliente1 grava hoje).",
+      "body": {
+        "event": "messages.upsert",
+        "instance": "helo-teste",
+        "data": {
+          "key": { "remoteJid": "5511977776666@s.whatsapp.net", "fromMe": false, "id": "TESTE-MSG-007" },
+          "pushName": "Lead Do Anuncio",
+          "messageType": "extendedTextMessage",
+          "messageTimestamp": 1758470760,
+          "message": {
+            "extendedTextMessage": {
+              "text": "Olá",
+              "contextInfo": {
+                "externalAdReply": {
+                  "title": "Harmonização Facial - Avaliação Gratuita",
+                  "body": "Clínica XYZ",
+                  "sourceType": "ad",
+                  "sourceId": "TESTE_AD_ID_123456",
+                  "sourceUrl": "https://www.facebook.com/ads/TESTE_AD_ID_123456",
+                  "mediaType": 2,
+                  "thumbnailUrl": "https://exemplo-teste.invalid/thumb-anuncio.jpg"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+
+  "achados_confirmados_na_inspecao": [
+    "mensagens.formato tem CHECK constraint permitindo somente ('texto','audio') — imagem e vídeo não podem ser gravados hoje.",
+    "ROTA Mensagens1 (switch) não tem nenhuma saída para 'videoMessage' — só text/conversation, audioMessage, imageMessage.",
+    "Os nós 'Enviar Mensagem WhatsApp' e 'Enviar texto1' têm instanceName fixo = 'cheffin' (hardcoded), que não corresponde a nenhuma instância real do Evolution Manager da Herval (que está vazio hoje). O nó 'Evolution API' já faz certo, puxando o valor dinamicamente de Dados1.Instance.",
+    "Criar Cliente1 grava leads.origem sempre como a string fixa 'WhatsApp' — não existe hoje nenhuma captura real de dados de anúncio/CTWA.",
+    "O workflow 'Helô - base' está com active=false (inativo) no n8n."
+  ]
+}

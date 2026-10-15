@@ -47,6 +47,7 @@ import {
   valoresDoHorario,
 } from "@/components/cadastro/comuns";
 import UnidadesDoCliente from "@/components/UnidadesDoCliente";
+import AcessoDoCliente from "@/components/AcessoDoCliente";
 
 /**
  * A tela de um cliente: os dados dele, quem atende nele, e o que cada pessoa
@@ -79,6 +80,10 @@ export default function DetalheCliente({
       ) : (
         <FormularioDaOperacao cliente={cliente} />
       )}
+
+      {/* Gerar o convite de autocadastro é ação própria deste cliente, não
+          dado do formulário de cima — por isso cartão separado, não campo. */}
+      <AcessoDoCliente clienteId={cliente.id} />
 
       {/* Os lugares vêm antes da equipe porque é neles que a equipe é
           encaixada: quem cadastra alguém precisa que a unidade dele já exista.

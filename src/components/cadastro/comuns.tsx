@@ -71,6 +71,7 @@ export function Campo({
   ajuda,
   tipo = "text",
   limite = 120,
+  autoCompletar = "off",
 }: {
   nome: string;
   etiqueta: string;
@@ -79,8 +80,11 @@ export function Campo({
   obrigatorio?: boolean;
   exemplo?: string;
   ajuda?: string;
-  tipo?: "text" | "email";
+  tipo?: "text" | "email" | "password";
   limite?: number;
+  /** Ex.: "name", "email", "new-password" — "off" é o padrão, porque a
+   * maioria destes campos é dado de cadastro interno, não login. */
+  autoCompletar?: string;
 }) {
   const id = `campo-${nome}`;
 
@@ -95,7 +99,7 @@ export function Campo({
         name={nome}
         type={tipo}
         maxLength={limite}
-        autoComplete="off"
+        autoComplete={autoCompletar}
         placeholder={exemplo}
         value={valores[nome] ?? ""}
         onChange={(e) => aoMudar(nome, e.target.value)}
