@@ -1,4 +1,8 @@
-import { carregarAutorizacao, ehHervalAdmin, PAPEIS } from "@/lib/autorizacao";
+import {
+  carregarAutorizacao,
+  ehHervalAdmin,
+  PAPEIS,
+} from "@/lib/autorizacao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import {
@@ -10,18 +14,29 @@ import {
 } from "@/lib/convites";
 
 /**
- * Gera o convite de autocadastro de um cliente que já existe em `clinicas`.
+ * Gera o convite de autocadastro de alguém que vai entrar numa clínica que já
+ * existe em `clinicas`.
  *
- * O botão "Convidar cliente" (tela do cliente, em Clientes) chama esta rota.
- * Ela não cria clínica nem profissional — isso é formulário próprio, na
- * mesma tela — e, por enquanto, não cria nada em `autorizacoes` também: só
- * depois que o cliente completar o próprio cadastro em `/convite/[token]` é
- * que a conta nasce. Até lá, nada muda para ninguém.
+ * Duas portas, mesma rota — por isso nunca foi reaberta quando chegou a fase
+ * do convite de colaborador:
+ *
+ * - A Herval (`herval_admin`) convida qualquer clínica, em qualquer papel
+ *   (`cliente_admin`, o contato principal, ou `cliente_operacional`). É o
+ *   botão "Convidar cliente" na tela de Clientes.
+ * - Quem já é `cliente_admin` de uma clínica convida só PARA a própria
+ *   clínica, e só como `cliente_operacional` — ela não escolhe a clínica
+ *   (`clinicaId` do corpo é ignorado; a de verdade é a da própria sessão) nem
+ *   o papel (sempre colaborador, nunca outro admin). É o botão em Equipe.
+ *
+ * A rota não cria clínica nem profissional — isso é formulário próprio — e,
+ * por enquanto, não cria nada em `autorizacoes` também: só depois que a
+ * pessoa completar o próprio cadastro em `/convite/[token]` é que a conta
+ * nasce. Até lá, nada muda para ninguém.
  *
  * Dois textos voltam na resposta e não são gravados em lugar nenhum: o link
  * e o código de acesso. É a única vez que o código existe por fora do hash —
- * depois deste retorno, só quem a Herval mandou para o cliente (por fora
- * deste sistema) sabe qual é.
+ * depois deste retorno, só quem mandou o convite (por fora deste sistema)
+ * sabe qual é.
  */
 
 type Corpo = {
@@ -37,7 +52,11 @@ export async function POST(request: Request) {
   const autorizacao = await carregarAutorizacao();
   if (!autorizacao) return recusar("Sessão expirada.", 401);
 
-  if (!ehHervalAdmin(autorizacao)) {
+  const souHervalAdmin = ehHervalAdmin(autorizacao);
+  const souClienteAdmin =
+    autorizacao.autorizado && autorizacao.papel === PAPEIS.CLIENTE_ADMIN;
+
+  if (!souHervalAdmin && !souClienteAdmin) {
     return recusar("Acesso não autorizado.", 403);
   }
 
@@ -49,19 +68,28 @@ export async function POST(request: Request) {
     );
   }
 
-  const corpo = (await request.json().catch(() => null)) as Corpo | null;
-  if (!corpo) return recusar("Corpo do pedido inválido.", 400);
+  const corpo = ((await request.json().catch(() => ({}))) ?? {}) as Corpo;
 
-  const clinicaId = Number(corpo.clinicaId);
-  if (!Number.isInteger(clinicaId) || clinicaId <= 0) {
+  // Herval escolhe a clínica pelo corpo do pedido; cliente_admin não escolhe
+  // nada — a clínica é sempre a da própria sessão, nunca a que vier no corpo
+  // (confiar nisso deixaria uma clínica convidar gente para outra).
+  const clinicaId = souHervalAdmin
+    ? Number(corpo.clinicaId)
+    : autorizacao.operacaoId;
+
+  if (!Number.isInteger(clinicaId) || clinicaId === null || clinicaId <= 0) {
     return recusar("Clínica inválida.", 400);
   }
 
-  // O botão de hoje só convida o contato principal. Operacional já está na
-  // lista porque é o mesmo papel que o convite de colaborador vai usar —
-  // sem reabrir esta rota quando essa fase chegar.
-  const papel =
-    corpo.papel === undefined ? PAPEIS.CLIENTE_ADMIN : corpo.papel;
+  // Mesma regra: só a Herval decide o papel de quem está convidando. Convite
+  // de colaborador — gerado pelo próprio cliente_admin — é sempre
+  // cliente_operacional; ela não cria outro admin por conta própria.
+  const papel = souHervalAdmin
+    ? corpo.papel === undefined
+      ? PAPEIS.CLIENTE_ADMIN
+      : corpo.papel
+    : PAPEIS.CLIENTE_OPERACIONAL;
+
   if (papel !== PAPEIS.CLIENTE_ADMIN && papel !== PAPEIS.CLIENTE_OPERACIONAL) {
     return recusar(
       "Papel inválido. Use 'cliente_admin' ou 'cliente_operacional'.",

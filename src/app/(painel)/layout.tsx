@@ -5,7 +5,7 @@ import CabecalhoTopo from "@/components/CabecalhoTopo";
 import ProvedorLeads from "@/components/ProvedorLeads";
 import { carregarPerfil } from "@/lib/perfil";
 import { carregarFilaDeTarefas } from "@/lib/dados/tarefas";
-import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
+import { carregarAutorizacao, ehCliente, PAPEIS } from "@/lib/autorizacao";
 
 /**
  * Moldura das telas internas: cabeçalho fixo e menu lateral. A tela de login
@@ -27,10 +27,12 @@ import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
  * **O menu lateral depende de quem está logado.** A Herval continua vendo o
  * `MenuLateral` de sempre, inteiro. Quem é cliente (`cliente_admin` ou
  * `cliente_operacional`) vê o `MenuLateralCliente`, cortado para as cinco
- * telas que o autocadastro prometeu — o resto do painel continua existindo,
- * só não tem link para lá; a tranca de verdade é `exigirHervalAdmin`, dentro
- * de cada página exclusiva da Herval, porque esconder o link não impede
- * digitar o endereço.
+ * telas que o autocadastro prometeu — `cliente_admin` ganha uma sexta,
+ * Equipe, de onde convida colaborador para a própria clínica. O resto do
+ * painel continua existindo, só não tem link para lá; a tranca de verdade é
+ * `exigirHervalAdmin` (telas da Herval) e `exigirClienteAdmin` (Equipe),
+ * dentro de cada página, porque esconder o link não impede digitar o
+ * endereço.
  *
  * Sem sessão nenhuma, a pessoa nem chega a ver o painel: cai no login. Com
  * sessão mas sem autorização ativa (conta órfã — por exemplo, alguém
@@ -81,7 +83,13 @@ export default async function LayoutPainel({
   return (
     <>
       <CabecalhoTopo />
-      {cliente ? <MenuLateralCliente /> : <MenuLateral />}
+      {cliente ? (
+        <MenuLateralCliente
+          mostrarEquipe={autorizacao.papel === PAPEIS.CLIENTE_ADMIN}
+        />
+      ) : (
+        <MenuLateral />
+      )}
       {/*
         A margem em volta é pequena de propósito: com 24px nos lados e 32px em
         cima e embaixo, os cartões pareciam flutuar dentro de uma moldura de

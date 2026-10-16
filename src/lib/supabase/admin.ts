@@ -7,7 +7,8 @@ import { supabaseUrl } from "@/lib/supabase/config";
  * USO RESTRITO: só estas rotas/páginas importam este arquivo —
  * `src/app/api/admin/provisionar-cliente/route.ts`,
  * `src/app/api/admin/convidar-cliente/route.ts`,
- * `src/app/api/convite/completar/route.ts` e `src/app/convite/[token]/page.tsx`.
+ * `src/app/api/convite/completar/route.ts`, `src/app/convite/[token]/page.tsx`
+ * e `src/lib/dados/equipe.ts`.
  * Nenhum outro lugar do projeto precisa de um cliente privilegiado — a leitura
  * e a escrita de todas as telas e Server Actions continuam pela sessão do
  * próprio usuário (`criarClienteServidor`), sujeitas à RLS. Se um dia outro

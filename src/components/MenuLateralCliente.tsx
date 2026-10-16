@@ -8,6 +8,7 @@ import {
   BarChart3,
   MessagesSquare,
   LayoutDashboard,
+  Users,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 
@@ -22,12 +23,18 @@ import LogoHerval from "@/components/LogoHerval";
  * Integrações — tudo isso é operação da Herval sobre VÁRIOS clientes, não
  * ferramenta de um cliente sobre a própria conta.
  *
+ * Equipe é a sexta, e só aparece para `cliente_admin` — é de lá que ela
+ * convida colaborador para a própria clínica. `cliente_operacional` não vê o
+ * link porque não é quem convida (ver `exigirClienteAdmin`): se entrasse na
+ * tela, só cairia de volta na Visão Geral.
+ *
  * Esconder o link aqui não é a tranca de verdade — é só não oferecer o
- * caminho. Quem impede de fato é `exigirHervalAdmin`, chamado na primeira
- * linha de cada uma daquelas páginas: ele é o que faz digitar o endereço na
- * mão não servir de nada.
+ * caminho. Quem impede de fato é `exigirHervalAdmin` (para as telas da
+ * Herval) e `exigirClienteAdmin` (para Equipe), chamados na primeira linha de
+ * cada uma daquelas páginas: são eles que fazem digitar o endereço na mão não
+ * servir de nada.
  */
-const itens = [
+const itensFixos = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/funil", rotulo: "Leads", Icone: KanbanSquare },
   { href: "/atendimento", rotulo: "Conversas", Icone: MessagesSquare },
@@ -35,8 +42,19 @@ const itens = [
   { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
 ];
 
-export default function MenuLateralCliente() {
+const itemDeEquipe = {
+  href: "/equipe",
+  rotulo: "Equipe",
+  Icone: Users,
+};
+
+export default function MenuLateralCliente({
+  mostrarEquipe = false,
+}: {
+  mostrarEquipe?: boolean;
+}) {
   const caminho = usePathname();
+  const itens = mostrarEquipe ? [...itensFixos, itemDeEquipe] : itensFixos;
 
   return (
     <aside className="fixed bottom-0 left-0 top-16 z-20 flex w-56 flex-col bg-herval-preto md:w-64">

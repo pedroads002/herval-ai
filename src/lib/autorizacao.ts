@@ -189,3 +189,24 @@ export async function exigirHervalAdmin(): Promise<Autorizacao> {
 
   return autorizacao;
 }
+
+/**
+ * A tranca da Equipe — a única tela que o próprio cliente usa para conceder
+ * acesso a mais gente da clínica dele.
+ *
+ * Só `cliente_admin` entra: `cliente_operacional` já é quem foi convidado por
+ * alguém, não quem convida, e a Herval administra o acesso das clínicas por
+ * `Clientes` (`exigirHervalAdmin`), não por aqui. Sem sessão, cai no login;
+ * com sessão mas sem ser `cliente_admin`, cai na Visão Geral — mesmo padrão de
+ * `exigirHervalAdmin`, só que para o papel oposto.
+ */
+export async function exigirClienteAdmin(): Promise<Autorizacao> {
+  const autorizacao = await carregarAutorizacao();
+
+  if (!autorizacao) redirect("/login");
+  if (!autorizacao.autorizado || autorizacao.papel !== PAPEIS.CLIENTE_ADMIN) {
+    redirect("/visao-geral");
+  }
+
+  return autorizacao;
+}
