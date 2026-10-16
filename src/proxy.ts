@@ -9,18 +9,41 @@ import {
 const TELA_DE_LOGIN = "/login";
 
 /**
- * Telas que qualquer pessoa abre sem estar logada, e que também não empurram
- * quem já está logado para outro lugar.
+ * Telas (e rotas de API) que qualquer pessoa abre sem estar logada, e que
+ * também não empurram quem já está logado para outro lugar.
  *
  * A política de privacidade está aqui porque precisa estar: a Meta exige uma
  * URL de política de privacidade que o revisor dela consiga abrir sem conta e
  * sem senha. Atrás do login, a URL não serviria para nada.
  *
+ * `/convite` e `/api/convite/completar` estão aqui pelo mesmo motivo: quem
+ * abre um link de convite ou envia o formulário de autocadastro, por
+ * definição, ainda não tem conta — não existe sessão nenhuma para este
+ * `proxy` conferir. A rota já faz sua própria conferência (token válido, não
+ * usado, não expirado, código de acesso certo); sem esta entrada na lista,
+ * o `proxy` barra a pessoa antes mesmo dela chegar lá, mandando-a pro login
+ * — exatamente o bug observado (convite abrindo a tela de login).
+ *
  * Esta lista é a exceção, não a regra — qualquer outra tela nova continua
  * nascendo protegida sozinha. Só entra aqui o que for público de propósito, e
  * nada que leia ou grave dado de paciente, lead ou cliente.
  */
-const TELAS_PUBLICAS: readonly string[] = ["/privacidade"];
+const TELAS_PUBLICAS: readonly string[] = [
+  "/privacidade",
+  "/convite",
+  "/api/convite/completar",
+];
+
+/**
+ * Compara por prefixo, não só por igualdade: `/convite` cobre `/convite` e
+ * qualquer `/convite/<token>` por baixo dele, sem precisar listar token por
+ * token (o que seria impossível, já que cada um é gerado na hora).
+ */
+function ehTelaPublica(caminho: string) {
+  return TELAS_PUBLICAS.some(
+    (publica) => caminho === publica || caminho.startsWith(`${publica}/`),
+  );
+}
 
 /**
  * Roda antes de qualquer tela ser renderizada (no Next 16 este arquivo se chama
@@ -33,7 +56,7 @@ export async function proxy(request: NextRequest) {
 
   // Tela pública passa direto, logado ou não. Nem chega a consultar o Supabase:
   // não há sessão para validar nem cookie para renovar.
-  if (TELAS_PUBLICAS.includes(caminho)) return NextResponse.next();
+  if (ehTelaPublica(caminho)) return NextResponse.next();
 
   // Sem as chaves do Supabase ninguém entra: só a tela de login responde, e ela
   // mostra o aviso de configuração pendente.
