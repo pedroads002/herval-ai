@@ -28,10 +28,16 @@ export default function FiltrosDaVisaoGeral({
   periodo,
   clinicas,
   clinicaId,
+  seletorDeClinica = true,
 }: {
   periodo: PeriodoEscolhido;
   clinicas: ClinicaDaLista[];
   clinicaId: number | null;
+  /**
+   * Falso para quem é cliente: a clínica dele já está fixa (ver a página), e
+   * o seletor só existe para a Herval trocar entre as que atende.
+   */
+  seletorDeClinica?: boolean;
 }) {
   const router = useRouter();
   const [de, setDe] = useState(periodo.intervalo.de);
@@ -124,24 +130,26 @@ export default function FiltrosDaVisaoGeral({
         </div>
       )}
 
-      <select
-        aria-label="Clínica"
-        value={clinicaId === null ? "todas" : String(clinicaId)}
-        onChange={(evento) =>
-          navegar({
-            clinica:
-              evento.target.value === "todas" ? null : evento.target.value,
-          })
-        }
-        className={ESTILO_DE_CAMPO}
-      >
-        <option value="todas">Todas as clínicas</option>
-        {clinicas.map((clinica) => (
-          <option key={clinica.id} value={clinica.id}>
-            {clinica.nome}
-          </option>
-        ))}
-      </select>
+      {seletorDeClinica && (
+        <select
+          aria-label="Clínica"
+          value={clinicaId === null ? "todas" : String(clinicaId)}
+          onChange={(evento) =>
+            navegar({
+              clinica:
+                evento.target.value === "todas" ? null : evento.target.value,
+            })
+          }
+          className={ESTILO_DE_CAMPO}
+        >
+          <option value="todas">Todas as clínicas</option>
+          {clinicas.map((clinica) => (
+            <option key={clinica.id} value={clinica.id}>
+              {clinica.nome}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

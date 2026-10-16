@@ -1,7 +1,11 @@
 import Cabecalho from "@/components/Cabecalho";
 import TabelaRegua from "@/components/TabelaRegua";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
-export default function PaginaReguaAutomacao() {
+export default async function PaginaReguaAutomacao() {
+  // Tela exclusiva da Herval. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   return (
     <>
       <Cabecalho

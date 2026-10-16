@@ -1,8 +1,11 @@
+import { redirect } from "next/navigation";
 import MenuLateral from "@/components/MenuLateral";
+import MenuLateralCliente from "@/components/MenuLateralCliente";
 import CabecalhoTopo from "@/components/CabecalhoTopo";
 import ProvedorLeads from "@/components/ProvedorLeads";
 import { carregarPerfil } from "@/lib/perfil";
 import { carregarFilaDeTarefas } from "@/lib/dados/tarefas";
+import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
 
 /**
  * Moldura das telas internas: cabeçalho fixo e menu lateral. A tela de login
@@ -20,22 +23,65 @@ import { carregarFilaDeTarefas } from "@/lib/dados/tarefas";
  * Telas compridas (Funil, Relatórios) rolam igual ao que rolavam — mudou o
  * elemento que rola, não a sensação. Telas que cabem inteiras, como o
  * Atendimento, deixam de rolar.
+ *
+ * **O menu lateral depende de quem está logado.** A Herval continua vendo o
+ * `MenuLateral` de sempre, inteiro. Quem é cliente (`cliente_admin` ou
+ * `cliente_operacional`) vê o `MenuLateralCliente`, cortado para as cinco
+ * telas que o autocadastro prometeu — o resto do painel continua existindo,
+ * só não tem link para lá; a tranca de verdade é `exigirHervalAdmin`, dentro
+ * de cada página exclusiva da Herval, porque esconder o link não impede
+ * digitar o endereço.
+ *
+ * Sem sessão nenhuma, a pessoa nem chega a ver o painel: cai no login. Com
+ * sessão mas sem autorização ativa (conta órfã — por exemplo, alguém
+ * desativado depois de já ter entrado uma vez) também não vê o painel, só o
+ * aviso: nem o menu da Herval nem o do cliente dizem a verdade para essa
+ * conta.
  */
 export default async function LayoutPainel({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   // A fila é lida aqui, e não na página da Fila de Tarefas, porque quem guarda
-  // as tarefas é o provedor, que mora neste layout. As duas leituras não
-  // dependem uma da outra.
-  const [perfil, fila] = await Promise.all([
+  // as tarefas é o provedor, que mora neste layout. As leituras não dependem
+  // uma da outra, e podem ir juntas no mesmo `Promise.all`.
+  const [perfil, fila, autorizacao] = await Promise.all([
     carregarPerfil(),
     carregarFilaDeTarefas(),
+    carregarAutorizacao(),
   ]);
+
+  // Sem sessão, não há painel para mostrar.
+  if (!autorizacao) redirect("/login");
+
+  // Logado, mas sem autorização ativa: nem Herval, nem cliente. Mostra o
+  // cabeçalho (é dali que a pessoa consegue sair) e explica, em vez de cair
+  // num painel que não é dela.
+  if (!autorizacao.autorizado) {
+    return (
+      <>
+        <CabecalhoTopo />
+        <main className="mt-16 flex min-h-[calc(100dvh-4rem)] items-center justify-center p-6">
+          <div className="max-w-sm rounded-card border border-black/10 bg-herval-branco p-8 text-center shadow-card">
+            <h1 className="text-lg font-extrabold tracking-tight text-herval-preto">
+              Sem acesso
+            </h1>
+            <p className="mt-2 text-sm font-medium text-black/55">
+              Sua conta está logada, mas não tem nenhum acesso liberado neste
+              momento. Peça à Herval um novo convite, ou avise se isso for um
+              engano.
+            </p>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  const cliente = ehCliente(autorizacao);
 
   return (
     <>
       <CabecalhoTopo />
-      <MenuLateral />
+      {cliente ? <MenuLateralCliente /> : <MenuLateral />}
       {/*
         A margem em volta é pequena de propósito: com 24px nos lados e 32px em
         cima e embaixo, os cartões pareciam flutuar dentro de uma moldura de

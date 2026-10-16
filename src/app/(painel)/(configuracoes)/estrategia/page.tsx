@@ -2,6 +2,7 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import FormularioEstrategia from "@/components/FormularioEstrategia";
 import { carregarEstrategiaDoCliente } from "@/lib/dados/estrategiaDoCliente";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
 /**
  * A Estratégia do Cliente.
@@ -29,6 +30,11 @@ export default async function PaginaEstrategia({
 }: {
   searchParams: Promise<{ [chave: string]: string | string[] | undefined }>;
 }) {
+  // Tela exclusiva da Herval: é a ficha de COMO A HELÔ FALA, item deixado
+  // fora do item 1 (deferido para a fase de permissões granulares). Ver
+  // `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   const parametros = await searchParams;
 
   /*

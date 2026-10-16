@@ -1,7 +1,11 @@
 import Cabecalho from "@/components/Cabecalho";
 import SimuladorIa from "@/components/SimuladorIa";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
-export default function PaginaTesteIa() {
+export default async function PaginaTesteIa() {
+  // Tela exclusiva da Herval. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   return (
     <>
       <Cabecalho

@@ -1,7 +1,11 @@
 import Cabecalho from "@/components/Cabecalho";
 import GerenciadorObjecoes from "@/components/GerenciadorObjecoes";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
-export default function PaginaObjecoes() {
+export default async function PaginaObjecoes() {
+  // Tela exclusiva da Herval. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   return (
     <>
       <Cabecalho

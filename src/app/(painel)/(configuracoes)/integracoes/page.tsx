@@ -1,6 +1,7 @@
 import Cabecalho from "@/components/Cabecalho";
 import Etiqueta from "@/components/Etiqueta";
 import { Kanban, MessageCircle, Megaphone } from "lucide-react";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
 const integracoes = [
   {
@@ -29,7 +30,10 @@ const integracoes = [
   },
 ];
 
-export default function PaginaIntegracoes() {
+export default async function PaginaIntegracoes() {
+  // Tela exclusiva da Herval. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   return (
     <>
       <Cabecalho

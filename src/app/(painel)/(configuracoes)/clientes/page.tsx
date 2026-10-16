@@ -3,6 +3,7 @@ import AvisoDeCorte from "@/components/AvisoDeCorte";
 import CadastroCliente from "@/components/CadastroCliente";
 import TabelaClientes from "@/components/TabelaClientes";
 import { carregarProfissionais } from "@/lib/dados/profissionais";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
 /**
  * A tela dos clientes atendidos pela Helô.
@@ -17,6 +18,10 @@ import { carregarProfissionais } from "@/lib/dados/profissionais";
  * já torna a página dinâmica. A opção `dynamic` está em via de saída no Next.
  */
 export default async function PaginaClientes() {
+  // Tela exclusiva da Herval: o roster de TODOS os clientes, inclusive o
+  // cadastro de cliente novo. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   const { clientes, especialidades, falha, aviso } =
     await carregarProfissionais();
 

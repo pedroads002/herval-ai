@@ -1,7 +1,12 @@
 import Cabecalho from "@/components/Cabecalho";
 import TabelaTarefas from "@/components/TabelaTarefas";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
-export default function PaginaFilaDeTarefas() {
+export default async function PaginaFilaDeTarefas() {
+  // Tela exclusiva da Herval: a fila é de quem atende várias clínicas, não de
+  // uma clínica só. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   return (
     <>
       <Cabecalho

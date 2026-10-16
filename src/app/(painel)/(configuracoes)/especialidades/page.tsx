@@ -2,6 +2,7 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import ListaEspecialidades from "@/components/ListaEspecialidades";
 import { carregarProcedimentos } from "@/lib/dados/procedimentos";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
 /**
  * O catálogo de procedimentos da agência.
@@ -15,6 +16,10 @@ import { carregarProcedimentos } from "@/lib/dados/procedimentos";
  * torna a página dinâmica.
  */
 export default async function PaginaEspecialidades() {
+  // Tela exclusiva da Herval: o catálogo é da agência, não de uma clínica.
+  // Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   const { procedimentos, falha, aviso } = await carregarProcedimentos();
 
   return (

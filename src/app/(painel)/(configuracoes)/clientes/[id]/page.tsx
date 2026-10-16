@@ -4,6 +4,7 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import DetalheCliente, { ResumoDoCliente } from "@/components/DetalheCliente";
 import { carregarCliente } from "@/lib/dados/profissionais";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
 /**
  * A tela de um cliente.
@@ -17,6 +18,10 @@ export default async function PaginaDoCliente({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Tela exclusiva da Herval, mesma ficha de `/clientes`. Ver
+  // `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   const { id } = await params;
   const numero = Number(id);
 

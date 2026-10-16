@@ -1,7 +1,11 @@
 import Cabecalho from "@/components/Cabecalho";
 import ListaTemplates from "@/components/ListaTemplates";
+import { exigirHervalAdmin } from "@/lib/autorizacao";
 
-export default function PaginaTemplates() {
+export default async function PaginaTemplates() {
+  // Tela exclusiva da Herval. Ver `exigirHervalAdmin`.
+  await exigirHervalAdmin();
+
   return (
     <>
       <Cabecalho

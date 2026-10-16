@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 
@@ -164,4 +165,27 @@ export function operacaoDoUsuario(
 ): number | null {
   if (!autorizacao || !ehCliente(autorizacao)) return null;
   return autorizacao.operacaoId;
+}
+
+/**
+ * A tranca das telas exclusivas da Herval (Fila de Tarefas, Clientes,
+ * Procedimentos, Estratégia do Cliente, Quebra de Objeções, Régua de
+ * Automação, Templates de WhatsApp, Integrações, Teste da IA).
+ *
+ * Chamada na primeira linha de cada uma dessas páginas — o menu já escondia o
+ * link para quem é cliente, mas o menu não impede ninguém de digitar o
+ * endereço direto. Sem sessão, cai no login; com sessão mas sem ser da Herval
+ * (cliente ou autorização nenhuma), cai na Visão Geral, que é o que a conta
+ * dela sabe abrir.
+ *
+ * Devolve a autorização só para a página não precisar carregá-la de novo
+ * quando também precisar do nome ou do id de quem está logado.
+ */
+export async function exigirHervalAdmin(): Promise<Autorizacao> {
+  const autorizacao = await carregarAutorizacao();
+
+  if (!autorizacao) redirect("/login");
+  if (!ehHervalAdmin(autorizacao)) redirect("/visao-geral");
+
+  return autorizacao;
 }
