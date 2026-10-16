@@ -117,7 +117,7 @@ export async function POST(request: Request) {
   const { data: cadastro, error: erroDoCadastro } = await supabasePublico.auth.signUp({
     email,
     password: senha,
-    options: { emailRedirectTo: `${origem}/login` },
+    options: { emailRedirectTo: `${origem}/confirmar-email` },
   });
 
   if (erroDoCadastro || !cadastro.user) {
@@ -132,38 +132,47 @@ export async function POST(request: Request) {
   const usuarioId = cadastro.user.id;
 
   /**
-   * `signUp` chamado de novo para o mesmo e-mail ainda não confirmado não dá
-   * erro — o Supabase devolve o mesmo usuário e reenvia o e-mail. É o jeito
-   * documentado de reconhecer isso: `identities` vem vazio quando o e-mail já
-   * existia. Sem esta conferência, um clique duplo no botão (ou uma segunda
-   * tentativa depois de uma rede instável) cairia direto no `insert` de
-   * `autorizacoes` abaixo, bateria na chave primária (`usuario_id` já tem
-   * linha, da primeira tentativa que deu certo) e o `desfazer` apagaria uma
-   * conta que tinha acabado de nascer certinha.
+   * `identities.length === 0` só é sinal confiável de "e-mail já existia"
+   * quando a conta antiga ainda não tinha sido confirmada — para um e-mail já
+   * confirmado (de um teste anterior, por exemplo), o Supabase pode devolver
+   * sucesso com `identities` preenchido mesmo sem criar nada de novo. Por
+   * isso a conferência de idempotência não depende mais desse sinal: olha
+   * direto se `autorizacoes` já tem linha para este usuário, sempre, antes de
+   * tentar o `insert` — é o que realmente importa, e é o mesmo motivo de
+   * nunca mais cair num `insert` cego que bateria na chave primária.
+   *
+   * `autorizacoes.usuario_id` é chave primária — um e-mail só pode estar
+   * ligado a UMA clínica. Por isso a linha existente só conta como "mesmo
+   * convite, tentativa repetida" quando é da MESMA clínica deste convite; se
+   * for de outra clínica, este e-mail já pertence a um acesso diferente, e
+   * isso é erro de verdade — não dá pra reportar sucesso silenciosamente.
    */
-  const eraCadastroNovo = (cadastro.user.identities?.length ?? 0) > 0;
+  const { data: jaAutorizado } = await clienteAdmin
+    .from("autorizacoes")
+    .select("usuario_id, clinica_id")
+    .eq("usuario_id", usuarioId)
+    .maybeSingle();
 
-  if (!eraCadastroNovo) {
-    const { data: jaAutorizado } = await clienteAdmin
-      .from("autorizacoes")
-      .select("usuario_id")
-      .eq("usuario_id", usuarioId)
-      .maybeSingle();
+  if (jaAutorizado) {
+    if (jaAutorizado.clinica_id !== convite.clinica_id) {
+      return recusar(
+        "Este e-mail já tem acesso a outra clínica no sistema. Use um e-mail diferente para este convite.",
+        409,
+      );
+    }
 
-    // Primeira tentativa já tinha terminado: nada a refazer, só o e-mail de
-    // confirmação que o `signUp` logo acima reenviou. Ainda assim fecha o
+    // Mesma clínica: nada a refazer, só o e-mail de confirmação que o
+    // `signUp` logo acima reenviou (se for o caso). Ainda assim fecha o
     // convite agora, se por algum motivo a primeira passagem não tinha
     // chegado a marcar `usado_em` — sem isso o mesmo convite continuaria
-    // aceitando um e-mail diferente, criando um segundo acesso à clínica.
-    if (jaAutorizado) {
-      await clienteAdmin
-        .from("convites")
-        .update({ usado_em: new Date().toISOString(), usuario_criado: usuarioId })
-        .eq("token", token)
-        .is("usado_em", null);
+    // aceitando outro e-mail, criando um segundo acesso à mesma clínica.
+    await clienteAdmin
+      .from("convites")
+      .update({ usado_em: new Date().toISOString(), usuario_criado: usuarioId })
+      .eq("token", token)
+      .is("usado_em", null);
 
-      return Response.json({ ok: true });
-    }
+    return Response.json({ ok: true });
   }
 
   // `clienteAdmin` já foi conferido lá no topo, mas o TypeScript não carrega
@@ -171,6 +180,13 @@ export async function POST(request: Request) {
   // apelido aqui, com o tipo já sem o `| null`.
   const admin = clienteAdmin;
 
+  /**
+   * Só apaga a conta recém-criada quando o problema é ANTES dela ganhar
+   * acesso (ninguém ficaria com conta órfã, sem autorização nenhuma). Nunca
+   * chamado depois do `insert` de `autorizacoes` dar certo — a partir dali a
+   * conta já tem acesso de verdade, e apagá-la seria destruir algo que
+   * funcionou.
+   */
   async function desfazer(motivo: string) {
     await admin.auth.admin.deleteUser(usuarioId).catch(() => {});
     return recusar(motivo, 500);
@@ -184,6 +200,36 @@ export async function POST(request: Request) {
   });
 
   if (erroDaAutorizacao) {
+    // 23505 = chave primária duplicada: outra requisição (corrida entre duas
+    // abas, ou um duplo clique) já inseriu a linha entre a conferência de
+    // cima e este insert. Confere de novo qual clínica venceu a corrida — se
+    // foi esta mesma, sucesso (e por isso não é `desfazer()`: a conta já
+    // está autorizada, apagá-la destruiria um acesso que acabou de ser
+    // concedido); se foi outra, o mesmo erro de "já tem acesso em outro
+    // lugar" de cima, não um 500 genérico.
+    if (erroDaAutorizacao.code === "23505") {
+      const { data: autorizacaoAtual } = await clienteAdmin
+        .from("autorizacoes")
+        .select("clinica_id")
+        .eq("usuario_id", usuarioId)
+        .maybeSingle();
+
+      if (autorizacaoAtual?.clinica_id !== convite.clinica_id) {
+        return recusar(
+          "Este e-mail já tem acesso a outra clínica no sistema. Use um e-mail diferente para este convite.",
+          409,
+        );
+      }
+
+      await clienteAdmin
+        .from("convites")
+        .update({ usado_em: new Date().toISOString(), usuario_criado: usuarioId })
+        .eq("token", token)
+        .is("usado_em", null);
+
+      return Response.json({ ok: true });
+    }
+
     return desfazer("Não deu para liberar o acesso. Nada foi criado — tente de novo.");
   }
 
