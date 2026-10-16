@@ -28,18 +28,42 @@ import LogoHerval from "@/components/LogoHerval";
  * link porque não é quem convida (ver `exigirClienteAdmin`): se entrasse na
  * tela, só cairia de volta na Visão Geral.
  *
+ * Das quatro telas opcionais (Leads, Conversas, Relatórios, Agenda), um
+ * colaborador só vê as que o `cliente_admin` liberou para ele, em Equipe —
+ * `telasPermitidas` chega como `null` (sem restrição, mostra as quatro) para
+ * todo mundo que não é colaborador, e como vetor (possivelmente vazio) só
+ * para `cliente_operacional`. Visão Geral nunca é filtrada: é a única tela
+ * que todo cliente sempre vê.
+ *
+ * Note que este arquivo não importa nada de `@/lib/autorizacao`, de
+ * propósito: aquele módulo carrega `next/headers` por baixo (via
+ * `criarClienteServidor`), e um Client Component que importasse dali
+ * quebraria o build. Por isso as chaves de tela aparecem aqui como texto
+ * literal, repetindo `TELAS_CONTROLAVEIS` daquele arquivo em vez de
+ * reaproveitá-la.
+ *
  * Esconder o link aqui não é a tranca de verdade — é só não oferecer o
  * caminho. Quem impede de fato é `exigirHervalAdmin` (para as telas da
- * Herval) e `exigirClienteAdmin` (para Equipe), chamados na primeira linha de
- * cada uma daquelas páginas: são eles que fazem digitar o endereço na mão não
- * servir de nada.
+ * Herval), `exigirClienteAdmin` (para Equipe) e `exigirTela` (para as quatro
+ * telas opcionais), chamados na primeira linha de cada uma daquelas páginas:
+ * são eles que fazem digitar o endereço na mão não servir de nada.
  */
 const itensFixos = [
-  { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
-  { href: "/funil", rotulo: "Leads", Icone: KanbanSquare },
-  { href: "/atendimento", rotulo: "Conversas", Icone: MessagesSquare },
-  { href: "/relatorios", rotulo: "Relatórios", Icone: BarChart3 },
-  { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
+  { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard, tela: null },
+  { href: "/funil", rotulo: "Leads", Icone: KanbanSquare, tela: "funil" as const },
+  {
+    href: "/atendimento",
+    rotulo: "Conversas",
+    Icone: MessagesSquare,
+    tela: "atendimento" as const,
+  },
+  {
+    href: "/relatorios",
+    rotulo: "Relatórios",
+    Icone: BarChart3,
+    tela: "relatorios" as const,
+  },
+  { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays, tela: "agenda" as const },
 ];
 
 const itemDeEquipe = {
@@ -50,11 +74,24 @@ const itemDeEquipe = {
 
 export default function MenuLateralCliente({
   mostrarEquipe = false,
+  telasPermitidas = null,
 }: {
   mostrarEquipe?: boolean;
+  /**
+   * `null` é "sem restrição" — mostra as quatro telas opcionais. Um vetor
+   * (mesmo vazio) só chega aqui para `cliente_operacional`; o restante dos
+   * itens (`tela: null`, como Visão Geral) nunca é filtrado por ele.
+   */
+  telasPermitidas?: string[] | null;
 }) {
   const caminho = usePathname();
-  const itens = mostrarEquipe ? [...itensFixos, itemDeEquipe] : itensFixos;
+
+  const itensLiberados = itensFixos.filter(
+    (item) =>
+      item.tela === null || telasPermitidas === null || telasPermitidas.includes(item.tela),
+  );
+
+  const itens = mostrarEquipe ? [...itensLiberados, itemDeEquipe] : itensLiberados;
 
   return (
     <aside className="fixed bottom-0 left-0 top-16 z-20 flex w-56 flex-col bg-herval-preto md:w-64">

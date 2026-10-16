@@ -2,6 +2,7 @@ import Cabecalho from "@/components/Cabecalho";
 import ListaAtendimentos from "@/components/ListaAtendimentos";
 import AtualizacaoAutomatica from "@/components/AtualizacaoAutomatica";
 import { carregarAtendimento } from "@/lib/dados/atendimento";
+import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autorizacao";
 
 /**
  * A porta de entrada do atendimento. Antes só se chegava aqui pelo card do
@@ -16,13 +17,25 @@ import { carregarAtendimento } from "@/lib/dados/atendimento";
  * topo existe por causa disso: duas telas mostrando listas diferentes sem
  * aviso levariam o CRC a achar que uma delas está errada.
  *
+ * `exigirTela` é nova aqui: até agora esta era a única das quatro telas
+ * opcionais sem nenhuma chamada a `carregarAutorizacao()`, porque nada nela
+ * dependia de quem está logado — só passou a precisar quando um colaborador
+ * ganhou a possibilidade de não ter Conversas liberado. Vai junto no mesmo
+ * `Promise.all` da leitura do atendimento, para não virar uma segunda ida ao
+ * banco em série.
+ *
  * Não há `export const dynamic` aqui de propósito: a leitura passa pelo cliente
  * do Supabase, que lê os cookies da sessão, e isso já torna a página dinâmica.
  * A opção `dynamic` está em via de saída no Next (some quando Cache Components
  * é ligado), então depender dela seria dívida na certa.
  */
 export default async function PaginaAtendimento() {
-  const { leads, mensagens, falha } = await carregarAtendimento();
+  const [{ leads, mensagens, falha }, autorizacao] = await Promise.all([
+    carregarAtendimento(),
+    carregarAutorizacao(),
+  ]);
+
+  await exigirTela(TELAS_CONTROLAVEIS.ATENDIMENTO, autorizacao);
 
   return (
     <>

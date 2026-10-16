@@ -7,6 +7,7 @@ import { supabaseUrl } from "@/lib/supabase/config";
  * USO RESTRITO: só estas rotas/páginas importam este arquivo —
  * `src/app/api/admin/provisionar-cliente/route.ts`,
  * `src/app/api/admin/convidar-cliente/route.ts`,
+ * `src/app/api/admin/equipe/permissoes/route.ts`,
  * `src/app/api/convite/completar/route.ts`, `src/app/convite/[token]/page.tsx`
  * e `src/lib/dados/equipe.ts`.
  * Nenhum outro lugar do projeto precisa de um cliente privilegiado — a leitura

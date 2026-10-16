@@ -29,6 +29,40 @@ export const PAPEIS = {
 
 export type Papel = (typeof PAPEIS)[keyof typeof PAPEIS];
 
+/**
+ * As quatro telas opcionais do cliente — todas, menos Visão Geral, que todo
+ * cliente sempre vê. É sobre estas quatro que o `cliente_admin` decide, por
+ * colaborador, em Equipe.
+ */
+export const TELAS_CONTROLAVEIS = {
+  FUNIL: "funil",
+  ATENDIMENTO: "atendimento",
+  RELATORIOS: "relatorios",
+  AGENDA: "agenda",
+} as const;
+
+export type TelaControlavel =
+  (typeof TELAS_CONTROLAVEIS)[keyof typeof TELAS_CONTROLAVEIS];
+
+const TODAS_AS_TELAS_CONTROLAVEIS: readonly TelaControlavel[] = Object.values(
+  TELAS_CONTROLAVEIS,
+);
+
+function ehTelaConhecida(valor: unknown): valor is TelaControlavel {
+  return (TODAS_AS_TELAS_CONTROLAVEIS as readonly unknown[]).includes(valor);
+}
+
+/**
+ * Lê `telas_permitidas` do banco sem confiar no formato. `null`/qualquer
+ * coisa que não seja vetor volta `null` ("sem restrição"); um vetor some com
+ * o que não for uma das quatro telas conhecidas, em vez de propagar lixo para
+ * dentro de `Autorizacao`.
+ */
+function telasPermitidasValidas(bruto: unknown): TelaControlavel[] | null {
+  if (!Array.isArray(bruto)) return null;
+  return bruto.filter(ehTelaConhecida);
+}
+
 export type Autorizacao = {
   usuarioId: string;
   nome: string;
@@ -42,6 +76,12 @@ export type Autorizacao = {
    * leitura, a resposta é "não autorizado" — nunca "administrador".
    */
   autorizado: boolean;
+  /**
+   * Só tem efeito para `cliente_operacional` — ver `telaPermitidaParaColaborador`.
+   * `null` é "sem restrição configurada" (vê as quatro telas opcionais, igual
+   * a hoje); vetor vazio é "nenhuma delas", de propósito.
+   */
+  telasPermitidas: TelaControlavel[] | null;
 };
 
 function ehPapelConhecido(valor: unknown): valor is Papel {
@@ -54,7 +94,14 @@ function ehPapelConhecido(valor: unknown): valor is Papel {
  * em cada saída de erro — onde um campo esquecido viraria um privilégio.
  */
 function semAutorizacao(usuarioId: string, nome: string): Autorizacao {
-  return { usuarioId, nome, papel: null, operacaoId: null, autorizado: false };
+  return {
+    usuarioId,
+    nome,
+    papel: null,
+    operacaoId: null,
+    autorizado: false,
+    telasPermitidas: null,
+  };
 }
 
 /**
@@ -96,7 +143,7 @@ export async function carregarAutorizacao(): Promise<Autorizacao | null> {
   // pedindo só a própria linha.
   const { data: registro, error } = await supabase
     .from("autorizacoes")
-    .select("papel, clinica_id, ativo")
+    .select("papel, clinica_id, ativo, telas_permitidas")
     .eq("usuario_id", user.id)
     .maybeSingle();
 
@@ -113,6 +160,8 @@ export async function carregarAutorizacao(): Promise<Autorizacao | null> {
   const operacaoId =
     typeof registro.clinica_id === "number" ? registro.clinica_id : null;
 
+  const telasPermitidas = telasPermitidasValidas(registro.telas_permitidas);
+
   if (registro.papel === PAPEIS.HERVAL_ADMIN) {
     if (operacaoId !== null) return semAutorizacao(user.id, nome);
     return {
@@ -121,6 +170,7 @@ export async function carregarAutorizacao(): Promise<Autorizacao | null> {
       papel: PAPEIS.HERVAL_ADMIN,
       operacaoId: null,
       autorizado: true,
+      telasPermitidas,
     };
   }
 
@@ -132,6 +182,7 @@ export async function carregarAutorizacao(): Promise<Autorizacao | null> {
     papel: registro.papel,
     operacaoId,
     autorizado: true,
+    telasPermitidas,
   };
 }
 
@@ -168,6 +219,64 @@ export function operacaoDoUsuario(
 }
 
 /**
+ * Se um colaborador (`cliente_operacional`) pode abrir uma das quatro telas
+ * opcionais — Leads, Conversas, Relatórios ou Agenda.
+ *
+ * Só restringe quem é colaborador. `herval_admin` e `cliente_admin` sempre
+ * passam: a permissão granular é o que o ADMIN DA CLÍNICA libera para quem
+ * ele mesmo convidou, não algo que a Herval ou o próprio admin precisem pedir
+ * para ver a própria operação.
+ *
+ * `telasPermitidas === null` é "sem restrição configurada" — o padrão de todo
+ * colaborador até o `cliente_admin` abrir Equipe e mexer nisso.
+ */
+export function telaPermitidaParaColaborador(
+  autorizacao: Autorizacao | null,
+  tela: TelaControlavel,
+): boolean {
+  if (autorizacao?.autorizado !== true) return false;
+  if (autorizacao.papel !== PAPEIS.CLIENTE_OPERACIONAL) return true;
+  if (autorizacao.telasPermitidas === null) return true;
+  return autorizacao.telasPermitidas.includes(tela);
+}
+
+/**
+ * A tranca de cada uma das quatro telas opcionais do cliente — Leads
+ * (`/funil`), Conversas (`/atendimento`), Relatórios e Agenda.
+ *
+ * Visão Geral não entra aqui: é a única tela que todo cliente sempre vê, do
+ * mesmo jeito que Equipe nunca entrou em `exigirClienteAdmin`. Chamada na
+ * primeira linha de cada uma das quatro páginas — o menu já escondia o link
+ * de quem não tinha a tela liberada, mas o menu não impede ninguém de digitar
+ * o endereço direto.
+ *
+ * Sem sessão, cai no login; com sessão mas sem a tela liberada (ou sem
+ * autorização nenhuma), cai na Visão Geral — mesmo padrão de
+ * `exigirHervalAdmin` e `exigirClienteAdmin`.
+ *
+ * Recebe a autorização já carregada quando a página tiver chamado
+ * `carregarAutorizacao()` por outro motivo (ex.: decidir o texto do seletor),
+ * para não dobrar a ida ao banco; carrega sozinha quando a página não tinha
+ * motivo próprio para isso.
+ */
+export async function exigirTela(
+  tela: TelaControlavel,
+  autorizacaoJaCarregada?: Autorizacao | null,
+): Promise<Autorizacao> {
+  const autorizacao =
+    autorizacaoJaCarregada !== undefined
+      ? autorizacaoJaCarregada
+      : await carregarAutorizacao();
+
+  if (!autorizacao) redirect("/login");
+  if (!telaPermitidaParaColaborador(autorizacao, tela)) {
+    redirect("/visao-geral");
+  }
+
+  return autorizacao;
+}
+
+/**
  * A tranca das telas exclusivas da Herval (Fila de Tarefas, Clientes,
  * Procedimentos, Estratégia do Cliente, Quebra de Objeções, Régua de
  * Automação, Templates de WhatsApp, Integrações, Teste da IA).
@@ -192,13 +301,14 @@ export async function exigirHervalAdmin(): Promise<Autorizacao> {
 
 /**
  * A tranca da Equipe — a única tela que o próprio cliente usa para conceder
- * acesso a mais gente da clínica dele.
+ * acesso a mais gente da clínica dele, e para decidir, por colaborador,
+ * quais das quatro telas opcionais ele vê.
  *
  * Só `cliente_admin` entra: `cliente_operacional` já é quem foi convidado por
- * alguém, não quem convida, e a Herval administra o acesso das clínicas por
- * `Clientes` (`exigirHervalAdmin`), não por aqui. Sem sessão, cai no login;
- * com sessão mas sem ser `cliente_admin`, cai na Visão Geral — mesmo padrão de
- * `exigirHervalAdmin`, só que para o papel oposto.
+ * alguém, não quem convida ou configura, e a Herval administra o acesso das
+ * clínicas por `Clientes` (`exigirHervalAdmin`), não por aqui. Sem sessão, cai
+ * no login; com sessão mas sem ser `cliente_admin`, cai na Visão Geral — mesmo
+ * padrão de `exigirHervalAdmin`, só que para o papel oposto.
  */
 export async function exigirClienteAdmin(): Promise<Autorizacao> {
   const autorizacao = await carregarAutorizacao();

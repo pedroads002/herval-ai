@@ -28,11 +28,14 @@ import { carregarAutorizacao, ehCliente, PAPEIS } from "@/lib/autorizacao";
  * `MenuLateral` de sempre, inteiro. Quem é cliente (`cliente_admin` ou
  * `cliente_operacional`) vê o `MenuLateralCliente`, cortado para as cinco
  * telas que o autocadastro prometeu — `cliente_admin` ganha uma sexta,
- * Equipe, de onde convida colaborador para a própria clínica. O resto do
- * painel continua existindo, só não tem link para lá; a tranca de verdade é
- * `exigirHervalAdmin` (telas da Herval) e `exigirClienteAdmin` (Equipe),
- * dentro de cada página, porque esconder o link não impede digitar o
- * endereço.
+ * Equipe, de onde convida colaborador para a própria clínica e decide, por
+ * colaborador, quais das quatro telas opcionais (fora Visão Geral) ele vê.
+ * Um `cliente_operacional` só vê, das quatro, as que o próprio `cliente_admin`
+ * liberou para ele (`autorizacao.telasPermitidas`) — o resto do painel
+ * continua existindo, só não tem link para lá; a tranca de verdade é
+ * `exigirHervalAdmin` (telas da Herval), `exigirClienteAdmin` (Equipe) e
+ * `exigirTela` (as quatro telas opcionais), dentro de cada página, porque
+ * esconder o link não impede digitar o endereço.
  *
  * Sem sessão nenhuma, a pessoa nem chega a ver o painel: cai no login. Com
  * sessão mas sem autorização ativa (conta órfã — por exemplo, alguém
@@ -86,6 +89,15 @@ export default async function LayoutPainel({
       {cliente ? (
         <MenuLateralCliente
           mostrarEquipe={autorizacao.papel === PAPEIS.CLIENTE_ADMIN}
+          // Só o colaborador é restringido por tela (ver `telaPermitidaParaColaborador`
+          // em `src/lib/autorizacao.ts`) — `cliente_admin` sempre recebe `null`
+          // (sem restrição), mesmo que a própria linha dele tenha algum valor
+          // gravado por engano.
+          telasPermitidas={
+            autorizacao.papel === PAPEIS.CLIENTE_OPERACIONAL
+              ? autorizacao.telasPermitidas
+              : null
+          }
         />
       ) : (
         <MenuLateral />

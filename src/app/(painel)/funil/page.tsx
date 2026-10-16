@@ -2,7 +2,12 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import PainelFunil from "@/components/PainelFunil";
 import { carregarFunil } from "@/lib/dados/funil";
-import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
+import {
+  carregarAutorizacao,
+  ehCliente,
+  exigirTela,
+  TELAS_CONTROLAVEIS,
+} from "@/lib/autorizacao";
 
 /**
  * O Funil.
@@ -14,6 +19,11 @@ import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
  * A altura cheia é de propósito, e é o que permite ao quadro dar teto às colunas:
  * sem um pai de altura conhecida, `max-h-full` lá dentro não tem do que ser metade.
  *
+ * `exigirTela` reaproveita a `autorizacao` já carregada abaixo (ela já era
+ * buscada para decidir o texto do seletor) — não dobra a ida ao banco. Um
+ * colaborador sem Leads liberado cai na Visão Geral antes de montar o quadro;
+ * o menu já escondia o link, isto tranca quem digita o endereço direto.
+ *
  * Sem `export const dynamic`, pelo mesmo motivo da Agenda: a leitura passa pelo
  * cliente do Supabase, que lê os cookies da sessão, e isso já torna a página
  * dinâmica.
@@ -23,6 +33,8 @@ export default async function PaginaFunil() {
     carregarFunil(),
     carregarAutorizacao(),
   ]);
+
+  await exigirTela(TELAS_CONTROLAVEIS.FUNIL, autorizacao);
 
   // Quem é cliente só tem a própria clínica na lista — o seletor não teria o
   // que oferecer. Ver `seletorDeCliente` em `PainelFunil`.

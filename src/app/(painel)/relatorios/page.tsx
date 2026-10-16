@@ -2,13 +2,23 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import PainelRelatorios from "@/components/PainelRelatorios";
 import { carregarRelatorios } from "@/lib/dados/relatorios";
-import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
+import {
+  carregarAutorizacao,
+  ehCliente,
+  exigirTela,
+  TELAS_CONTROLAVEIS,
+} from "@/lib/autorizacao";
 
 /**
  * Os Relatórios.
  *
  * Passaram a ler o banco. Antes a tela consumia memória do navegador semeada
  * por arquivos vazios — tabela sem nenhuma linha para todo mundo, em produção.
+ *
+ * `exigirTela` reaproveita a `autorizacao` já carregada abaixo (ela já era
+ * buscada para decidir o texto do seletor) — não dobra a ida ao banco. Um
+ * colaborador sem Relatórios liberado cai na Visão Geral antes de montar a
+ * tela; o menu já escondia o link, isto tranca quem digita o endereço direto.
  *
  * Sem `export const dynamic`, pelo mesmo motivo do Funil e da Visão Geral: ler
  * os cookies da sessão já torna a página dinâmica.
@@ -18,6 +28,8 @@ export default async function PaginaRelatorios() {
     carregarRelatorios(),
     carregarAutorizacao(),
   ]);
+
+  await exigirTela(TELAS_CONTROLAVEIS.RELATORIOS, autorizacao);
 
   // Quem é cliente só tem a própria clínica em `dados.clinicas` — o seletor
   // não teria o que oferecer. Ver `seletorDeClinica` em `PainelRelatorios`.

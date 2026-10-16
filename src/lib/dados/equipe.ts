@@ -16,7 +16,7 @@
  */
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { supabaseConfigurado } from "@/lib/supabase/config";
-import { PAPEIS } from "@/lib/autorizacao";
+import { PAPEIS, TELAS_CONTROLAVEIS, type TelaControlavel } from "@/lib/autorizacao";
 
 /**
  * Só os dois papéis que esta lista mostra. `herval_admin` nunca tem
@@ -34,6 +34,12 @@ export type MembroDaEquipe = {
   email: string;
   papel: PapelDeCliente;
   criadoEm: string;
+  /**
+   * Só tem efeito para `cliente_operacional` (ver `telaPermitidaParaColaborador`
+   * em `src/lib/autorizacao.ts`). `null` é "sem restrição configurada" — vê as
+   * quatro telas opcionais, igual a hoje.
+   */
+  telasPermitidas: TelaControlavel[] | null;
 };
 
 export type DadosDaEquipe = {
@@ -42,6 +48,18 @@ export type DadosDaEquipe = {
 };
 
 const SEM_DADOS: DadosDaEquipe = { membros: [], falha: null };
+
+const TELAS_VALIDAS = new Set<string>(Object.values(TELAS_CONTROLAVEIS));
+
+/** Mesma defesa de `telasPermitidasValidas` em `autorizacao.ts`: nunca confia
+ * no formato bruto que vem do banco. */
+function telasValidas(bruto: unknown): TelaControlavel[] | null {
+  if (!Array.isArray(bruto)) return null;
+  return bruto.filter(
+    (valor): valor is TelaControlavel =>
+      typeof valor === "string" && TELAS_VALIDAS.has(valor),
+  );
+}
 
 export async function carregarEquipe(clinicaId: number): Promise<DadosDaEquipe> {
   if (!supabaseConfigurado()) {
@@ -64,7 +82,7 @@ export async function carregarEquipe(clinicaId: number): Promise<DadosDaEquipe> 
   // histórico, e não é isso que esta tela promete mostrar.
   const { data: linhas, error } = await admin
     .from("autorizacoes")
-    .select("usuario_id, papel, criado_em")
+    .select("usuario_id, papel, criado_em, telas_permitidas")
     .eq("clinica_id", clinicaId)
     .eq("ativo", true)
     .order("criado_em", { ascending: true });
@@ -112,6 +130,7 @@ export async function carregarEquipe(clinicaId: number): Promise<DadosDaEquipe> 
       email: perfil?.email ?? "",
       papel: linha.papel,
       criadoEm: linha.criado_em,
+      telasPermitidas: telasValidas(linha.telas_permitidas),
     };
   });
 
