@@ -2,6 +2,7 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import PainelFunil from "@/components/PainelFunil";
 import { carregarFunil } from "@/lib/dados/funil";
+import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
 
 /**
  * O Funil.
@@ -18,18 +19,34 @@ import { carregarFunil } from "@/lib/dados/funil";
  * dinâmica.
  */
 export default async function PaginaFunil() {
-  const { leads, clientes, falha, aviso } = await carregarFunil();
+  const [{ leads, clientes, falha, aviso }, autorizacao] = await Promise.all([
+    carregarFunil(),
+    carregarAutorizacao(),
+  ]);
+
+  // Quem é cliente só tem a própria clínica na lista — o seletor não teria o
+  // que oferecer. Ver `seletorDeCliente` em `PainelFunil`.
+  const clienteLogado = ehCliente(autorizacao);
 
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0">
         <Cabecalho
           titulo="Funil"
-          descricao="Os leads distribuídos pelas etapas do pipeline. Escolha o cliente para ver só o funil dele. Mover um card grava a etapa e entra no histórico do lead."
+          descricao={
+            clienteLogado
+              ? "Os leads distribuídos pelas etapas do pipeline. Mover um card grava a etapa e entra no histórico do lead."
+              : "Os leads distribuídos pelas etapas do pipeline. Escolha o cliente para ver só o funil dele. Mover um card grava a etapa e entra no histórico do lead."
+          }
         />
         <AvisoDeCorte aviso={aviso} />
       </div>
-      <PainelFunil leads={leads} clientes={clientes} falha={falha} />
+      <PainelFunil
+        leads={leads}
+        clientes={clientes}
+        falha={falha}
+        seletorDeCliente={!clienteLogado}
+      />
     </div>
   );
 }

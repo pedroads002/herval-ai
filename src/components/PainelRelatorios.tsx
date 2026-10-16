@@ -115,8 +115,15 @@ const relogio = new Intl.DateTimeFormat("pt-BR", {
  */
 export default function PainelRelatorios({
   dados,
+  seletorDeClinica = true,
 }: {
   dados: DadosDosRelatorios;
+  /**
+   * Falso para quem é cliente: `dados.clinicas` já chega com uma só linha (a
+   * própria), porque o RLS não devolve outra clínica para essa sessão — o
+   * seletor só repetiria "Todas as clínicas" sem opção real de trocar.
+   */
+  seletorDeClinica?: boolean;
 }) {
   const [hoje, setHoje] = useState<Date | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
@@ -350,30 +357,32 @@ export default function PainelRelatorios({
               />
             </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-black/45">
-                Clínica
-              </span>
-              <select
-                value={clinicaId}
-                onChange={(e) =>
-                  setClinicaId(
-                    e.target.value === "todas"
-                      ? "todas"
-                      : Number(e.target.value),
-                  )
-                }
-                className={estiloCampo}
-              >
-                <option value="todas">Todas as clínicas</option>
-                {dados.clinicas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                    {c.ativa ? "" : " (pausada)"}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {seletorDeClinica && (
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-black/45">
+                  Clínica
+                </span>
+                <select
+                  value={clinicaId}
+                  onChange={(e) =>
+                    setClinicaId(
+                      e.target.value === "todas"
+                        ? "todas"
+                        : Number(e.target.value),
+                    )
+                  }
+                  className={estiloCampo}
+                >
+                  <option value="todas">Todas as clínicas</option>
+                  {dados.clinicas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                      {c.ativa ? "" : " (pausada)"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="flex items-center gap-4">

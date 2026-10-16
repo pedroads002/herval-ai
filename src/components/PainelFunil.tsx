@@ -49,10 +49,17 @@ export default function PainelFunil({
   leads,
   clientes,
   falha,
+  seletorDeCliente = true,
 }: {
   leads: LeadDoFunil[];
   clientes: ClienteDoFunil[];
   falha: string | null;
+  /**
+   * Falso para quem é cliente: a lista de `clientes` já chega com um só nome
+   * (o RLS não devolve outra clínica para essa sessão), então o seletor só
+   * repetiria "Todos os clientes" — sem opção real de ver outra operação.
+   */
+  seletorDeCliente?: boolean;
 }) {
   const [busca, setBusca] = useState("");
   const [periodo, setPeriodo] = useState<Periodo>("Todos");
@@ -149,22 +156,24 @@ export default function PainelFunil({
     <div className="flex min-h-0 flex-1 flex-col gap-7">
       {/* Cliente, busca e período */}
       <div className="flex shrink-0 flex-col gap-4 lg:flex-row lg:items-center">
-        <label className="inline-flex shrink-0 items-center gap-2">
-          <span className="sr-only">Cliente</span>
-          <select
-            value={String(cliente)}
-            onChange={(e) => setCliente(valorDoFiltro(e.target.value))}
-            className="rounded-full border border-black/15 bg-herval-branco px-4 py-2.5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
-          >
-            <option value="todos">Todos os clientes</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-            {temLeadSemCliente && <option value="sem">Sem cliente</option>}
-          </select>
-        </label>
+        {seletorDeCliente && (
+          <label className="inline-flex shrink-0 items-center gap-2">
+            <span className="sr-only">Cliente</span>
+            <select
+              value={String(cliente)}
+              onChange={(e) => setCliente(valorDoFiltro(e.target.value))}
+              className="rounded-full border border-black/15 bg-herval-branco px-4 py-2.5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
+            >
+              <option value="todos">Todos os clientes</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+              {temLeadSemCliente && <option value="sem">Sem cliente</option>}
+            </select>
+          </label>
+        )}
 
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />

@@ -2,6 +2,7 @@ import Cabecalho from "@/components/Cabecalho";
 import AvisoDeCorte from "@/components/AvisoDeCorte";
 import PainelRelatorios from "@/components/PainelRelatorios";
 import { carregarRelatorios } from "@/lib/dados/relatorios";
+import { carregarAutorizacao, ehCliente } from "@/lib/autorizacao";
 
 /**
  * Os Relatórios.
@@ -13,16 +14,27 @@ import { carregarRelatorios } from "@/lib/dados/relatorios";
  * os cookies da sessão já torna a página dinâmica.
  */
 export default async function PaginaRelatorios() {
-  const dados = await carregarRelatorios();
+  const [dados, autorizacao] = await Promise.all([
+    carregarRelatorios(),
+    carregarAutorizacao(),
+  ]);
+
+  // Quem é cliente só tem a própria clínica em `dados.clinicas` — o seletor
+  // não teria o que oferecer. Ver `seletorDeClinica` em `PainelRelatorios`.
+  const clienteLogado = ehCliente(autorizacao);
 
   return (
     <>
       <Cabecalho
         titulo="Relatórios"
-        descricao="Desempenho comercial de todas as clínicas atendidas, por período."
+        descricao={
+          clienteLogado
+            ? "Desempenho comercial da sua operação, por período."
+            : "Desempenho comercial de todas as clínicas atendidas, por período."
+        }
       />
       <AvisoDeCorte aviso={dados.aviso} />
-      <PainelRelatorios dados={dados} />
+      <PainelRelatorios dados={dados} seletorDeClinica={!clienteLogado} />
     </>
   );
 }
