@@ -1119,11 +1119,6 @@ export default function ConversaReal({
             <div className="flex-1 overflow-y-auto p-5 lg:min-h-0">
               {aba === "Agenda" && (
                 <>
-                  <FichaDoAtendimento
-                    lead={lead}
-                    clinica={clinica}
-                    especialidades={especialidades}
-                  />
                   <AbaAgenda
                     clinica={
                       lead.clinicaId === null
@@ -1135,6 +1130,7 @@ export default function ConversaReal({
                     aoAlternar={setAgendamentoAberto}
                     aoAgendar={(dados) => definirConsulta(lead.id, dados)}
                   />
+                  <FichaDoAtendimento especialidades={especialidades} />
                 </>
               )}
               {aba === "Ligações" && <AbaLigacoes ligacoes={chamadas} />}
@@ -1153,9 +1149,15 @@ export default function ConversaReal({
 /**
  * Quem é este atendimento: o cliente, a clínica e o que ela atende.
  *
- * Fica no alto da aba Agenda, junto do botão de agendar, porque é ali que a
- * informação é usada — na hora de marcar, o CRC precisa saber qual
- * procedimento, quanto dura e onde é.
+ * Fica na aba Agenda, logo abaixo do botão de agendar e da consulta marcada
+ * (ou do aviso de que ainda não há uma), porque é ali que a informação é
+ * usada — na hora de marcar, o CRC precisa saber qual procedimento, quanto
+ * dura e onde é.
+ *
+ * Nome e telefone do lead não aparecem aqui: já estão no cabeçalho da
+ * conversa, acima. Nome e endereço da clínica também não: já têm aba própria
+ * ("Clínica", ao lado de "Ligações") — repetir os dois neste painel era
+ * informação duplicada, não uma segunda forma de usá-la.
  *
  * Preço não aparece, aqui nem em lugar nenhum: o sistema não guarda nem exibe
  * valor de nada. Quanto custa é assunto da clínica, fora deste painel.
@@ -1169,50 +1171,12 @@ export default function ConversaReal({
  * agendamento não escolher a unidade, não há resposta certa para exibir.
  */
 function FichaDoAtendimento({
-  lead,
-  clinica,
   especialidades,
 }: {
-  lead: LeadEmAtendimento;
-  clinica: ClinicaDoLead | null;
   especialidades: EspecialidadeDaClinica[];
 }) {
   return (
-    <div className="mb-4 space-y-4 border-b border-black/10 pb-4">
-      <div>
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-          Cliente
-        </h3>
-        <p className="mt-1 text-sm font-bold text-herval-preto">{lead.lead}</p>
-        <p className="text-xs font-medium text-black/55">
-          {lead.telefone} · {lead.origem}
-        </p>
-      </div>
-
-      <div>
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-          Clínica
-        </h3>
-        <p className="mt-1 text-sm font-bold text-herval-preto">
-          {clinica?.nome ?? lead.nomeDaClinica}
-        </p>
-        {clinica?.endereco ? (
-          <p className="text-xs font-medium leading-relaxed text-black/55">
-            {clinica.endereco}
-            {clinica.cidade ? ` · ${clinica.cidade}` : ""}
-          </p>
-        ) : (
-          <p className="text-xs font-medium text-black/40">
-            Endereço não cadastrado.
-          </p>
-        )}
-        {clinica?.horarioFuncionamento && (
-          <p className="mt-0.5 text-xs font-medium text-black/55">
-            {clinica.horarioFuncionamento}
-          </p>
-        )}
-      </div>
-
+    <div className="mt-4 space-y-4 border-t border-black/10 pt-4">
       <div>
         <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
           Especialidades ({especialidades.length})

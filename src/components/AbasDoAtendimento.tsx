@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, CalendarPlus } from "lucide-react";
+import { ArrowRight, Calendar, CalendarPlus } from "lucide-react";
 import type { Agendamento } from "@/data/agendamentos";
 import type { Ligacao } from "@/data/ligacoes";
 import { tentativasPorCanal } from "@/data/ligacoes";
@@ -83,20 +83,42 @@ export function AbaAgenda({
   aoAgendar: (dados: DadosDaConsulta) => void;
 }) {
   /*
-    O botão fica colado no rodapé do cartão, e não logo abaixo do texto.
-
-    `min-h-full` faz este bloco ocupar a altura do cartão quando há pouca
-    coisa, e crescer normalmente quando a lista é longa — nos dois casos o
-    `mt-auto` empurra o botão para baixo. O vazio que sobra entre o texto e o
-    botão é esperado: não há o que colocar ali, e inventar conteúdo para
-    preencher seria pior que o vazio.
+    O botão de agendar vem primeiro, logo abaixo das abas — é a ação mais
+    usada aqui. A consulta marcada (ou o aviso de que ainda não há uma) vem
+    em seguida. Sem `min-h-full` nem `mt-auto`: não há mais nada "no rodapé"
+    do cartão para empurrar, então o bloco só ocupa a altura do que tem.
   */
   return (
-    <div className="flex min-h-full flex-col gap-4">
+    <div className="flex flex-col gap-4">
+      <div>
+        {aberto ? (
+          <FormularioDeConsulta
+            clinica={clinica}
+            aoAgendar={(dados) => {
+              aoAgendar(dados);
+              aoAlternar(false);
+            }}
+            aoCancelar={() => aoAlternar(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => aoAlternar(true)}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Agendar consulta
+          </button>
+        )}
+      </div>
+
       {agendamentos.length === 0 ? (
-        <p className="text-sm font-medium text-black/55">
-          Este lead ainda não tem consulta marcada.
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-controle border border-dashed border-black/15 py-8 text-center">
+          <Calendar className="h-6 w-6 text-black/25" />
+          <p className="text-sm font-medium text-black/55">
+            Nenhum agendamento
+          </p>
+        </div>
       ) : (
         <ul className="space-y-3">
           {[...agendamentos]
@@ -130,28 +152,6 @@ export function AbaAgenda({
             ))}
         </ul>
       )}
-
-      <div className="mt-auto">
-        {aberto ? (
-          <FormularioDeConsulta
-            clinica={clinica}
-            aoAgendar={(dados) => {
-              aoAgendar(dados);
-              aoAlternar(false);
-            }}
-            aoCancelar={() => aoAlternar(false)}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => aoAlternar(true)}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-herval-verde px-4 py-2.5 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            Agendar consulta
-          </button>
-        )}
-      </div>
     </div>
   );
 }
