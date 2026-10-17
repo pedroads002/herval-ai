@@ -99,8 +99,10 @@ export default function MarcarComoPerdido({
             >
               Marcar lead como perdido
             </h2>
-            <p className="mt-0.5 truncate text-xs font-medium text-black/55">
-              {leadNome}
+            <p className="mt-1 text-xs font-medium leading-snug text-black/55">
+              Tem certeza que deseja marcar{" "}
+              <span className="font-extrabold text-herval-preto">{leadNome}</span>{" "}
+              como perdido?
             </p>
           </div>
           <button
