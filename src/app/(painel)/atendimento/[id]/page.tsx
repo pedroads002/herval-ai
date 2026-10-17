@@ -1,6 +1,7 @@
 import AtualizacaoAutomatica from "@/components/AtualizacaoAutomatica";
 import ConversaReal from "@/components/ConversaReal";
 import { carregarConversa } from "@/lib/dados/atendimento";
+import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autorizacao";
 
 /**
  * O atendimento de um lead, lido do banco.
@@ -9,6 +10,11 @@ import { carregarConversa } from "@/lib/dados/atendimento";
  * dados de exemplo. Um card de lá cai num id que não existe no banco, e a tela
  * diz isso em vez de dar erro — é a costura visível entre a parte que já é
  * real e a que ainda não é, e escondê-la seria pior que mostrá-la.
+ *
+ * `exigirTela` estava faltando aqui: a lista em `/atendimento` já travava
+ * certo, mas esta tela (uma conversa específica) ficava sem a mesma
+ * conferência — um colaborador sem Conversas liberado não via o link, mas
+ * digitando o endereço direto (`/atendimento/42`) entrava do mesmo jeito.
  */
 export default async function PaginaDoAtendimento({
   params,
@@ -16,8 +22,11 @@ export default async function PaginaDoAtendimento({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { lead, mensagens, notas, clinica, especialidades, falha } =
-    await carregarConversa(Number(id));
+
+  const [{ lead, mensagens, notas, clinica, especialidades, falha }, autorizacao] =
+    await Promise.all([carregarConversa(Number(id)), carregarAutorizacao()]);
+
+  await exigirTela(TELAS_CONTROLAVEIS.ATENDIMENTO, autorizacao);
 
   /**
    * Se o envio está ligado é decidido aqui, no servidor: as variáveis não têm
