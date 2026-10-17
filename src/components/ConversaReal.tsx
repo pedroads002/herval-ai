@@ -11,6 +11,7 @@ import {
   Mic,
   MicOff,
   Paperclip,
+  Phone,
   Send,
   StickyNote,
   Video,
@@ -25,6 +26,7 @@ import {
 } from "@/data/mensagens";
 import { useLeads } from "@/components/ProvedorLeads";
 import FormularioDeTarefa from "@/components/FormularioDeTarefa";
+import MarcarComoPerdido from "@/components/MarcarComoPerdido";
 import {
   duracaoEmMinutos,
   useGravadorDeAudio,
@@ -37,6 +39,7 @@ import {
 } from "@/components/AbasDoAtendimento";
 import { clinicaPorId } from "@/data/clinicas";
 import { ligacoesDoLead } from "@/data/ligacoes";
+import { ETAPA_PERDIDA } from "@/data/leads";
 import { tempoRelativo } from "@/lib/tempo";
 import type {
   ClinicaDoLead,
@@ -91,6 +94,19 @@ function lerComoBase64(arquivo: File) {
     leitor.onerror = () => recusar(new Error("Não deu para ler o arquivo."));
     leitor.readAsDataURL(arquivo);
   });
+}
+
+/**
+ * O glifo do WhatsApp, embutido como SVG — o lucide-react não traz ícones de
+ * marca, e é esse reconhecimento visual que diferencia o botão de "Ligar" do
+ * de "Ligar pelo WhatsApp" antes mesmo de ler o texto.
+ */
+function IconeWhatsApp({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.004c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2Zm0 1.67c2.21 0 4.29.86 5.86 2.43a8.23 8.23 0 0 1 2.42 5.86c0 4.56-3.72 8.28-8.29 8.28a8.3 8.3 0 0 1-4.22-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.4c0-4.57 3.72-8.31 8.28-8.31Zm-4.5 4.37c-.17 0-.44.06-.67.32-.23.26-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.6.13.17 1.76 2.8 4.37 3.82 2.17.86 2.61.69 3.08.65.47-.04 1.52-.62 1.73-1.22.22-.6.22-1.11.15-1.22-.07-.1-.24-.17-.5-.3-.27-.13-1.53-.76-1.77-.84-.24-.1-.41-.13-.59.13-.17.27-.67.84-.82 1.01-.15.17-.3.19-.57.07-.27-.13-1.13-.42-2.15-1.33-.8-.72-1.33-1.6-1.49-1.87-.15-.27-.02-.42.12-.55.12-.12.27-.3.4-.46.13-.15.17-.26.26-.43.09-.17.04-.33-.02-.46-.07-.13-.59-1.46-.82-2-.22-.52-.44-.45-.6-.46-.15 0-.33 0-.5 0Z" />
+    </svg>
+  );
 }
 
 /**
@@ -157,9 +173,15 @@ export default function ConversaReal({
    * A pausa da Helô entra no mesmo espelho, e pelo mesmo motivo: quem pausa num
    * computador precisa ver a pausa aparecer no outro. O clique também só troca
    * este estado depois de a rota confirmar que gravou.
+   *
+   * A etapa segue o mesmo caminho, pelo mesmo motivo de `iaPausada`: é o que
+   * permite ao botão "Marcar como perdido" atualizar o selo do cabeçalho assim
+   * que o servidor confirma, sem esperar a próxima leitura automática — e sem
+   * nunca mostrar "Venda Perdida" antes de o banco dizer isso de verdade.
    */
   const [iaPausada, setIaPausada] = useState(lead?.iaPausada ?? false);
   const [pausa, setPausa] = useState(lead?.pausa ?? null);
+  const [etapa, setEtapa] = useState(lead?.etapa ?? null);
   const [mudandoIa, setMudandoIa] = useState(false);
   const [avisoDaIa, setAvisoDaIa] = useState<string | null>(null);
 
@@ -170,10 +192,12 @@ export default function ConversaReal({
     setNotas(notasIniciais);
     setIaPausada(lead?.iaPausada ?? false);
     setPausa(lead?.pausa ?? null);
+    setEtapa(lead?.etapa ?? null);
   }
   const [aba, setAba] = useState<AbaDoAtendimento>("Agenda");
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [criandoTarefa, setCriandoTarefa] = useState(false);
+  const [marcandoPerdido, setMarcandoPerdido] = useState(false);
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [nota, setNota] = useState("");
@@ -181,6 +205,24 @@ export default function ConversaReal({
   const [salvandoNota, setSalvandoNota] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [avisoDaNota, setAvisoDaNota] = useState<string | null>(null);
+
+  const botaoTarefaRef = useRef<HTMLButtonElement>(null);
+
+  // Esc fecha o painel de tarefa, e o foco volta pro botão que abriu —
+  // mesma garantia que o modal de perda já tem por conta própria.
+  useEffect(() => {
+    if (!criandoTarefa) return;
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") setCriandoTarefa(false);
+    }
+
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("keydown", aoTeclar);
+      botaoTarefaRef.current?.focus();
+    };
+  }, [criandoTarefa]);
 
   /**
    * A linha do tempo não tem tabela própria, de propósito: ela é derivada do
@@ -481,27 +523,45 @@ export default function ConversaReal({
       Abaixo de `lg` fica só o piso: as colunas empilham e a área rola.
     */
     <div className="flex min-h-full flex-col gap-5 lg:h-full">
-      {/* Cabeçalho */}
-      <div className="shrink-0 rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
-        <Link
-          href="/atendimento"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 transition-colors hover:text-herval-preto"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Atendimento
-        </Link>
+      {/*
+        Cabeçalho, em duas linhas compactas.
 
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-herval-preto">
-              {lead.lead}
-            </h1>
-            <p className="mt-1 text-sm font-medium text-black/55">
-              {lead.telefone} · {lead.nomeDaClinica} · {lead.origem}
-            </p>
-          </div>
+        Linha 1: voltar, identificação do lead e a clínica. A clínica ganhou
+        um chip próprio, separado do nome por `gap`, não por "·" solto no
+        meio do texto: um nome de lead comprido não empurra mais a clínica
+        pra fora da leitura.
 
-          <div className="flex flex-wrap items-center gap-3">
+        Linha 2: à esquerda, as ações que o CRC usa a cada atendimento — Criar
+        tarefa continua verde e em primeiro porque é a ação prioritária;
+        Ligar e Ligar pelo WhatsApp são visualmente secundários e equivalentes
+        entre si. À direita, uma única fileira — a etapa (informação de
+        estado, por isso o selo, nunca um botão), o estado da Helô e, com
+        respiro extra antes dele, Marcar como perdido — todos com a mesma
+        altura, para não lerem como controles soltos uns sobre os outros.
+      */}
+      <div className="shrink-0 rounded-card border border-black/10 bg-herval-branco px-5 py-4 shadow-card">
+        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+          <Link
+            href="/atendimento"
+            aria-label="Voltar para Atendimento"
+            title="Voltar para Atendimento"
+            className="inline-flex shrink-0 items-center text-black/45 transition-colors hover:text-herval-preto"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <h1 className="min-w-0 truncate text-lg font-extrabold tracking-tight text-herval-preto">
+            {lead.lead}
+          </h1>
+          <span className="shrink-0 text-sm font-medium text-black/45">
+            {lead.telefone}
+          </span>
+          <span className="inline-flex shrink-0 items-center rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-bold text-black/60">
+            {lead.nomeDaClinica}
+          </span>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {/*
               O único lugar onde a tarefa é criada: aqui o lead e a clínica já
               estão decididos pela tela, então criar a tarefa é escolher de quem
@@ -510,8 +570,12 @@ export default function ConversaReal({
               conversa que se descobre que precisa retornar na quinta às 14:30.
             */}
             <button
+              ref={botaoTarefaRef}
               type="button"
-              onClick={() => setCriandoTarefa((aberto) => !aberto)}
+              onClick={() => {
+                setCriandoTarefa((aberto) => !aberto);
+                setMarcandoPerdido(false);
+              }}
               aria-expanded={criandoTarefa}
               className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
             >
@@ -520,12 +584,52 @@ export default function ConversaReal({
             </button>
 
             {/*
+              Ligar e Ligar pelo WhatsApp: só a aparência por enquanto. Nenhum
+              dos dois faz nada ao clicar — a ligação depende de uma API que
+              ainda não está ativa neste ambiente. Quando estiver, o
+              comportamento entra aqui sem mexer na aparência.
+            */}
+            <button
+              type="button"
+              title="Ligar"
+              className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-herval-preto px-4 py-2 text-xs font-extrabold text-herval-branco transition-colors hover:border-black/30"
+            >
+              <Phone className="h-3.5 w-3.5" />
+              Ligar
+            </button>
+            <button
+              type="button"
+              title="Ligar pelo WhatsApp"
+              className="inline-flex items-center gap-1.5 rounded-full border border-black/15 bg-[#CAF3C2] px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:border-black/30"
+            >
+              <IconeWhatsApp className="h-3.5 w-3.5" />
+              WhatsApp
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/*
+              A etapa é informação de estado — por isso o selo, nunca um
+              botão. Entra na mesma fileira e com a mesma altura de Helô
+              ativa/pausada e Marcar como perdido, para o canto direito ler
+              como um grupo único, não como controles soltos uns sobre os
+              outros.
+            */}
+            <span className="inline-flex h-9 shrink-0 items-center rounded-full bg-herval-verde/15 px-3.5 text-xs font-bold text-herval-preto">
+              {etapa}
+            </span>
+
+            {/*
               Ligar e desligar a Helô neste lead.
 
               O rótulo diz o estado, e não a ação: "Helô ativa" com o botão
               verde é o que está acontecendo agora, e clicar pausa. Um botão
               escrito "Pausar" diria a ação e deixaria o estado por adivinhar —
               e aqui o estado é a informação que importa antes de responder.
+
+              Pausada usa borda visível e o mesmo peso de texto da ativa, não
+              opacidade reduzida: reduzida lê como desabilitado, e o botão
+              pausado pode ser clicado igual ao ativo.
 
               Quem pausou e a que horas não fica aqui: fica no Log, que é onde
               o histórico do atendimento mora.
@@ -541,10 +645,10 @@ export default function ConversaReal({
                   : "A Helô está atendendo este lead. Clique para pausar."
               }
               className={[
-                "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-colors disabled:opacity-60",
+                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-extrabold transition-colors disabled:opacity-60",
                 iaPausada
-                  ? "bg-black/[0.06] text-black/55 hover:bg-black/[0.1]"
-                  : "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro",
+                  ? "border border-black/20 bg-herval-branco text-black/70 hover:border-black/35"
+                  : "bg-herval-verde/15 text-herval-preto hover:bg-herval-verde/25",
               ].join(" ")}
             >
               {iaPausada ? (
@@ -555,9 +659,26 @@ export default function ConversaReal({
               {iaPausada ? "Helô pausada" : "Helô ativa"}
             </button>
 
-            <span className="rounded-full bg-herval-verde/15 px-3 py-1.5 text-xs font-bold text-herval-preto">
-              {lead.etapa}
-            </span>
+            {/*
+              Some quando o lead já está perdido: marcar de novo não teria o
+              que fazer, e manter o botão ali só convidaria a repetir uma ação
+              sem efeito. Reabrir um lead perdido é decisão de negócio fora
+              deste trabalho — não implementada aqui.
+            */}
+            {etapa !== ETAPA_PERDIDA && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMarcandoPerdido(true);
+                  setCriandoTarefa(false);
+                }}
+                title="Marcar como perdido"
+                aria-label="Marcar como perdido"
+                className="ml-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-herval-preto text-herval-vermelho transition-colors hover:bg-black/85"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -566,16 +687,46 @@ export default function ConversaReal({
             {avisoDaIa}
           </p>
         )}
+      </div>
 
-        {criandoTarefa && (
-          <div className="mt-4 max-w-xl">
+      {/*
+        Painel de "Criar tarefa", sobreposto à direita — não mais dentro do
+        cabeçalho. O fundo semi-transparente deixa a conversa visível atrás,
+        sem redimensionar nem deslocar o grid de três colunas abaixo. Fecha
+        clicando fora, em Esc ou no X do próprio `FormularioDeTarefa`
+        (inalterado: mesmos campos, mesmo comportamento de sempre).
+      */}
+      {criandoTarefa && (
+        <div
+          role="presentation"
+          className="fixed inset-0 z-40 flex justify-end bg-black/30"
+          onClick={() => setCriandoTarefa(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="h-full w-full max-w-md overflow-y-auto bg-herval-branco p-5 shadow-card"
+            onClick={(evento) => evento.stopPropagation()}
+          >
             <FormularioDeTarefa
               leadFixo={{ id: lead.id, nome: lead.lead }}
               aoFechar={() => setCriandoTarefa(false)}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {marcandoPerdido && (
+        <MarcarComoPerdido
+          leadId={lead.id}
+          leadNome={lead.lead}
+          aoFechar={() => setMarcandoPerdido(false)}
+          aoMarcado={() => {
+            setEtapa(ETAPA_PERDIDA);
+            setMarcandoPerdido(false);
+          }}
+        />
+      )}
 
       {/*
         As três colunas dividem uma altura só.
@@ -612,10 +763,6 @@ export default function ConversaReal({
               <Dado rotulo="Origem" valor={lead.origem} />
               <Dado rotulo="Chegou" valor={tempoRelativo(lead.minutosAtras)} />
             </dl>
-            <p className="mt-3 rounded-controle bg-black/[0.04] px-3 py-2 text-xs text-black/60">
-              Score, régua de ligação e prazo não aparecem aqui porque ainda não
-              existem no banco.
-            </p>
           </section>
 
           {/*
@@ -953,13 +1100,17 @@ export default function ConversaReal({
                     onClick={() => setAba(opcao)}
                     aria-current={ativa}
                     className={[
-                      "rounded-t-controle px-3 py-2 text-xs font-bold transition-colors",
+                      "relative rounded-t-controle px-3 py-2 text-xs font-bold transition-colors",
                       ativa
                         ? "bg-herval-verde/15 text-herval-preto"
                         : "text-black/50 hover:text-herval-preto",
                     ].join(" ")}
                   >
                     {opcao}
+                    {/* Segunda pista visual da aba ativa, além do fundo. */}
+                    {ativa && (
+                      <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-herval-verde" />
+                    )}
                   </button>
                 );
               })}
