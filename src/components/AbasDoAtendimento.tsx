@@ -430,7 +430,7 @@ function FormularioDeConsulta({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2">
         <button
           type="submit"
           disabled={
