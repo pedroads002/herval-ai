@@ -20,6 +20,10 @@ import {
   type Agendamento,
   type StatusAgendamento,
 } from "@/data/agendamentos";
+import {
+  canaisDeFechamento,
+  type CanalDeFechamento,
+} from "@/lib/acoes/consultaDoFormulario";
 import type { Clinica } from "@/data/clinicas";
 import {
   etapasFunil,
@@ -53,6 +57,8 @@ export type LinhaDeAgendamentoDoBanco = {
   status: string;
   confirmada: boolean;
   fechado_por: string;
+  /** Nulo em consulta marcada antes deste campo existir. */
+  canal_fechamento: string | null;
   observacao: string | null;
   criado_em: string;
 };
@@ -197,6 +203,13 @@ export function montarAgendamentosDoBanco(
       status: situacao as StatusAgendamento,
       // Igual à Visão Geral: só "IA" é fechamento da Helô, o resto é CRC.
       fechadoPor: linha.fechado_por === "IA" ? "IA" : "CRC",
+      // Nulo fica nulo: canal fora da lista, ou consulta de antes do campo
+      // existir, não é "WhatsApp" por eliminação.
+      canalFechamento: canaisDeFechamento.includes(
+        linha.canal_fechamento as CanalDeFechamento,
+      )
+        ? (linha.canal_fechamento as CanalDeFechamento)
+        : null,
       profissionalId: linha.profissional_id,
       especialidadeId: linha.especialidade_id,
       hora:

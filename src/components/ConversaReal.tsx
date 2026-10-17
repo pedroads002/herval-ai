@@ -37,7 +37,6 @@ import {
   AbaLigacoes,
   type AbaDoAtendimento,
 } from "@/components/AbasDoAtendimento";
-import { clinicaPorId } from "@/data/clinicas";
 import { ligacoesDoLead } from "@/data/ligacoes";
 import { ETAPA_PERDIDA } from "@/data/leads";
 import { tempoRelativo } from "@/lib/tempo";
@@ -48,6 +47,11 @@ import type {
   MensagemEmAtendimento,
   NotaEmAtendimento,
 } from "@/lib/dados/atendimento";
+import type {
+  ProfissionalCadastrado,
+  UnidadeDoCadastro,
+} from "@/lib/dados/profissionais";
+import type { Consulta } from "@/lib/dados/agenda";
 
 /** O ícone que acompanha a bolha quando a mensagem chegou sem texto. */
 const iconeDoFormato: Record<FormatoDeMidia, typeof Mic> = {
@@ -133,6 +137,9 @@ export default function ConversaReal({
   especialidades,
   falha,
   envioConfigurado,
+  unidades,
+  equipe,
+  consultas,
 }: {
   lead: LeadEmAtendimento | null;
   mensagens: MensagemEmAtendimento[];
@@ -146,13 +153,19 @@ export default function ConversaReal({
    * falharia só depois do clique.
    */
   envioConfigurado: boolean;
+  /** As unidades do cliente deste lead — onde a consulta pode acontecer. */
+  unidades: UnidadeDoCadastro[];
+  /** Quem atende nessas unidades, com o que cada um realiza. */
+  equipe: ProfissionalCadastrado[];
+  /** As consultas já marcadas para este lead, lidas do banco. */
+  consultas: Consulta[];
 }) {
   /**
-   * As abas Agenda e Ligações seguem no provedor de exemplo, que é de onde
-   * elas sempre vieram. Nada aqui grava no banco: `definirConsulta` mexe só no
-   * estado do navegador, como já fazia.
+   * A aba Ligações segue no provedor de exemplo, que é de onde ela sempre
+   * veio. A Agenda já não: suas consultas agora chegam reais, pelo prop
+   * `consultas`, lidas do banco.
    */
-  const { agendamentos, ligacoes, definirConsulta } = useLeads();
+  const { ligacoes } = useLeads();
 
   const [conversa, setConversa] = useState(mensagens);
   const [notas, setNotas] = useState(notasIniciais);
@@ -291,10 +304,6 @@ export default function ConversaReal({
    * lead real cujo id não exista lá simplesmente aparece sem consulta e sem
    * ligação — que é o estado verdadeiro dele, já que nada disso foi migrado.
    */
-  const consultas = useMemo(
-    () => (lead ? agendamentos.filter((a) => a.leadId === lead.id) : []),
-    [agendamentos, lead],
-  );
   const chamadas = useMemo(
     () => (lead ? ligacoesDoLead(ligacoes, lead.id) : []),
     [ligacoes, lead],
@@ -1120,15 +1129,14 @@ export default function ConversaReal({
               {aba === "Agenda" && (
                 <>
                   <AbaAgenda
-                    clinica={
-                      lead.clinicaId === null
-                        ? undefined
-                        : clinicaPorId(lead.clinicaId)
-                    }
-                    agendamentos={consultas}
+                    leadId={lead.id}
+                    leadNome={lead.lead}
+                    unidades={unidades}
+                    equipe={equipe}
+                    procedimentos={especialidades}
+                    consultas={consultas}
                     aberto={agendamentoAberto}
                     aoAlternar={setAgendamentoAberto}
-                    aoAgendar={(dados) => definirConsulta(lead.id, dados)}
                   />
                   <FichaDoAtendimento especialidades={especialidades} />
                 </>

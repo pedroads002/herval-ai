@@ -71,7 +71,7 @@ const CAMPOS_DO_EVENTO =
   "id, lead_id, de_etapa, para_etapa, autor_nome, criado_em";
 
 const CAMPOS_DO_AGENDAMENTO =
-  "id, lead_id, unidade_id, profissional_id, especialidade_id, data_consulta, hora_consulta, status, confirmada, fechado_por, observacao, criado_em";
+  "id, lead_id, unidade_id, profissional_id, especialidade_id, data_consulta, hora_consulta, status, confirmada, fechado_por, canal_fechamento, observacao, criado_em";
 
 export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
   if (!supabaseConfigurado()) {

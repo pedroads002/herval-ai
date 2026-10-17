@@ -376,6 +376,11 @@ export type ResumoGeral = {
   fechadosPelaIa: number;
   fechadosPeloCrc: number;
   percentualIa: number | null;
+  /** Das consultas acima, quantas têm canal de fechamento registrado. */
+  comCanalRegistrado: number;
+  fechadosPorLigacao: number;
+  fechadosPorWhatsapp: number;
+  percentualLigacao: number | null;
 };
 
 export function montarResumo(
@@ -397,6 +402,14 @@ export function montarResumo(
     dentroDaFaixa(a.criadoHaDias, faixa),
   );
   const pelaIa = doPeriodo.filter((a) => a.fechadoPor === "IA").length;
+
+  // Base própria, e não `doPeriodo.length`: o canal só existe para consulta
+  // marcada depois dele, e contar o resto como "WhatsApp" por eliminação
+  // inventaria dado que ninguém registrou.
+  const comCanal = doPeriodo.filter((a) => a.canalFechamento !== null);
+  const porLigacao = comCanal.filter(
+    (a) => a.canalFechamento === "Ligação",
+  ).length;
 
   const totalProducao = soma(producao, (l) => l.agendamentos);
   const remarcacoes = soma(producao, (l) => l.remarcacoes);
@@ -426,6 +439,10 @@ export function montarResumo(
     fechadosPelaIa: pelaIa,
     fechadosPeloCrc: doPeriodo.length - pelaIa,
     percentualIa: taxa(pelaIa, doPeriodo.length),
+    comCanalRegistrado: comCanal.length,
+    fechadosPorLigacao: porLigacao,
+    fechadosPorWhatsapp: comCanal.length - porLigacao,
+    percentualLigacao: taxa(porLigacao, comCanal.length),
   };
 }
 

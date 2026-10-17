@@ -452,7 +452,7 @@ export default function PainelRelatorios({
       ) : (
         <div className="space-y-8">
           {/* KPIs */}
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
             <Kpi
               rotulo="Leads de marketing"
               valor={formatarNumero(resumo.leadsMarketing)}
@@ -502,6 +502,25 @@ export default function PainelRelatorios({
                 resumo.percentualIa === null ? null : 100 - resumo.percentualIa,
               )} CRC · ${formatarNumero(resumo.fechadosPelaIa)} × ${formatarNumero(resumo.fechadosPeloCrc)}`}
             />
+            <Kpi
+              rotulo="Canal de fechamento"
+              valor={`${comPercentual(resumo.percentualLigacao)} Ligação`}
+              detalhe={
+                `${comPercentual(
+                  resumo.percentualLigacao === null
+                    ? null
+                    : 100 - resumo.percentualLigacao,
+                )} WhatsApp · ${formatarNumero(resumo.fechadosPorLigacao)} × ${formatarNumero(resumo.fechadosPorWhatsapp)}` +
+                (resumo.comCanalRegistrado <
+                resumo.fechadosPelaIa + resumo.fechadosPeloCrc
+                  ? ` · ${formatarNumero(
+                      resumo.fechadosPelaIa +
+                        resumo.fechadosPeloCrc -
+                        resumo.comCanalRegistrado,
+                    )} sem canal registrado, fora da conta`
+                  : "")
+              }
+            />
           </div>
 
           {/* Fica fora do card para não esticar a linha inteira de indicadores. */}
@@ -514,6 +533,21 @@ export default function PainelRelatorios({
               mede quem travou o agendamento. A IA executa o processo
               (follow-up, lembrete, reagendamento) em 100% dos casos, mesmo
               quando quem fecha é o CRC.
+            </span>
+          </p>
+
+          {/* Mesmo tratamento da nota acima. */}
+          <p className="-mt-4 flex items-start gap-2 text-xs font-medium leading-relaxed text-black/50">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-bold text-herval-preto">
+                Canal de fechamento
+              </span>{" "}
+              mede como o agendamento foi fechado com o lead: por Ligação
+              (direta ou por WhatsApp) ou por mensagem de WhatsApp. É
+              diferente de quem fechou — aqui o que importa é o meio, não a
+              pessoa. Consulta marcada antes deste campo existir fica fora da
+              conta, e não é contada como WhatsApp por eliminação.
             </span>
           </p>
 

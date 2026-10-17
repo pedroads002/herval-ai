@@ -40,6 +40,10 @@ import {
   type IntervaloDeDatas,
   type PeriodoEscolhido,
 } from "@/lib/visaoGeral/periodo";
+import {
+  canaisDeFechamento,
+  type CanalDeFechamento,
+} from "@/lib/acoes/consultaDoFormulario";
 
 /** Ver o mesmo raciocínio em `dados/funil.ts`. */
 const TETO_DE_LINHAS = 1000;
@@ -70,6 +74,8 @@ type LinhaDeAgendamento = {
   hora_consulta: string | null;
   status: string;
   fechado_por: string;
+  /** Nulo em consulta marcada antes deste campo existir. */
+  canal_fechamento: string | null;
   confirmada: boolean;
   criado_em: string;
 };
@@ -106,12 +112,17 @@ export type ResumoDoPeriodo = {
   remarcacoes: number;
   fechadosPelaIa: number;
   fechadosPeloCrc: number;
+  /** Desta produção, quantas têm canal de fechamento registrado. */
+  comCanalRegistrado: number;
+  fechadosPorLigacao: number;
+  fechadosPorWhatsapp: number;
   qualificados: number;
   leadsComAgendamento: number;
   /** Percentuais; `null` quando não há base para dividir. */
   taxaNoShow: number | null;
   taxaReagendamento: number | null;
   percentualIa: number | null;
+  percentualLigacao: number | null;
   taxaCancelamento: number | null;
   showRate: number | null;
   taxaAgendamento: number | null;
@@ -140,11 +151,15 @@ const RESUMO_VAZIO: ResumoDoPeriodo = {
   remarcacoes: 0,
   fechadosPelaIa: 0,
   fechadosPeloCrc: 0,
+  comCanalRegistrado: 0,
+  fechadosPorLigacao: 0,
+  fechadosPorWhatsapp: 0,
   qualificados: 0,
   leadsComAgendamento: 0,
   taxaNoShow: null,
   taxaReagendamento: null,
   percentualIa: null,
+  percentualLigacao: null,
   taxaCancelamento: null,
   showRate: null,
   taxaAgendamento: null,
@@ -306,6 +321,21 @@ function montarResumo(
   ).length;
   const fechadosPeloCrc = producao.length - fechadosPelaIa;
 
+  // Base própria, e não `producao.length`: o canal só existe para consulta
+  // marcada depois dele, e contar o resto como "WhatsApp" por eliminação
+  // inventaria dado que ninguém registrou.
+  const comCanal = producao.filter(
+    (consulta) =>
+      consulta.canal_fechamento !== null &&
+      canaisDeFechamento.includes(
+        consulta.canal_fechamento as CanalDeFechamento,
+      ),
+  );
+  const fechadosPorLigacao = comCanal.filter(
+    (consulta) => consulta.canal_fechamento === "Ligação",
+  ).length;
+  const fechadosPorWhatsapp = comCanal.length - fechadosPorLigacao;
+
   const qualificados = leadsDoPeriodo.filter((lead) =>
     ehQualificado(lead.etapa, contexto.motivoDoLead.get(lead.id) ?? null),
   ).length;
@@ -337,11 +367,15 @@ function montarResumo(
     remarcacoes,
     fechadosPelaIa,
     fechadosPeloCrc,
+    comCanalRegistrado: comCanal.length,
+    fechadosPorLigacao,
+    fechadosPorWhatsapp,
     qualificados,
     leadsComAgendamento: comAgendamento.size,
     taxaNoShow: taxa(faltas, jaAconteceram.length),
     taxaReagendamento: taxa(remarcacoes, producao.length),
     percentualIa: taxa(fechadosPelaIa, producao.length),
+    percentualLigacao: taxa(fechadosPorLigacao, comCanal.length),
     taxaCancelamento: taxa(cancelamentos, producao.length),
     showRate: taxa(comparecimentos, jaAconteceram.length),
     taxaAgendamento: taxa(comAgendamento.size, qualificados),
@@ -552,7 +586,7 @@ export async function carregarVisaoGeral(
     supabase
       .from("agendamentos")
       .select(
-        "id, lead_id, unidade_id, data_consulta, hora_consulta, status, fechado_por, confirmada, criado_em",
+        "id, lead_id, unidade_id, data_consulta, hora_consulta, status, fechado_por, canal_fechamento, confirmada, criado_em",
       )
       .order("criado_em", { ascending: false })
       .limit(TETO_DE_LINHAS),

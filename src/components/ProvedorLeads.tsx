@@ -366,6 +366,10 @@ export default function ProvedorLeads({
             criadoHaDias: 0,
             status: "Agendada" as const,
             fechadoPor: "CRC" as const,
+            // Este caminho é só o antigo mock em memória do navegador, que
+            // nada mais escreve: quem agenda de verdade grava direto no
+            // banco, via `marcarConsulta`.
+            canalFechamento: null,
             confirmada: false,
             ...dados,
           },

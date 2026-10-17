@@ -1,6 +1,8 @@
 import AtualizacaoAutomatica from "@/components/AtualizacaoAutomatica";
 import ConversaReal from "@/components/ConversaReal";
 import { carregarConversa } from "@/lib/dados/atendimento";
+import { carregarCliente } from "@/lib/dados/profissionais";
+import { carregarConsultasDoLead } from "@/lib/dados/agenda";
 import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autorizacao";
 
 /**
@@ -29,6 +31,19 @@ export default async function PaginaDoAtendimento({
   await exigirTela(TELAS_CONTROLAVEIS.ATENDIMENTO, autorizacao);
 
   /**
+   * O cliente (unidades e equipe) só dá para buscar depois de saber de qual
+   * clínica este lead é — por isso é uma segunda leitura, e não a mesma do
+   * `Promise.all` de cima. Lead sem clínica, ou sem id válido, não tem onde
+   * marcar consulta: a Agenda do Atendimento mostra isso em vez de agendar.
+   */
+  const [cliente, consultas] = await Promise.all([
+    lead && lead.clinicaId !== null
+      ? carregarCliente(lead.clinicaId)
+      : Promise.resolve({ cliente: null, especialidades: [], falha: null, aviso: null }),
+    lead ? carregarConsultasDoLead(lead.id) : Promise.resolve([]),
+  ]);
+
+  /**
    * Se o envio está ligado é decidido aqui, no servidor: as variáveis não têm
    * `NEXT_PUBLIC_`, de propósito, então o navegador não consegue lê-las. Sem
    * isso o botão prometeria um envio que só falharia depois do clique.
@@ -49,6 +64,9 @@ export default async function PaginaDoAtendimento({
         especialidades={especialidades}
         falha={falha}
         envioConfigurado={envioConfigurado}
+        unidades={cliente.cliente?.unidades ?? []}
+        equipe={cliente.cliente?.profissionais ?? []}
+        consultas={consultas}
       />
     </>
   );

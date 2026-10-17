@@ -21,6 +21,7 @@ import { exigirSessao, moverEtapaDoLead } from "@/lib/acoes/etapaDoLead";
 import {
   lerConsulta,
   numeroDoCampo,
+  textoDoCampo,
   type ConsultaGravavel,
 } from "@/lib/acoes/consultaDoFormulario";
 import { conferirExpediente } from "@/lib/acoes/expedienteDaConsulta";
@@ -116,6 +117,46 @@ async function conferirCombinacao(
 }
 
 /**
+ * Corrige o nome do lead antes de marcar a consulta, quando o formulário trouxe
+ * um nome diferente do que já está gravado.
+ *
+ * O WhatsApp só dá o nome de exibição da pessoa ("Lu", apelido, etc.), e é
+ * comum precisar corrigir para o nome completo bem na hora de marcar — é
+ * justamente aí, com a pessoa ao telefone ou no chat, que o CRC descobre o
+ * nome certo. Devolve o motivo da recusa, em português, ou nulo quando não
+ * havia nome novo ou ele já era igual ao gravado.
+ */
+async function renomearLeadSeMudou(
+  supabase: ClienteDoServidor,
+  leadId: number,
+  nomeNovo: string | null,
+): Promise<string | null> {
+  if (nomeNovo === null) return null;
+
+  const { data: leadAtual, error: erroDaLeitura } = await supabase
+    .from("leads")
+    .select("nome")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (erroDaLeitura) {
+    return `Não deu para conferir o nome do lead: ${erroDaLeitura.message}`;
+  }
+  if (!leadAtual || leadAtual.nome === nomeNovo) return null;
+
+  const { error: erroAoGravar } = await supabase
+    .from("leads")
+    .update({ nome: nomeNovo })
+    .eq("id", leadId);
+
+  if (erroAoGravar) {
+    return `Não deu para atualizar o nome do lead: ${erroAoGravar.message}`;
+  }
+
+  return null;
+}
+
+/**
  * O horário já está ocupado por outra consulta da mesma pessoa.
  *
  * Só olha consulta em aberto: faltou, compareceu e cancelou é passado, e passado
@@ -179,6 +220,13 @@ export async function marcarConsulta(
 
   const impedimento = await conferirCombinacao(sessao.supabase, dados);
   if (impedimento !== null) return recusar(impedimento);
+
+  const erroAoRenomear = await renomearLeadSeMudou(
+    sessao.supabase,
+    dados.lead_id,
+    textoDoCampo(formData, "nome_lead"),
+  );
+  if (erroAoRenomear !== null) return recusar(erroAoRenomear);
 
   const { data: aberta, error: erroDaBusca } = await sessao.supabase
     .from("agendamentos")
@@ -296,4 +344,6 @@ function revalidar() {
   revalidatePath("/agenda");
   // A etapa do lead mudou, e ela é o que o Funil desenha.
   revalidatePath("/funil");
+  // O Atendimento também marca consulta agora, e pode ter corrigido o nome.
+  revalidatePath("/atendimento", "layout");
 }

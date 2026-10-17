@@ -1,5 +1,6 @@
 import type { EtapaFunil } from "@/data/leads";
 import { ETAPA_AGENDADO, ETAPA_COMPARECEU, ETAPA_REMARCAR } from "@/data/leads";
+import type { CanalDeFechamento } from "@/lib/acoes/consultaDoFormulario";
 
 /** Status de uma consulta marcada. */
 export type StatusAgendamento =
@@ -38,6 +39,12 @@ export type Agendamento = {
   consultaEmDias: number;
   status: StatusAgendamento;
   fechadoPor: FechadoPor;
+  /**
+   * Como o agendamento foi fechado com o lead: Ligação (direta ou por
+   * WhatsApp) ou WhatsApp (mensagem). Nulo em toda consulta marcada antes
+   * deste campo existir — não é "desconhecido como WhatsApp", é ausente.
+   */
+  canalFechamento: CanalDeFechamento | null;
   /** Id da tela de Profissionais. Nulo enquanto a agenda não for montada. */
   profissionalId: number | null;
   /** Id da tela de Especialidades. */
@@ -114,6 +121,9 @@ export const agendamentosIniciais: Agendamento[] = registros.map(
     consultaEmDias,
     status: statusAgendamento[status],
     fechadoPor: fechado === 0 ? "IA" : "CRC",
+    // Lista de exemplo, vazia desde que o canal passou a existir — nunca
+    // houve registro real aqui para converter.
+    canalFechamento: null,
     profissionalId: prof > 0 ? prof : null,
     especialidadeId: esp > 0 ? esp : null,
     hora: hora >= 0 ? `${String(hora).padStart(2, "0")}:00` : null,

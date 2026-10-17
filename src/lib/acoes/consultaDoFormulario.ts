@@ -25,6 +25,10 @@ const DIAS_PARA_FRENTE = 730;
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 const HORA = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
+/** Como o agendamento foi fechado com o lead. */
+export const canaisDeFechamento = ["Ligação", "WhatsApp"] as const;
+export type CanalDeFechamento = (typeof canaisDeFechamento)[number];
+
 /** Os campos como a tabela `agendamentos` os espera. */
 export type ConsultaGravavel = {
   lead_id: number;
@@ -34,6 +38,7 @@ export type ConsultaGravavel = {
   data_consulta: string;
   hora_consulta: string | null;
   observacao: string | null;
+  canal_fechamento: CanalDeFechamento | null;
 };
 
 export function numeroDoCampo(formData: FormData, campo: string) {
@@ -41,7 +46,7 @@ export function numeroDoCampo(formData: FormData, campo: string) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-function textoDoCampo(formData: FormData, campo: string) {
+export function textoDoCampo(formData: FormData, campo: string) {
   const valor = String(formData.get(campo) ?? "").trim();
   return valor === "" ? null : valor;
 }
@@ -87,6 +92,11 @@ export function lerConsulta(
     };
   }
 
+  const canal = textoDoCampo(formData, "canal");
+  if (canal === null || !canaisDeFechamento.includes(canal as CanalDeFechamento)) {
+    return { erro: "Escolha como o agendamento foi fechado com o lead." };
+  }
+
   return {
     lead_id: leadId,
     unidade_id: unidadeId,
@@ -95,6 +105,7 @@ export function lerConsulta(
     data_consulta: dia,
     hora_consulta: hora,
     observacao,
+    canal_fechamento: canal as CanalDeFechamento,
   };
 }
 

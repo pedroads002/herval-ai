@@ -6,6 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  MessageCircle,
+  Phone,
   RefreshCw,
   X,
 } from "lucide-react";
@@ -35,6 +37,10 @@ import type {
   UnidadeDoCadastro,
 } from "@/lib/dados/profissionais";
 import { definirDesfechoDaConsulta, marcarConsulta } from "@/lib/acoes/agenda";
+import {
+  canaisDeFechamento,
+  type CanalDeFechamento,
+} from "@/lib/acoes/consultaDoFormulario";
 import {
   Aviso,
   botaoPrincipal,
@@ -953,6 +959,7 @@ function FormularioNovaConsulta({
   const [pessoaId, setPessoaId] = useState<number | "">("");
   const [dia, setDia] = useState(diaSugerido);
   const [hora, setHora] = useState("");
+  const [canal, setCanal] = useState<CanalDeFechamento | "">("");
 
   useQuandoDerCerto(estado, aoMarcar);
 
@@ -1178,13 +1185,42 @@ function FormularioNovaConsulta({
             />
           </label>
 
+          <div>
+            <span className={estiloRotulo}>Como fechou o agendamento?</span>
+            <input type="hidden" name="canal" value={canal} />
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              {canaisDeFechamento.map((opcao) => {
+                const Icone = opcao === "Ligação" ? Phone : MessageCircle;
+                const ativo = canal === opcao;
+                return (
+                  <button
+                    key={opcao}
+                    type="button"
+                    onClick={() => setCanal(opcao)}
+                    aria-pressed={ativo}
+                    className={[
+                      "inline-flex items-center justify-center gap-1.5 rounded-controle border px-3 py-2 text-xs font-bold transition-colors",
+                      ativo
+                        ? "border-herval-verde bg-herval-verde/15 text-herval-preto"
+                        : "border-black/15 text-black/60 hover:border-black/30",
+                    ].join(" ")}
+                  >
+                    <Icone className="h-3.5 w-3.5" />
+                    {opcao}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
               disabled={
                 enviando ||
                 unidadesDoCliente.length === 0 ||
-                impedimento !== null
+                impedimento !== null ||
+                canal === ""
               }
               className={botaoPrincipal}
             >

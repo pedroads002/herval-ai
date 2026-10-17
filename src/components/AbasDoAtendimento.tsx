@@ -1,25 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowRight, Calendar, CalendarPlus } from "lucide-react";
-import type { Agendamento } from "@/data/agendamentos";
+import { useActionState, useEffect, useState } from "react";
+import {
+  ArrowRight,
+  Calendar,
+  CalendarPlus,
+  MessageCircle,
+  Phone,
+} from "lucide-react";
 import type { Ligacao } from "@/data/ligacoes";
 import { tentativasPorCanal } from "@/data/ligacoes";
 import type { MudancaDeEtapa } from "@/data/historicoEtapas";
-import {
-  conveniosQueCobrem,
-  procedimentoDaClinica,
-  type Clinica,
-} from "@/data/clinicas";
-import {
-  especialidadePorId,
-  especialidadesIniciais,
-} from "@/data/especialidades";
-import { profissionaisDisponiveis } from "@/data/profissionais";
+import { conveniosQueCobrem, type Clinica } from "@/data/clinicas";
+import { especialidadePorId } from "@/data/especialidades";
 import { diasAteAData, inicioDoDia, somarDias } from "@/data/agenda";
 import { formatarDuracao } from "@/lib/formato";
-import { duracao, tempoRelativo } from "@/lib/tempo";
-import type { DadosDaConsulta } from "@/components/ProvedorLeads";
+import { tempoRelativo } from "@/lib/tempo";
+import { marcarConsulta } from "@/lib/acoes/agenda";
+import {
+  canaisDeFechamento,
+  type CanalDeFechamento,
+} from "@/lib/acoes/consultaDoFormulario";
+import { RESULTADO_INICIAL } from "@/lib/acoes/resultadoDoCadastro";
+import { Aviso, useQuandoDerCerto } from "@/components/cadastro/comuns";
+import type {
+  ProfissionalCadastrado,
+  UnidadeDoCadastro,
+} from "@/lib/dados/profissionais";
+import type { Consulta } from "@/lib/dados/agenda";
+import type { EspecialidadeDaClinica } from "@/lib/dados/atendimento";
 
 export const abasDoAtendimento = [
   "Agenda",
@@ -32,14 +41,6 @@ export type AbaDoAtendimento = (typeof abasDoAtendimento)[number];
 const rotulo = "text-[11px] font-bold uppercase tracking-wide text-black/45";
 const campo =
   "w-full rounded-controle border border-black/15 bg-herval-branco px-3 py-2 text-sm text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-2 focus:ring-herval-verde/25";
-
-/** Um dia relativo vira texto sem virar data fixa: "em 3 dias", "há 2 dias". */
-function quandoEmDias(dias: number) {
-  if (dias === 0) return "hoje";
-  return dias < 0
-    ? `em ${duracao(-dias * 1440)}`
-    : `há ${duracao(dias * 1440)}`;
-}
 
 /**
  * O campo de calendário do navegador fala "2026-09-04". Estas duas funções
@@ -69,19 +70,27 @@ const dataPorExtenso = new Intl.DateTimeFormat("pt-BR", {
 });
 
 export function AbaAgenda({
-  clinica,
-  agendamentos,
+  leadId,
+  leadNome,
+  unidades,
+  equipe,
+  procedimentos,
+  consultas,
   aberto,
   aoAlternar,
-  aoAgendar,
 }: {
-  clinica: Clinica | undefined;
-  agendamentos: Agendamento[];
+  leadId: number;
+  leadNome: string;
+  unidades: UnidadeDoCadastro[];
+  equipe: ProfissionalCadastrado[];
+  procedimentos: EspecialidadeDaClinica[];
+  consultas: Consulta[];
   /** Controlado de fora: converter uma ligação já abre o formulário. */
   aberto: boolean;
   aoAlternar: (aberto: boolean) => void;
-  aoAgendar: (dados: DadosDaConsulta) => void;
 }) {
+  const procedimentoPorId = new Map(procedimentos.map((p) => [p.id, p]));
+
   /*
     O botão de agendar vem primeiro, logo abaixo das abas — é a ação mais
     usada aqui. A consulta marcada (ou o aviso de que ainda não há uma) vem
@@ -93,11 +102,12 @@ export function AbaAgenda({
       <div>
         {aberto ? (
           <FormularioDeConsulta
-            clinica={clinica}
-            aoAgendar={(dados) => {
-              aoAgendar(dados);
-              aoAlternar(false);
-            }}
+            leadId={leadId}
+            leadNome={leadNome}
+            unidades={unidades}
+            equipe={equipe}
+            procedimentos={procedimentos}
+            aoMarcado={() => aoAlternar(false)}
             aoCancelar={() => aoAlternar(false)}
           />
         ) : (
@@ -112,7 +122,7 @@ export function AbaAgenda({
         )}
       </div>
 
-      {agendamentos.length === 0 ? (
+      {consultas.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-controle border border-dashed border-black/15 py-8 text-center">
           <Calendar className="h-6 w-6 text-black/25" />
           <p className="text-sm font-medium text-black/55">
@@ -121,35 +131,36 @@ export function AbaAgenda({
         </div>
       ) : (
         <ul className="space-y-3">
-          {[...agendamentos]
-            .sort((a, b) => a.criadoHaDias - b.criadoHaDias)
-            .map((agendamento) => (
-              <li
-                key={agendamento.id}
-                className="rounded-controle border border-black/10 p-3"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-herval-preto">
-                    {especialidadePorId(agendamento.especialidadeId ?? 0)
-                      ?.nome ?? "Especialidade não informada"}
-                  </span>
-                  <span className="rounded-full border border-black/20 px-2 py-0.5 text-[11px] font-bold text-black/60">
-                    {agendamento.status}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs font-medium text-black/60">
-                  Consulta {quandoEmDias(agendamento.consultaEmDias)}
-                  {agendamento.hora
-                    ? ` · ${agendamento.hora}`
-                    : " · sem horário"}
+          {consultas.map((consulta) => (
+            <li
+              key={consulta.id}
+              className="rounded-controle border border-black/10 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-herval-preto">
+                  {procedimentoPorId.get(consulta.especialidadeId ?? -1)
+                    ?.nome ?? "Procedimento não informado"}
+                </span>
+                <span className="rounded-full border border-black/20 px-2 py-0.5 text-[11px] font-bold text-black/60">
+                  {consulta.status}
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-medium text-black/60">
+                {dataPorExtenso.format(dataDoTexto(consulta.dia))}
+                {consulta.hora ? ` · ${consulta.hora}` : " · sem horário"}
+              </p>
+              {consulta.canalFechamento && (
+                <p className="mt-0.5 text-[11px] font-medium text-black/45">
+                  Fechado por {consulta.canalFechamento}
                 </p>
-                {agendamento.observacao && (
-                  <p className="mt-2 rounded bg-black/[0.04] px-2.5 py-1.5 text-xs text-black/70">
-                    {agendamento.observacao}
-                  </p>
-                )}
-              </li>
-            ))}
+              )}
+              {consulta.observacao && (
+                <p className="mt-2 rounded bg-black/[0.04] px-2.5 py-1.5 text-xs text-black/70">
+                  {consulta.observacao}
+                </p>
+              )}
+            </li>
+          ))}
         </ul>
       )}
     </div>
@@ -157,34 +168,46 @@ export function AbaAgenda({
 }
 
 /**
- * Os campos são os mesmos que a Agenda já usava — o que muda é só de onde se
- * marca. Procedimento, especialista, dia e horário são obrigatórios; a
- * observação, não. O horário final não é campo: sai da duração da
- * especialidade, e dois campos que precisam concordar é como divergência
- * começa.
+ * Os mesmos campos da Agenda, e a mesma ação de servidor (`marcarConsulta`) —
+ * só muda de onde se marca. Já existe consulta em aberto para este lead? Ela
+ * é remarcada, não duplicada: é a mesma regra de lá.
+ *
+ * Procedimento, profissional, dia e horário são obrigatórios; observação não.
+ * O horário final não é campo: sai da duração do procedimento, e dois campos
+ * que precisam concordar é como divergência começa.
  */
 function FormularioDeConsulta({
-  clinica,
-  aoAgendar,
+  leadId,
+  leadNome,
+  unidades,
+  equipe,
+  procedimentos,
+  aoMarcado,
   aoCancelar,
 }: {
-  clinica: Clinica | undefined;
-  aoAgendar: (dados: DadosDaConsulta) => void;
+  leadId: number;
+  leadNome: string;
+  unidades: UnidadeDoCadastro[];
+  equipe: ProfissionalCadastrado[];
+  procedimentos: EspecialidadeDaClinica[];
+  aoMarcado: () => void;
   aoCancelar: () => void;
 }) {
-  const oferecidas = especialidadesIniciais.filter(
-    (e) =>
-      e.ativa &&
-      clinica !== undefined &&
-      procedimentoDaClinica(clinica, e.id) !== null,
+  const [estado, executar, enviando] = useActionState(
+    marcarConsulta,
+    RESULTADO_INICIAL,
   );
+  useQuandoDerCerto(estado, aoMarcado);
 
-  const [especialidadeId, setEspecialidadeId] = useState(
-    oferecidas[0]?.id ?? 0,
+  const [nomeLead, setNomeLead] = useState(leadNome);
+  const [unidadeId, setUnidadeId] = useState<number | "">(
+    unidades[0]?.id ?? "",
   );
-  const [profissionalId, setProfissionalId] = useState(0);
-  const [hora, setHora] = useState("09:00");
+  const [procedimentoId, setProcedimentoId] = useState<number | "">("");
+  const [profissionalId, setProfissionalId] = useState<number | "">("");
+  const [hora, setHora] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [canal, setCanal] = useState<CanalDeFechamento | "">("");
 
   /**
    * A data de hoje só é lida depois que a tela monta, para o servidor e o
@@ -200,59 +223,122 @@ function FormularioDeConsulta({
     setData(textoDaData(somarDias(agora, 1)));
   }, []);
 
-  const equipe = profissionaisDisponiveis(clinica?.id ?? 0, especialidadeId);
-  const profissionalValido = equipe.some((p) => p.id === profissionalId)
-    ? profissionalId
-    : (equipe[0]?.id ?? 0);
+  const unidadeEscolhida =
+    unidades.find((u) => u.id === unidadeId) ?? unidades[0];
 
-  const especialidade = especialidadePorId(especialidadeId);
-  const podeMarcar = oferecidas.length > 0 && equipe.length > 0;
+  /** Quem atende naquele lugar — a mesma regra da Agenda. */
+  const naUnidade = unidadeEscolhida
+    ? equipe.filter((p) => p.unidades.some((u) => u.id === unidadeEscolhida.id))
+    : [];
+
+  /** O que dá para marcar ali é o que a equipe daquele lugar realiza. */
+  const idsQueAEquipeRealiza = new Set(
+    naUnidade.flatMap((p) => p.especialidades.map((e) => e.id)),
+  );
+  const oferecidos = procedimentos.filter((p) =>
+    idsQueAEquipeRealiza.has(p.id),
+  );
+  const procedimentoEscolhido =
+    oferecidos.find((p) => p.id === procedimentoId) ?? oferecidos[0];
+
+  /** Só quem realiza o procedimento escolhido, naquele lugar. */
+  const habilitados = procedimentoEscolhido
+    ? naUnidade.filter((p) =>
+        p.especialidades.some((e) => e.id === procedimentoEscolhido.id),
+      )
+    : naUnidade;
+  const profissionalEscolhido =
+    habilitados.find((p) => p.id === profissionalId) ?? habilitados[0];
+
+  const podeMarcar = unidades.length > 0 && oferecidos.length > 0;
 
   const diaEscolhido = data === "" ? null : dataDoTexto(data);
-  /**
-   * A distância da consulta até hoje, na mesma convenção do resto da base:
-   * negativo é futuro. É este número que vai para o agendamento — a data
-   * escolhida no calendário serve só para chegar até ele.
-   */
   const diasDaConsulta =
     diaEscolhido && hoje ? diasAteAData(diaEscolhido, hoje) : null;
   const dataNoPassado = diasDaConsulta !== null && diasDaConsulta > 0;
-  const dataValida = diasDaConsulta !== null && !dataNoPassado;
 
   if (!podeMarcar) {
     return (
       <p className="rounded-controle bg-black/[0.04] p-3 text-xs font-medium text-black/60">
-        Esta clínica não tem procedimento ativo com profissional disponível.
-        Ajuste a ficha dela antes de marcar.
+        {unidades.length === 0
+          ? "Este lead não tem unidade definida. Ajuste o cadastro da clínica antes de marcar."
+          : "Nenhum procedimento desta clínica tem profissional disponível. Ajuste a equipe antes de marcar."}
       </p>
     );
   }
 
   return (
-    <div className="space-y-3 rounded-controle border border-black/10 bg-black/[0.02] p-3">
+    <form
+      action={executar}
+      className="space-y-3 rounded-controle border border-black/10 bg-black/[0.02] p-3"
+    >
+      <input type="hidden" name="lead" value={leadId} />
+      {unidadeEscolhida && (
+        <input type="hidden" name="unidade" value={unidadeEscolhida.id} />
+      )}
+
+      <div>
+        <label className={rotulo}>Nome do lead</label>
+        <input
+          type="text"
+          name="nome_lead"
+          value={nomeLead}
+          onChange={(e) => setNomeLead(e.target.value)}
+          className={`mt-1 ${campo}`}
+        />
+        <p className="mt-1 text-[11px] font-medium text-black/45">
+          Esse nome será salvo no lead antes de concluir o agendamento.
+        </p>
+      </div>
+
+      {unidades.length > 1 && (
+        <div>
+          <label className={rotulo}>Unidade</label>
+          <select
+            value={unidadeEscolhida?.id ?? ""}
+            onChange={(e) => {
+              setUnidadeId(Number(e.target.value));
+              setProfissionalId("");
+            }}
+            className={`mt-1 ${campo}`}
+          >
+            {unidades.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div>
         <label className={rotulo}>Procedimento</label>
         <select
-          value={especialidadeId}
-          onChange={(e) => setEspecialidadeId(Number(e.target.value))}
+          name="procedimento"
+          value={procedimentoEscolhido?.id ?? ""}
+          onChange={(e) => {
+            setProcedimentoId(Number(e.target.value));
+            setProfissionalId("");
+          }}
           className={`mt-1 ${campo}`}
         >
-          {oferecidas.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nome}
+          {oferecidos.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
             </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label className={rotulo}>Especialista</label>
+        <label className={rotulo}>Profissional</label>
         <select
-          value={profissionalValido}
+          name="profissional"
+          value={profissionalEscolhido?.id ?? ""}
           onChange={(e) => setProfissionalId(Number(e.target.value))}
           className={`mt-1 ${campo}`}
         >
-          {equipe.map((p) => (
+          {habilitados.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
             </option>
@@ -265,6 +351,7 @@ function FormularioDeConsulta({
           <label className={rotulo}>Data</label>
           <input
             type="date"
+            name="dia"
             value={data}
             min={hoje ? textoDaData(hoje) : undefined}
             onChange={(e) => setData(e.target.value)}
@@ -273,31 +360,27 @@ function FormularioDeConsulta({
         </div>
         <div>
           <label className={rotulo}>Horário</label>
-          <select
+          <input
+            type="time"
+            name="hora"
             value={hora}
             onChange={(e) => setHora(e.target.value)}
             className={`mt-1 ${campo}`}
-          >
-            {Array.from({ length: 11 }, (_, i) => 8 + i).map((h) => (
-              <option key={h} value={`${String(h).padStart(2, "0")}:00`}>
-                {String(h).padStart(2, "0")}:00
-              </option>
-            ))}
-          </select>
+          />
         </div>
       </div>
 
       {diaEscolhido && (
         <p className="text-[11px] font-medium text-black/50">
           {dataPorExtenso.format(diaEscolhido)}
-          {diasDaConsulta !== null && ` · ${quandoEmDias(diasDaConsulta)}`}
         </p>
       )}
 
-      {especialidade && (
+      {procedimentoEscolhido && (
         <p className="text-[11px] font-medium text-black/50">
-          A consulta leva {formatarDuracao(especialidade.duracaoMinutos)} — o
-          horário de término sai daí, não é digitado.
+          A consulta leva{" "}
+          {formatarDuracao(procedimentoEscolhido.duracaoMinutos)} — o horário
+          de término sai daí, não é digitado.
         </p>
       )}
 
@@ -310,6 +393,7 @@ function FormularioDeConsulta({
       <div>
         <label className={rotulo}>Observações (opcional)</label>
         <textarea
+          name="observacao"
           rows={2}
           value={observacao}
           onChange={(e) => setObservacao(e.target.value)}
@@ -318,23 +402,48 @@ function FormularioDeConsulta({
         />
       </div>
 
-      <div className="flex gap-2">
+      <div>
+        <label className={rotulo}>Como fechou o agendamento?</label>
+        <input type="hidden" name="canal" value={canal} />
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          {canaisDeFechamento.map((opcao) => {
+            const Icone = opcao === "Ligação" ? Phone : MessageCircle;
+            const ativo = canal === opcao;
+            return (
+              <button
+                key={opcao}
+                type="button"
+                onClick={() => setCanal(opcao)}
+                aria-pressed={ativo}
+                className={[
+                  "inline-flex items-center justify-center gap-1.5 rounded-controle border px-3 py-2 text-xs font-bold transition-colors",
+                  ativo
+                    ? "border-herval-verde bg-herval-verde/15 text-herval-preto"
+                    : "border-black/15 text-black/60 hover:border-black/30",
+                ].join(" ")}
+              >
+                <Icone className="h-3.5 w-3.5" />
+                {opcao}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
         <button
-          type="button"
-          disabled={!dataValida}
-          onClick={() => {
-            if (diasDaConsulta === null || dataNoPassado) return;
-            aoAgendar({
-              especialidadeId,
-              profissionalId: profissionalValido,
-              consultaEmDias: diasDaConsulta,
-              hora,
-              ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
-            });
-          }}
+          type="submit"
+          disabled={
+            enviando ||
+            dataNoPassado ||
+            data === "" ||
+            hora === "" ||
+            canal === "" ||
+            !profissionalEscolhido
+          }
           className="flex-1 rounded-full bg-herval-verde px-4 py-2 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
         >
-          Confirmar
+          {enviando ? "Agendando…" : "Agendar consulta"}
         </button>
         <button
           type="button"
@@ -343,8 +452,9 @@ function FormularioDeConsulta({
         >
           Cancelar
         </button>
+        <Aviso estado={estado} />
       </div>
-    </div>
+    </form>
   );
 }
 

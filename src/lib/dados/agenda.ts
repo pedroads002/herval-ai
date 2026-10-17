@@ -21,6 +21,7 @@ import {
   type ProfissionalCadastrado,
 } from "@/lib/dados/profissionais";
 import { etapasComAgenda } from "@/data/agenda";
+import { canaisDeFechamento, type CanalDeFechamento } from "@/lib/acoes/consultaDoFormulario";
 
 /** Os desfechos que uma consulta marcada pode ter. */
 export type StatusDaConsulta =
@@ -51,6 +52,8 @@ export type Consulta = {
   status: StatusDaConsulta;
   confirmada: boolean;
   fechadoPor: FechadoPor;
+  /** Como o agendamento foi fechado com o lead. Nulo em consulta antiga, de antes deste campo existir. */
+  canalFechamento: CanalDeFechamento | null;
   observacao: string | null;
 };
 
@@ -114,6 +117,7 @@ type LinhaDeAgendamento = {
   status: string;
   confirmada: boolean;
   fechado_por: string;
+  canal_fechamento: string | null;
   observacao: string | null;
 };
 
@@ -127,7 +131,7 @@ type LinhaDeLead = {
 };
 
 const CAMPOS_DO_AGENDAMENTO =
-  "id, lead_id, unidade_id, profissional_id, especialidade_id, data_consulta, hora_consulta, status, confirmada, fechado_por, observacao";
+  "id, lead_id, unidade_id, profissional_id, especialidade_id, data_consulta, hora_consulta, status, confirmada, fechado_por, canal_fechamento, observacao";
 
 const CAMPOS_DO_LEAD =
   "id, nome, telefone, etapa, clinica_id, especialidade_interesse_id";
@@ -201,19 +205,7 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
     linhasDeLead.push(...((data ?? []) as LinhaDeLead[]));
   }
 
-  const consultas = linhasDeConsulta.map((linha): Consulta => ({
-    id: linha.id,
-    leadId: linha.lead_id,
-    unidadeId: linha.unidade_id,
-    profissionalId: linha.profissional_id,
-    especialidadeId: linha.especialidade_id,
-    dia: linha.data_consulta,
-    hora: horaCurta(linha.hora_consulta),
-    status: statusValido(linha.status),
-    confirmada: linha.confirmada,
-    fechadoPor: linha.fechado_por === "IA" ? "IA" : "CRC",
-    observacao: (linha.observacao ?? "").trim() || null,
-  }));
+  const consultas = linhasDeConsulta.map(linhaParaConsulta);
 
   const candidatos = linhasDeLead.map((linha): LeadDaAgenda => ({
     id: linha.id,
@@ -269,4 +261,49 @@ function statusValido(valor: string): StatusDaConsulta {
   return (statusPossiveis as string[]).includes(valor)
     ? (valor as StatusDaConsulta)
     : "Agendada";
+}
+
+/** Uma linha de `agendamentos` como a tela usa, em qualquer leitura. */
+function linhaParaConsulta(linha: LinhaDeAgendamento): Consulta {
+  return {
+    id: linha.id,
+    leadId: linha.lead_id,
+    unidadeId: linha.unidade_id,
+    profissionalId: linha.profissional_id,
+    especialidadeId: linha.especialidade_id,
+    dia: linha.data_consulta,
+    hora: horaCurta(linha.hora_consulta),
+    status: statusValido(linha.status),
+    confirmada: linha.confirmada,
+    fechadoPor: linha.fechado_por === "IA" ? "IA" : "CRC",
+    canalFechamento: canaisDeFechamento.includes(
+      linha.canal_fechamento as CanalDeFechamento,
+    )
+      ? (linha.canal_fechamento as CanalDeFechamento)
+      : null,
+    observacao: (linha.observacao ?? "").trim() || null,
+  };
+}
+
+/**
+ * As consultas de um lead só — o Atendimento mostra o que já está marcado
+ * sem carregar a agenda inteira, que é informação de todos os leads.
+ */
+export async function carregarConsultasDoLead(
+  leadId: number,
+): Promise<Consulta[]> {
+  if (!supabaseConfigurado() || !Number.isInteger(leadId) || leadId <= 0) {
+    return [];
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select(CAMPOS_DO_AGENDAMENTO)
+    .eq("lead_id", leadId)
+    .order("data_consulta", { ascending: true });
+
+  if (error || !data) return [];
+
+  return (data as LinhaDeAgendamento[]).map(linhaParaConsulta);
 }

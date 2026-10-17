@@ -77,7 +77,7 @@ export default function PainelVisaoGeral({
 
       {/* Indicadores secundários */}
       <section className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
-        <div className="grid gap-7 sm:grid-cols-3">
+        <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-4">
           <Indicador
             rotulo="Taxa de no-show"
             valor={comPercentual(atual.taxaNoShow)}
@@ -103,6 +103,21 @@ export default function PainelVisaoGeral({
             detalhe={`${comPercentual(
               atual.percentualIa === null ? null : 100 - atual.percentualIa,
             )} CRC · ${formatarNumero(atual.fechadosPelaIa)} × ${formatarNumero(atual.fechadosPeloCrc)}`}
+          />
+          <Indicador
+            rotulo="Canal de fechamento"
+            valor={`${comPercentual(atual.percentualLigacao)} Ligação`}
+            variacao={pontos(atual.percentualLigacao, anterior.percentualLigacao)}
+            detalhe={
+              `${comPercentual(
+                atual.percentualLigacao === null
+                  ? null
+                  : 100 - atual.percentualLigacao,
+              )} WhatsApp · ${formatarNumero(atual.fechadosPorLigacao)} × ${formatarNumero(atual.fechadosPorWhatsapp)}` +
+              (atual.comCanalRegistrado < atual.agendamentos
+                ? ` · ${formatarNumero(atual.agendamentos - atual.comCanalRegistrado)} sem canal registrado, fora da conta`
+                : "")
+            }
           />
         </div>
       </section>
