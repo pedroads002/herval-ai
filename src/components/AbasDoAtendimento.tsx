@@ -441,9 +441,9 @@ function FormularioDeConsulta({
             canal === "" ||
             !profissionalEscolhido
           }
-          className="flex-1 rounded-full bg-herval-verde px-4 py-2 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
+          className="rounded-full bg-herval-verde px-4 py-2 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
         >
-          {enviando ? "Agendando…" : "Agendar consulta"}
+          {enviando ? "Agendando…" : "Agendar"}
         </button>
         <button
           type="button"
