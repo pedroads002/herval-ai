@@ -7,6 +7,7 @@ import {
 } from "@/lib/supabase/config";
 
 const TELA_DE_LOGIN = "/login";
+const PRIMEIRA_TELA = "/visao-geral";
 
 /**
  * Telas (e rotas de API) que qualquer pessoa abre sem estar logada, e que
@@ -97,7 +98,13 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!user && !naTelaDeLogin) return irPara(request, TELA_DE_LOGIN);
-  if (user && naTelaDeLogin) return irPara(request, "/");
+  // Quem já está logado não fica na tela de login: vai para a Visão Geral, a
+  // primeira seção do menu. Não para "/", que é a Fila de Tarefas — tela
+  // exclusiva de admin Herval, e não a página inicial do sistema. É este
+  // desvio, e não o `router.replace` do formulário, que decide onde o login
+  // termina: o `router.refresh()` revalida `/login` com a sessão já criada e
+  // esta linha responde antes da navegação do formulário chegar.
+  if (user && naTelaDeLogin) return irPara(request, PRIMEIRA_TELA);
 
   return resposta;
 }
