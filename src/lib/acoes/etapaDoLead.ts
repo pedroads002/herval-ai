@@ -19,7 +19,13 @@
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 import { carregarPerfil } from "@/lib/perfil";
-import { ETAPA_PERDIDA, type EtapaFunil, type MotivoPerda } from "@/data/leads";
+import {
+  ETAPA_COMPARECEU,
+  ETAPA_GANHA,
+  ETAPA_PERDIDA,
+  type EtapaFunil,
+  type MotivoPerda,
+} from "@/data/leads";
 
 type ClienteDoServidor = Awaited<ReturnType<typeof criarClienteServidor>>;
 
@@ -125,4 +131,55 @@ export async function moverEtapaDoLead(
   }
 
   return null;
+}
+
+/**
+ * Uma vez aqui, só o Funil à mão tira o lead dali — nenhuma ação automática
+ * da Agenda deve fazer isso sozinha. "Comparecimento" e "Venda Ganha" são o
+ * fim da linha de quem veio; "Venda Perdida" é quem já foi descartado, sem
+ * potencial de conversão. Dali em diante o único destino que resta de
+ * verdade é "Venda Ganha" (fechou o procedimento depois de comparecer), e
+ * isso é decisão de quem mexe no Funil, não consequência automática de uma
+ * consulta marcada ou remarcada sozinha.
+ */
+const ETAPAS_SEM_VOLTA_AUTOMATICA: EtapaFunil[] = [
+  ETAPA_COMPARECEU,
+  ETAPA_GANHA,
+  ETAPA_PERDIDA,
+];
+
+/**
+ * Mesma coisa que `moverEtapaDoLead`, só que para quem vem da Agenda — marcar
+ * consulta, remarcar, registrar desfecho. Essas movimentações são
+ * automáticas, consequência do que aconteceu na Agenda, não uma decisão de
+ * quem está olhando o Funil. Por isso, diferente do Funil (onde mover
+ * continua livre, de propósito — é o próprio CRC decidindo), aqui existe a
+ * trava: uma vez que o lead chegou em "Comparecimento", "Venda Ganha" ou
+ * "Venda Perdida", nada que vier automaticamente da Agenda deve tirá-lo de
+ * lá. O vaivém Agendamento ⇄ Reagendamento continua livre, exatamente como
+ * sempre foi — só essas três etapas ficam fora do alcance do automático.
+ */
+export async function moverEtapaPelaAgenda(
+  sessao: Sessao,
+  leadId: number,
+  destino: EtapaFunil,
+): Promise<string | null> {
+  const { data: lead, error: erroDaLeitura } = await sessao.supabase
+    .from("leads")
+    .select("etapa")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  // A leitura falhou ou o lead sumiu: não decide nada aqui, deixa
+  // `moverEtapaDoLead` tentar de novo e devolver o aviso certo — evita
+  // duplicar a mesma mensagem de erro em dois lugares.
+  if (erroDaLeitura || !lead) {
+    return moverEtapaDoLead(sessao, leadId, destino);
+  }
+
+  if (ETAPAS_SEM_VOLTA_AUTOMATICA.includes(lead.etapa as EtapaFunil)) {
+    return null;
+  }
+
+  return moverEtapaDoLead(sessao, leadId, destino);
 }

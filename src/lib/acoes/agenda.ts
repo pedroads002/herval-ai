@@ -9,15 +9,18 @@
  * Grava em `agendamentos`, e move o lead de etapa quando o desfecho manda: quem
  * comparece vai para "Comparecimento", quem falta cai em "Reagendamento".
  *
- * A sessão e a mudança de etapa vêm de `acoes/etapaDoLead.ts`, compartilhadas com
- * o Funil: as duas telas movem o mesmo lead, e a etapa precisa ser gravada e
- * assinada do mesmo jeito venha o movimento de onde vier.
+ * A sessão vem de `acoes/etapaDoLead.ts`, compartilhada com o Funil. Já a
+ * mudança de etapa em si passa por `moverEtapaPelaAgenda`, não por
+ * `moverEtapaDoLead` direto: aqui o movimento é sempre automático,
+ * consequência de marcar ou remarcar uma consulta, e por isso tem a trava que
+ * o Funil (mover à mão) não tem — uma vez em "Comparecimento", "Venda Ganha"
+ * ou "Venda Perdida", nada daqui tira o lead de lá sozinho.
  */
 
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { statusPossiveis, type StatusDaConsulta } from "@/lib/dados/agenda";
-import { exigirSessao, moverEtapaDoLead } from "@/lib/acoes/etapaDoLead";
+import { exigirSessao, moverEtapaPelaAgenda } from "@/lib/acoes/etapaDoLead";
 import {
   lerConsulta,
   numeroDoCampo,
@@ -269,7 +272,11 @@ export async function marcarConsulta(
     return recusar(`Não deu para marcar: ${error.message}`);
   }
 
-  const aviso = await moverEtapaDoLead(sessao, dados.lead_id, ETAPA_AGENDADO);
+  const aviso = await moverEtapaPelaAgenda(
+    sessao,
+    dados.lead_id,
+    ETAPA_AGENDADO,
+  );
 
   revalidar();
   return aceitar(
@@ -324,7 +331,7 @@ export async function definirDesfechoDaConsulta(
   const aviso =
     destino === null
       ? null
-      : await moverEtapaDoLead(sessao, consulta.lead_id, destino);
+      : await moverEtapaPelaAgenda(sessao, consulta.lead_id, destino);
 
   revalidar();
   return aceitar(
