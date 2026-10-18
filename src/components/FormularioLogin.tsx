@@ -41,7 +41,10 @@ export default function FormularioLogin() {
     }
 
     // Recarrega do servidor para o proxy enxergar a sessão recém-criada.
-    router.replace("/");
+    // Visão Geral é a primeira seção do menu — é para lá que o login leva,
+    // não para a Fila de Tarefas (que mora em "/" por ser a tela exclusiva da
+    // Herval, não a página inicial do sistema).
+    router.replace("/visao-geral");
     router.refresh();
   }
 
