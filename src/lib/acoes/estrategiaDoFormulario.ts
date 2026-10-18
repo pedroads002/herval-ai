@@ -87,6 +87,7 @@ export type CamposDaEstrategia = {
   avaliacao_quando_cobrada?: string | null;
   avaliacao_abate_procedimento?: boolean | null;
   helo_pode_informar_valor?: boolean | null;
+  avaliacao_valor?: number | null;
 
   formas_pagamento?: string[];
   parcelamento?: number | null;
@@ -228,11 +229,13 @@ function lerBloco(
           avaliacao_quando_cobrada: null,
           avaliacao_abate_procedimento: null,
           helo_pode_informar_valor: podeFalarDeValor.valor,
+          avaliacao_valor: null,
         },
       };
     }
 
-    // Gratuita não é cobrada nunca, e o que não foi pago não abate nada.
+    // Gratuita não é cobrada nunca, e o que não foi pago não abate nada nem
+    // tem valor — "Gratuita" já é a resposta inteira.
     if (gratuita.valor === true) {
       return {
         campos: {
@@ -242,9 +245,13 @@ function lerBloco(
           avaliacao_quando_cobrada: null,
           avaliacao_abate_procedimento: null,
           helo_pode_informar_valor: podeFalarDeValor.valor,
+          avaliacao_valor: null,
         },
       };
     }
+
+    const valor = reais(formData, "avaliacao_valor", "O valor da consulta");
+    if ("erro" in valor) return valor;
 
     return {
       campos: {
@@ -254,6 +261,7 @@ function lerBloco(
         avaliacao_quando_cobrada: quando.valor,
         avaliacao_abate_procedimento: abate.valor,
         helo_pode_informar_valor: podeFalarDeValor.valor,
+        avaliacao_valor: valor.valor,
       },
     };
   }
@@ -517,20 +525,27 @@ function lerFaixasDeValor(
  *
  * Sem centavo de propósito: isto é média aproximada, e centavo em cima de uma
  * aproximação é precisão falsa — é o que faria a estimativa parecer orçamento.
+ * A mesma regra (inteiro, sem zero sobrando) serve ao valor da consulta de
+ * avaliação, que não é média — é o preço que a própria clínica decidiu —, por
+ * isso o rótulo do erro é parâmetro em vez de fixo.
  */
-function reais(formData: FormData, campo: string): Talvez<number | null> {
+function reais(
+  formData: FormData,
+  campo: string,
+  rotulo = "O valor médio",
+): Talvez<number | null> {
   const bruto = textoDoCampo(formData, campo);
   if (bruto === null) return { valor: null };
 
   const numero = Number(bruto);
   if (!Number.isInteger(numero) || numero <= 0) {
     return {
-      erro: "O valor médio tem de ser um número inteiro de reais, sem centavo.",
+      erro: `${rotulo} tem de ser um número inteiro de reais, sem centavo.`,
     };
   }
   if (numero > VALOR_MEDIO_MAXIMO) {
     return {
-      erro: `O valor médio passou de R$ ${VALOR_MEDIO_MAXIMO.toLocaleString("pt-BR")}. Confira se não sobrou um zero.`,
+      erro: `${rotulo} passou de R$ ${VALOR_MEDIO_MAXIMO.toLocaleString("pt-BR")}. Confira se não sobrou um zero.`,
     };
   }
   return { valor: numero };

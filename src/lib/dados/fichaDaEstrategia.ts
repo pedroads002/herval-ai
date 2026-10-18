@@ -170,6 +170,9 @@ export type LinhaDaClinica = {
   historia: string | null;
   endereco: string | null;
   horario_funcionamento: string | null;
+  descricao: string | null;
+  /** O que a consulta de avaliação custa, quando `avaliacao_gratuita` é falso. */
+  avaliacao_valor: number | string | null;
 };
 
 export type FichaDaEstrategia = {
@@ -187,6 +190,15 @@ export type FichaDaEstrategia = {
   quandoCobrada: QuandoCobrada | null;
   avaliacaoAbateNoProcedimento: boolean | null;
   heloPodeInformarValor: boolean | null;
+  /**
+   * O que a consulta custa, em reais inteiros, quando ela é paga.
+   *
+   * É a única exceção da ficha à regra de "nunca preço fechado": aqui o valor
+   * é da consulta em si, não de um procedimento, e quem decide o número é a
+   * própria clínica, não a Helô. Nulo quando a avaliação é gratuita, ou
+   * quando é paga e ninguém informou ainda.
+   */
+  avaliacaoValor: number | null;
 
   // Bloco 3 — Condições Comerciais
   formasDePagamento: FormaDePagamento[];
@@ -213,12 +225,17 @@ export type FichaDaEstrategia = {
   historia: string;
 
   /*
-    Só exibição, nunca edição: endereço e horário são da ficha de Clientes, e
-    quem manda neles é aquela tela. Aparecem aqui porque a Helô fala os dois com
-    o paciente, e quem está escrevendo a estratégia precisa ver o que ela diria.
+    Só exibição, nunca edição: cidade, endereço, horário e descrição curta são
+    da ficha de Clientes, e quem manda neles é aquela tela. Endereço e horário
+    aparecem aqui porque a Helô fala os dois com o paciente; a descrição não
+    — ela é só para quem está vendo esta ficha (ou a aba Clínica do
+    Atendimento) entender rápido quem é este cliente. A cidade acompanha o
+    nome do cliente no cabeçalho da aba Clínica.
   */
+  cidade: string;
   endereco: string;
   horarioDeFuncionamento: string;
+  descricao: string;
 };
 
 /**
@@ -393,6 +410,7 @@ export function montarFichaDaEstrategia(
     ),
     avaliacaoAbateNoProcedimento: linha.avaliacao_abate_procedimento ?? null,
     heloPodeInformarValor: linha.helo_pode_informar_valor ?? null,
+    avaliacaoValor: numeroPositivo(linha.avaliacao_valor),
 
     formasDePagamento: listaDaLista(
       linha.formas_pagamento,
@@ -430,7 +448,9 @@ export function montarFichaDaEstrategia(
     observacoesDeAtendimento: texto(linha.observacoes_atendimento),
     historia: texto(linha.historia),
 
+    cidade: texto(linha.cidade),
     endereco: texto(linha.endereco),
     horarioDeFuncionamento: texto(linha.horario_funcionamento),
+    descricao: texto(linha.descricao),
   };
 }

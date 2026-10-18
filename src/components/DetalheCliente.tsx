@@ -133,6 +133,7 @@ function FormularioIndividual({
     estado: cliente.estado,
     endereco: cliente.endereco,
     descricao: cliente.descricao,
+    horario_funcionamento: cliente.horarioFuncionamento,
   });
   const { marcados, setMarcados } = useMarcados(
     marcarIds(
@@ -190,6 +191,7 @@ function FormularioDaOperacao({ cliente }: { cliente: ClienteDoCadastro }) {
     estado: cliente.estado,
     endereco: cliente.endereco,
     descricao: cliente.descricao,
+    horario_funcionamento: cliente.horarioFuncionamento,
   });
   const [ativa, setAtiva] = useState(cliente.ativa);
 

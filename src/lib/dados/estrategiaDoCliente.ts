@@ -60,11 +60,11 @@ const CAMPOS_DA_FICHA =
   "id, nome, cidade, ativa, objetivo_atendimento, prioridade_comercial, " +
   "tem_avaliacao_inicial, tipo_avaliacao, avaliacao_gratuita, " +
   "avaliacao_quando_cobrada, avaliacao_abate_procedimento, " +
-  "helo_pode_informar_valor, politica_de_valores, formas_pagamento, " +
-  "parcelamento, convenios, classe_economica, faixa_etaria_de, " +
-  "faixa_etaria_ate, principais_dores, tom_predominante, diferenciais, " +
-  "informacoes_a_evitar, observacoes_atendimento, historia, endereco, " +
-  "horario_funcionamento";
+  "helo_pode_informar_valor, avaliacao_valor, politica_de_valores, " +
+  "formas_pagamento, parcelamento, convenios, classe_economica, " +
+  "faixa_etaria_de, faixa_etaria_ate, principais_dores, tom_predominante, " +
+  "diferenciais, informacoes_a_evitar, observacoes_atendimento, historia, " +
+  "endereco, horario_funcionamento, descricao";
 
 /**
  * `clienteId` vem da URL (`?cliente=19`), então pode ser qualquer coisa: nulo,

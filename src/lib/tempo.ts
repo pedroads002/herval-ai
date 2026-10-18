@@ -30,6 +30,31 @@ export function tempoRelativo(minutos: number) {
   return dias === 1 ? "há 1 dia" : `há ${dias} dias`;
 }
 
+/**
+ * A mesma distância de `tempoRelativo`, mas por extenso: "há 1 minuto", "há
+ * 12 minutos", "há 1 hora", "há 3 horas", "há 1 dia", "há 2 dias".
+ *
+ * Existe separada, e não uma troca de `tempoRelativo`, porque só a aba
+ * Clínica do Atendimento pediu esta forma — Ligações e Log continuam com a
+ * abreviada, e trocar a função de baixo para cima mudaria a aparência das
+ * duas sem ninguém ter pedido.
+ */
+export function tempoRelativoPorExtenso(minutos: number) {
+  const absoluto = Math.abs(Math.round(minutos));
+
+  if (absoluto < 1) return "agora";
+  if (absoluto < 60) {
+    return absoluto === 1 ? "há 1 minuto" : `há ${absoluto} minutos`;
+  }
+  if (absoluto < MINUTOS_POR_DIA) {
+    const horas = Math.round(absoluto / 60);
+    return horas === 1 ? "há 1 hora" : `há ${horas} horas`;
+  }
+
+  const dias = Math.round(absoluto / MINUTOS_POR_DIA);
+  return dias === 1 ? "há 1 dia" : `há ${dias} dias`;
+}
+
 /** A mesma distância, mas dita como duração: "4 min", "3h", "2 dias". */
 export function duracao(minutos: number) {
   const absoluto = Math.abs(Math.round(minutos));

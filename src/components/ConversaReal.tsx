@@ -39,9 +39,8 @@ import {
 } from "@/components/AbasDoAtendimento";
 import { ligacoesDoLead } from "@/data/ligacoes";
 import { ETAPA_PERDIDA } from "@/data/leads";
-import { tempoRelativo } from "@/lib/tempo";
+import { tempoRelativo, tempoRelativoPorExtenso } from "@/lib/tempo";
 import type {
-  ClinicaDoLead,
   EspecialidadeDaClinica,
   LeadEmAtendimento,
   MensagemEmAtendimento,
@@ -52,6 +51,14 @@ import type {
   UnidadeDoCadastro,
 } from "@/lib/dados/profissionais";
 import type { Consulta } from "@/lib/dados/agenda";
+import type {
+  FichaDaEstrategia,
+  TipoDeAvaliacao,
+} from "@/lib/dados/fichaDaEstrategia";
+import {
+  formatarFaixaDeValorMedio,
+  formatarValorDaAvaliacao,
+} from "@/lib/formato";
 
 /** O ícone que acompanha a bolha quando a mensagem chegou sem texto. */
 const iconeDoFormato: Record<FormatoDeMidia, typeof Mic> = {
@@ -144,7 +151,7 @@ export default function ConversaReal({
   lead: LeadEmAtendimento | null;
   mensagens: MensagemEmAtendimento[];
   notas: NotaEmAtendimento[];
-  clinica: ClinicaDoLead | null;
+  clinica: FichaDaEstrategia | null;
   especialidades: EspecialidadeDaClinica[];
   falha: string | null;
   /**
@@ -1143,7 +1150,13 @@ export default function ConversaReal({
               )}
               {aba === "Ligações" && <AbaLigacoes ligacoes={chamadas} />}
               {aba === "Clínica" && (
-                <FichaDaClinica clinica={clinica} nome={lead.nomeDaClinica} />
+                <FichaDaClinica
+                  clinica={clinica}
+                  nome={lead.nomeDaClinica}
+                  origem={lead.origem}
+                  minutosAtras={lead.minutosAtras}
+                  procedimentos={especialidades}
+                />
               )}
               {aba === "Log" && <Historico eventos={linhaDoTempo} />}
             </div>
@@ -1292,18 +1305,33 @@ function Midia({
 }
 
 /**
- * A ficha da clínica, lida do banco.
+ * A ficha da clínica, lida do banco — os seis blocos que a referência (Mavi)
+ * trouxe, preenchidos com os campos reais da Helô.
  *
  * Não reaproveita a `AbaClinica` original porque aquela recebe a clínica da
- * base de exemplo, com campos que a tabela `clinicas` não tem. O conteúdo aqui
- * é o que existe de verdade.
+ * base de exemplo, com campos que a tabela `clinicas` não tem. O conteúdo
+ * aqui é o que existe de verdade, montado em cima da mesma `FichaDaEstrategia`
+ * que a tela de Estratégia do Cliente usa — ver `fichaDaEstrategia.ts`. Não é
+ * tela de edição: quem muda estes campos é a Estratégia do Cliente ou o
+ * Cadastro, e um link para lá seria o próximo passo, não este.
+ *
+ * Preço de procedimento não aparece aqui, só a faixa de valor médio
+ * aproximado — mesma regra de `FichaDoAtendimento`, ao lado. A única exceção
+ * é o valor da consulta de avaliação, no último bloco: não é procedimento, é
+ * o preço que a própria clínica decidiu cobrar pela avaliação.
  */
 function FichaDaClinica({
   clinica,
   nome,
+  origem,
+  minutosAtras,
+  procedimentos,
 }: {
-  clinica: ClinicaDoLead | null;
+  clinica: FichaDaEstrategia | null;
   nome: string;
+  origem: string;
+  minutosAtras: number;
+  procedimentos: EspecialidadeDaClinica[];
 }) {
   if (!clinica) {
     return (
@@ -1313,23 +1341,221 @@ function FichaDaClinica({
     );
   }
 
+  const nomeDoProcedimento = new Map(
+    procedimentos.map((p) => [p.id, p.nome]),
+  );
+
   return (
-    <div className="space-y-4 text-sm">
-      <p className="text-sm font-extrabold text-herval-preto">
-        {clinica.nome}
-        {clinica.cidade ? (
-          <span className="font-medium text-black/50"> · {clinica.cidade}</span>
-        ) : null}
-      </p>
-      <dl className="space-y-2.5">
-        <Dado rotulo="Endereço" valor={clinica.endereco} />
-        <Dado rotulo="Horário" valor={clinica.horarioFuncionamento} />
-        <Dado rotulo="Pagamento" valor={clinica.formasPagamento} />
-        <Dado rotulo="Parcelamento" valor={clinica.parcelamento} />
-        <Dado rotulo="Convênios" valor={clinica.convenios} />
-      </dl>
+    <div className="space-y-5 text-sm">
+      <div>
+        <p className="text-sm font-extrabold text-herval-preto">
+          {clinica.nome}
+          {clinica.cidade ? (
+            <span className="font-medium text-black/50">
+              {" "}
+              · {clinica.cidade}
+            </span>
+          ) : null}
+        </p>
+        <dl className="mt-2.5 space-y-2.5">
+          <Dado rotulo="Endereço" valor={clinica.endereco} />
+          <Dado rotulo="Horário" valor={clinica.horarioDeFuncionamento} />
+        </dl>
+      </div>
+
+      <SecaoDaFicha titulo="Informações importantes">
+        <dl className="space-y-2.5">
+          <Dado rotulo="Descrição" valor={clinica.descricao} />
+        </dl>
+        <div className="mt-3">
+          <p className="text-xs font-bold text-black/45">
+            Procedimentos / tratamentos
+          </p>
+          {procedimentos.length === 0 ? (
+            <p className="mt-1.5 text-xs font-medium text-black/40">
+              Nenhum procedimento ativo cadastrado para esta clínica.
+            </p>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {procedimentos.map((p) => (
+                <span
+                  key={p.id}
+                  className="rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-bold text-herval-preto"
+                >
+                  {p.nome}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </SecaoDaFicha>
+
+      <SecaoDaFicha titulo="Condições oferecidas">
+        <dl className="space-y-2.5">
+          <Dado
+            rotulo="Parcelamento"
+            valor={
+              clinica.parcelamentoMaximo === null
+                ? null
+                : `Até ${clinica.parcelamentoMaximo}x`
+            }
+          />
+          <Dado
+            rotulo="Pagamento"
+            valor={
+              clinica.formasDePagamento.length === 0
+                ? null
+                : clinica.formasDePagamento.join(", ")
+            }
+          />
+          <Dado
+            rotulo="Boleto"
+            valor={
+              clinica.formasDePagamento.includes("Boleto") ? "Sim" : "Não"
+            }
+          />
+          <Dado
+            rotulo="Convênios"
+            valor={
+              clinica.convenios.length === 0
+                ? null
+                : clinica.convenios.map((c) => c.nome).join(", ")
+            }
+          />
+        </dl>
+        <div className="mt-3">
+          <p className="text-xs font-bold text-black/45">Valores médios</p>
+          {clinica.valoresMedios.length === 0 ? (
+            <p className="mt-1.5 text-xs font-medium text-black/40">
+              Nenhuma faixa cadastrada — a equipe confirma o valor.
+            </p>
+          ) : (
+            <ul className="mt-1.5 space-y-1">
+              {clinica.valoresMedios.map((faixa) => (
+                <li
+                  key={faixa.especialidadeId}
+                  className="text-xs font-medium text-black/70"
+                >
+                  <span className="font-bold text-herval-preto">
+                    {nomeDoProcedimento.get(faixa.especialidadeId) ??
+                      "Procedimento"}
+                    :
+                  </span>{" "}
+                  {formatarFaixaDeValorMedio(faixa.de, faixa.ate)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </SecaoDaFicha>
+
+      <SecaoDaFicha titulo="Público-alvo">
+        <dl className="space-y-2.5">
+          <Dado
+            rotulo="Classe"
+            valor={
+              clinica.classes.length === 0 ? null : clinica.classes.join(", ")
+            }
+          />
+          <Dado
+            rotulo="Faixa etária"
+            valor={formatarFaixaEtaria(
+              clinica.faixaEtariaDe,
+              clinica.faixaEtariaAte,
+            )}
+          />
+          <Dado
+            rotulo="Principais dores"
+            valor={
+              clinica.principaisDores.length === 0
+                ? null
+                : clinica.principaisDores.join(", ")
+            }
+          />
+        </dl>
+      </SecaoDaFicha>
+
+      <SecaoDaFicha titulo="Dados do lead">
+        <dl className="space-y-2.5">
+          <Dado rotulo="Origem" valor={origem} />
+          <Dado rotulo="Chegou" valor={tempoRelativoPorExtenso(minutosAtras)} />
+        </dl>
+      </SecaoDaFicha>
+
+      <SecaoDaFicha titulo="Consulta de avaliação">
+        {clinica.temAvaliacaoInicial === false ? (
+          <p className="text-xs font-medium text-black/55">
+            Este cliente não oferece avaliação inicial antes do procedimento.
+          </p>
+        ) : (
+          <dl className="space-y-2.5">
+            <Dado
+              rotulo="Valor"
+              valor={
+                clinica.avaliacaoGratuita === true
+                  ? "Gratuita"
+                  : clinica.avaliacaoValor === null
+                    ? null
+                    : formatarValorDaAvaliacao(clinica.avaliacaoValor)
+              }
+            />
+            <Dado
+              rotulo="On-line"
+              valor={consultaOnline(clinica.tipoDeAvaliacao)}
+            />
+            <Dado
+              rotulo="Abate no procedimento"
+              valor={simOuNaoOuNulo(clinica.avaliacaoAbateNoProcedimento)}
+            />
+          </dl>
+        )}
+      </SecaoDaFicha>
     </div>
   );
+}
+
+/** Um bloco da ficha, com o mesmo rótulo de seção que `FichaDoAtendimento` usa. */
+function SecaoDaFicha({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-t border-black/10 pt-4">
+      <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+        {titulo}
+      </h3>
+      <div className="mt-2.5">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Se a consulta de avaliação tem opção on-line.
+ *
+ * "Ambas" e "Online" respondem "Sim" porque, nos dois casos, a pessoa pode
+ * marcar uma avaliação on-line; só "Presencial" responde "Não".
+ */
+function consultaOnline(tipo: TipoDeAvaliacao | null): string | null {
+  if (tipo === null) return null;
+  return tipo === "Presencial" ? "Não" : "Sim";
+}
+
+function simOuNaoOuNulo(valor: boolean | null): string | null {
+  if (valor === null) return null;
+  return valor ? "Sim" : "Não";
+}
+
+function formatarFaixaEtaria(
+  de: number | null,
+  ate: number | null,
+): string | null {
+  if (de === null && ate === null) return null;
+  if (de !== null && ate !== null) return `${de} a ${ate} anos`;
+  if (de !== null) return `A partir de ${de} anos`;
+  return `Até ${ate} anos`;
 }
 
 /** A linha do tempo derivada: chegada do lead, falas e notas. */

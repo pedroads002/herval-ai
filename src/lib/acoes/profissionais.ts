@@ -223,6 +223,7 @@ type DadosDoCliente = {
   estado: string;
   endereco: string | null;
   descricao: string | null;
+  horario_funcionamento: string | null;
   ativa: boolean;
 };
 
@@ -247,6 +248,7 @@ function lerCliente(
   const instagram = opcional(formData, "instagram");
   const endereco = opcional(formData, "endereco");
   const descricao = opcional(formData, "descricao");
+  const horarioFuncionamento = opcional(formData, "horario_funcionamento");
 
   if (nome === "") return { erro: `${comoChamaONome} é obrigatório.` };
   if (nome.length > LIMITE_NOME) {
@@ -278,7 +280,12 @@ function lerCliente(
     longoDemais(instagram, LIMITE_CURTO, "Instagram") ??
     longoDemais(cidade, LIMITE_CURTO, "Cidade") ??
     longoDemais(endereco, LIMITE_NOME * 2, "Endereço") ??
-    longoDemais(descricao, LIMITE_DESCRICAO, "Descrição curta");
+    longoDemais(descricao, LIMITE_DESCRICAO, "Descrição curta") ??
+    longoDemais(
+      horarioFuncionamento,
+      LIMITE_CURTO,
+      "Horário de funcionamento",
+    );
 
   if (excedeu) return { erro: excedeu };
 
@@ -294,6 +301,7 @@ function lerCliente(
     estado,
     endereco,
     descricao,
+    horario_funcionamento: horarioFuncionamento,
     ativa: marcado(formData, "ativa"),
   };
 }

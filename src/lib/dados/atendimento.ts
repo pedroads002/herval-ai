@@ -30,6 +30,12 @@ import {
   type StatusEntrega,
   type TipoRemetente,
 } from "@/data/mensagens";
+import {
+  montarFichaDaEstrategia,
+  type FichaDaEstrategia,
+  type LinhaDaClinica,
+  type LinhaDaFaixaDeValor,
+} from "@/lib/dados/fichaDaEstrategia";
 
 /**
  * Um lead da tela de Atendimento.
@@ -374,16 +380,20 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
   return { leads, mensagens, notas, falha: null };
 }
 
-/** A ficha da clínica, para a coluna lateral da conversa. */
-export type ClinicaDoLead = {
-  nome: string;
-  cidade: string | null;
-  endereco: string | null;
-  horarioFuncionamento: string | null;
-  formasPagamento: string | null;
-  parcelamento: string | null;
-  convenios: string | null;
-};
+/**
+ * As colunas de `clinicas` que a aba Clínica do Atendimento mostra.
+ *
+ * Um subconjunto de `CAMPOS_DA_FICHA` (em `estrategiaDoCliente.ts`): esta tela
+ * não edita a Estratégia do Cliente, só mostra os blocos que o CRC precisa ver
+ * no meio de uma conversa — os campos de Objetivo e Comunicação ficam de fora
+ * de propósito, porque não aparecem em lugar nenhum da aba.
+ */
+const CAMPOS_DA_CLINICA_NO_ATENDIMENTO =
+  "id, nome, cidade, endereco, horario_funcionamento, descricao, " +
+  "tem_avaliacao_inicial, tipo_avaliacao, avaliacao_gratuita, " +
+  "avaliacao_valor, avaliacao_abate_procedimento, formas_pagamento, " +
+  "parcelamento, convenios, classe_economica, faixa_etaria_de, " +
+  "faixa_etaria_ate, principais_dores";
 
 /**
  * Uma especialidade que a clínica deste lead atende.
@@ -406,7 +416,7 @@ export type ConversaDoLead = {
   lead: LeadEmAtendimento | null;
   mensagens: MensagemEmAtendimento[];
   notas: NotaEmAtendimento[];
-  clinica: ClinicaDoLead | null;
+  clinica: FichaDaEstrategia | null;
   especialidades: EspecialidadeDaClinica[];
   falha: string | null;
 };
@@ -548,6 +558,7 @@ export async function carregarConversa(
     respostaNotas,
     respostaClinica,
     respostaEspecialidades,
+    respostaFaixas,
   ] = await Promise.all([
     supabase
       .from("mensagens")
@@ -565,12 +576,19 @@ export async function carregarConversa(
       ? Promise.resolve({ data: null, error: null })
       : supabase
           .from("clinicas")
-          .select(
-            "nome, cidade, endereco, horario_funcionamento, formas_pagamento, parcelamento, convenios",
-          )
+          .select(CAMPOS_DA_CLINICA_NO_ATENDIMENTO)
           .eq("id", lidoLead.clinica_id)
           .maybeSingle(),
     especialidadesDaClinica(supabase, lidoLead.clinica_id),
+    // As faixas de valor médio moram em `clinica_especialidades`, não em
+    // `clinicas` — mesma leitura separada que `estrategiaDoCliente.ts` faz.
+    // Falhar aqui não derruba a conversa: a ficha abre com valor em branco.
+    lidoLead.clinica_id === null
+      ? Promise.resolve({ data: [] as LinhaDaFaixaDeValor[], error: null })
+      : supabase
+          .from("clinica_especialidades")
+          .select("especialidade_id, valor_medio_de, valor_medio_ate")
+          .eq("clinica_id", lidoLead.clinica_id),
   ]);
 
   if (respostaMensagens.error) {
@@ -581,15 +599,12 @@ export async function carregarConversa(
   }
 
   const agora = Date.now();
-  const fichaDaClinica = respostaClinica.data as {
-    nome: string;
-    cidade: string | null;
-    endereco: string | null;
-    horario_funcionamento: string | null;
-    formas_pagamento: string | null;
-    parcelamento: string | null;
-    convenios: string | null;
-  } | null;
+  const linhaDaClinica = respostaClinica.data as unknown as
+    | LinhaDaClinica
+    | null;
+  const clinica = linhaDaClinica
+    ? montarFichaDaEstrategia(linhaDaClinica, respostaFaixas.data ?? [])
+    : null;
 
   const especialidades = (respostaEspecialidades.data ?? [])
     .map(
@@ -622,7 +637,7 @@ export async function carregarConversa(
       telefone: telefoneLegivel(bruto),
       telefoneBruto: bruto,
       clinicaId: lidoLead.clinica_id,
-      nomeDaClinica: fichaDaClinica?.nome ?? "Clínica não informada",
+      nomeDaClinica: clinica?.nome ?? "Clínica não informada",
       etapa: etapaConhecida(lidoLead.etapa),
       origem: (lidoLead.origem ?? "").trim() || "Origem não informada",
       minutosAtras: minutosDesde(lidoLead.criado_em, agora),
@@ -656,17 +671,7 @@ export async function carregarConversa(
       minutosAtras: minutosDesde(linha.criado_em, agora),
       texto: linha.texto,
     })),
-    clinica: fichaDaClinica
-      ? {
-          nome: fichaDaClinica.nome,
-          cidade: fichaDaClinica.cidade,
-          endereco: fichaDaClinica.endereco,
-          horarioFuncionamento: fichaDaClinica.horario_funcionamento,
-          formasPagamento: fichaDaClinica.formas_pagamento,
-          parcelamento: fichaDaClinica.parcelamento,
-          convenios: fichaDaClinica.convenios,
-        }
-      : null,
+    clinica,
     falha: null,
   };
 }

@@ -61,6 +61,7 @@ import {
   consequenciaDoParcelamento,
   consequenciaDoTipoDeAvaliacao,
   consequenciaDoTom,
+  consequenciaDoValorDaAvaliacao,
   consequenciaDoValorMedio,
   consequenciaDosConvenios,
   consequenciaDosDiferenciais,
@@ -75,7 +76,10 @@ import {
   campoBase,
   useQuandoDerCerto,
 } from "@/components/cadastro/comuns";
-import { formatarFaixaDeValorMedio } from "@/lib/formato";
+import {
+  formatarFaixaDeValorMedio,
+  formatarValorDaAvaliacao,
+} from "@/lib/formato";
 
 /**
  * A tela da Estratégia do Cliente.
@@ -713,7 +717,7 @@ function BlocoAvaliacao({
     <Cartao
       bloco="avaliacao"
       titulo="Avaliação / Consulta"
-      explicacao="O que vem antes do procedimento. São regras, não preço: nenhum campo aqui guarda valor, e nenhuma combinação deles faz a Helô fechar um número — fechar valor é da consulta de avaliação."
+      explicacao="O que vem antes do procedimento. Quase tudo aqui é regra, não preço — nenhum campo deste cartão faz a Helô fechar valor de procedimento. A única exceção é o valor da própria consulta, abaixo: ele não é estimativa, é o preço que esta clínica cobra pela avaliação."
       blocoAberto={blocoAberto}
       aoEditar={aoEditar}
       aoFechar={aoFechar}
@@ -740,6 +744,17 @@ function BlocoAvaliacao({
               />
               {ficha.avaliacaoGratuita !== true && (
                 <>
+                  <Linha
+                    rotulo="Valor da consulta"
+                    valor={
+                      ficha.avaliacaoValor === null
+                        ? null
+                        : formatarValorDaAvaliacao(ficha.avaliacaoValor)
+                    }
+                    consequencia={consequenciaDoValorDaAvaliacao(
+                      ficha.avaliacaoValor,
+                    )}
+                  />
                   <Linha
                     rotulo="Quando é cobrada"
                     valor={ficha.quandoCobrada}
@@ -796,6 +811,9 @@ function FormAvaliacao({
   const [podeFalar, setPodeFalar] = useState<Tri>(
     deSimOuNao(ficha.heloPodeInformarValor),
   );
+  const [valorConsulta, setValorConsulta] = useState(
+    ficha.avaliacaoValor === null ? "" : String(ficha.avaliacaoValor),
+  );
 
   /*
     Quem respondeu que não tem avaliação não é perguntado sobre o tipo nem sobre
@@ -849,6 +867,46 @@ function FormAvaliacao({
 
       {ehCobrada && (
         <>
+          <div>
+            <label className={rotuloBase} htmlFor="campo-avaliacao-valor">
+              Valor da consulta (R$)
+            </label>
+            <input
+              id="campo-avaliacao-valor"
+              name="avaliacao_valor"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={VALOR_MEDIO_MAXIMO}
+              step={1}
+              placeholder="Ex.: 150"
+              value={valorConsulta}
+              onChange={(e) => {
+                // Mesma trava do parcelamento: só aceita o que a gravação
+                // aceitaria, para a prévia nunca prometer um número que o
+                // envio vai recusar.
+                const texto = e.target.value;
+                if (texto === "") {
+                  setValorConsulta("");
+                  return;
+                }
+                if (!/^\d+$/.test(texto)) return;
+                const numero = Number(texto);
+                if (numero < 1 || numero > VALOR_MEDIO_MAXIMO) return;
+                setValorConsulta(texto);
+              }}
+              className={`${campoBase} max-w-40`}
+            />
+            <Consequencia
+              texto={consequenciaDoValorDaAvaliacao(
+                valorConsulta === "" ? null : Number(valorConsulta),
+              )}
+            />
+            <p className="mt-2 text-xs font-medium text-black/45">
+              Preço da consulta em si, não do procedimento. Cada clínica cobra
+              o que quiser — é por isso que não há faixa aqui.
+            </p>
+          </div>
           <Escolha
             nome="avaliacao_quando_cobrada"
             rotulo="Quando a avaliação é cobrada"

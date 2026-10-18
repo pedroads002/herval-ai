@@ -492,6 +492,14 @@ export function CamposDoIndividual({
 
       <div className="space-y-7 border-t border-black/10 pt-7">
         <p className={rotulo}>Informações adicionais</p>
+        <Campo
+          nome="horario_funcionamento"
+          etiqueta="Horário de funcionamento"
+          valores={valores}
+          aoMudar={aoMudar}
+          limite={120}
+          exemplo="Ex.: Seg a sex, 8h às 18h"
+        />
         <Descricao valores={valores} aoMudar={aoMudar} />
         <Status
           nome="ativa"
@@ -619,6 +627,15 @@ export function CamposDoCliente({
           exemplo="Ex.: Av. Ipiranga, 100 · sala 3"
         />
       </div>
+
+      <Campo
+        nome="horario_funcionamento"
+        etiqueta="Horário de funcionamento"
+        valores={valores}
+        aoMudar={aoMudar}
+        limite={120}
+        exemplo="Ex.: Seg a sex, 8h às 18h"
+      />
 
       <Descricao valores={valores} aoMudar={aoMudar} />
 

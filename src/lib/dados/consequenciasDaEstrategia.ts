@@ -22,6 +22,7 @@
  */
 
 import { PARCELAMENTO_MAXIMO } from "@/lib/dados/fichaDaEstrategia";
+import { formatarValorDaAvaliacao } from "@/lib/formato";
 import type {
   FichaDaEstrategia,
   ObjetivoDeAtendimento,
@@ -124,6 +125,31 @@ export function consequenciaDoAbatimento(valor: boolean | null): string {
   return valor
     ? "A Helô pode dizer que o que foi pago na avaliação abate no procedimento — sem citar número."
     : "A Helô não promete abatimento: o que foi pago na avaliação fica pago.";
+}
+
+/**
+ * O que o valor da consulta de avaliação faz a Helô dizer.
+ *
+ * Exceção deliberada, aprovada em 18/10/2026, à regra de nunca preço fechado:
+ * este número não é estimativa de procedimento, é o preço que a própria
+ * clínica cobra pela consulta, e cada cliente pode cobrar um valor diferente
+ * — por isso a Helô precisa dele de verdade, e não só de uma faixa.
+ *
+ * Diferente das outras funções deste arquivo, isto AINDA NÃO foi conferido
+ * contra o prompt ao vivo do `Supervisor1`: o campo é novo, o prompt não foi
+ * tocado junto, e por isso a frase não promete "a Helô diz" — só registra o
+ * dado e avisa que falar dele depende de um ajuste separado no n8n, ainda não
+ * feito. Atualize esta função (e o comentário) no dia em que o prompt passar a
+ * usar `avaliacao_valor`.
+ *
+ * Só se aplica quando a avaliação é paga; quando é gratuita a resposta já é
+ * "Gratuita" e este campo nem é mostrado na tela.
+ */
+export function consequenciaDoValorDaAvaliacao(valor: number | null): string {
+  if (valor === null) {
+    return "Sem valor cadastrado. Quando alguém preencher, o valor fica salvo no cadastro — mas falar dele na conversa depende de um ajuste no prompt da Helô que ainda não foi feito.";
+  }
+  return `Valor salvo: ${formatarValorDaAvaliacao(valor)}. Por enquanto isto é só cadastro — a Helô ainda não foi configurada para falar deste número na conversa.`;
 }
 
 /*

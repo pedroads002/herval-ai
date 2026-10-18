@@ -95,6 +95,7 @@ export type ClienteDoCadastro = {
   estado: string;
   endereco: string;
   descricao: string;
+  horarioFuncionamento: string;
   unidades: UnidadeDoCadastro[];
   /** Quem atende neste cliente. Vazio é possível e não é defeito. */
   profissionais: ProfissionalCadastrado[];
@@ -271,10 +272,11 @@ type LinhaCliente = {
   estado: string | null;
   endereco: string | null;
   descricao: string | null;
+  horario_funcionamento: string | null;
 };
 
 const COLUNAS_DO_CLIENTE =
-  "id, nome, ativa, tipo_operacao, nome_exibicao, responsavel_principal, area_atuacao, whatsapp, email, instagram, cidade, estado, endereco, descricao";
+  "id, nome, ativa, tipo_operacao, nome_exibicao, responsavel_principal, area_atuacao, whatsapp, email, instagram, cidade, estado, endereco, descricao, horario_funcionamento";
 
 const COLUNAS_DO_PROFISSIONAL =
   "id, nome, nome_exibicao, especialidade_principal, procedimento_outro, tipo, registro, ativo";
@@ -477,6 +479,7 @@ export async function carregarProfissionais(): Promise<DadosDosProfissionais> {
     estado: (linha.estado ?? "").trim(),
     endereco: (linha.endereco ?? "").trim(),
     descricao: (linha.descricao ?? "").trim(),
+    horarioFuncionamento: (linha.horario_funcionamento ?? "").trim(),
     unidades: unidades.filter((u) => u.clienteId === linha.id),
     profissionais: profissionais.filter((p) => p.clienteId === linha.id),
   }));

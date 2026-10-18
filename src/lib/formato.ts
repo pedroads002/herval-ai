@@ -1,13 +1,30 @@
 const numero = new Intl.NumberFormat("pt-BR");
 
-// Não existe formatador de moeda aqui, de propósito, e isto não é descuido: o
-// sistema não guarda preço fechado de nada nem de ninguém. Se você veio procurar
-// `formatarMoeda`, ela foi removida junto com todos os campos de dinheiro do
-// painel — e não deve voltar. A única forma de valor que existe é a faixa
-// aproximada logo abaixo, que não tem como imprimir um número só.
+// Não existe formatador de moeda genérico aqui, de propósito, e isto não é
+// descuido: o sistema não guarda preço fechado de procedimento nenhum. Se você
+// veio procurar `formatarMoeda`, ela foi removida junto com todos os campos de
+// dinheiro do painel — e não deve voltar nesse sentido largo. A forma comum de
+// valor é a faixa aproximada logo abaixo, que não tem como imprimir um número
+// só.
+//
+// A única excecão, aprovada em 18/10/2026, é `formatarValorDaAvaliacao`: o
+// preço da própria consulta de avaliação, que a clínica decide e não é
+// estimativa de procedimento. Não generalize essa função — ela existe para
+// este campo e nenhum outro.
 
 export function formatarNumero(valor: number) {
   return numero.format(valor);
+}
+
+/**
+ * O valor cobrado pela consulta de avaliação, quando ela é paga.
+ *
+ * Única forma de preço fechado que o sistema imprime — ver o comentário acima.
+ * É a própria clínica quem decide este número, ele não é uma estimativa de
+ * procedimento, e por isso não precisa (e não pode) ser faixa.
+ */
+export function formatarValorDaAvaliacao(valor: number) {
+  return `R$ ${numero.format(valor)}`;
 }
 
 /**
