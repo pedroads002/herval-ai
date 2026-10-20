@@ -17,6 +17,7 @@
  */
 import type { Tarefa } from "@/data/tarefas";
 import type { Objecao } from "@/data/objecoes";
+import type { MensagemFollowUp } from "@/lib/dados/followUp";
 
 export type ClienteCriado = {
   id: number;
@@ -51,6 +52,11 @@ export type ResultadoDoCadastro = {
    * inventar.
    */
   objecao?: Objecao;
+  /**
+   * Só vem preenchida quando a gravação criou uma mensagem de follow-up, com
+   * o `id` e a `ordem` que só o banco sabe — mesma lógica de `objecao`.
+   */
+  mensagemFollowUp?: MensagemFollowUp;
 };
 
 export const RESULTADO_INICIAL: ResultadoDoCadastro = {
