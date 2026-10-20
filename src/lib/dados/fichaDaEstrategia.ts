@@ -229,8 +229,8 @@ export type FichaDaEstrategia = {
     da ficha de Clientes, e quem manda neles é aquela tela. Endereço e horário
     aparecem aqui porque a Helô fala os dois com o paciente; a descrição não
     — ela é só para quem está vendo esta ficha (ou a aba Clínica do
-    Atendimento) entender rápido quem é este cliente. A cidade acompanha o
-    nome do cliente no cabeçalho da aba Clínica.
+    Atendimento) entender rápido quem é este cliente. A cidade aparece junto
+    do endereço, no bloco de informações da aba Clínica.
   */
   cidade: string;
   endereco: string;

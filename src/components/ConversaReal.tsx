@@ -6,7 +6,10 @@ import {
   ArrowLeft,
   Bot,
   BotOff,
+  Building2,
+  ExternalLink,
   Image as ImagemIcone,
+  Info,
   ListPlus,
   Mic,
   MicOff,
@@ -14,7 +17,11 @@ import {
   Phone,
   Send,
   StickyNote,
+  Stethoscope,
+  UserRound,
+  Users,
   Video,
+  Wallet,
   X,
 } from "lucide-react";
 import {
@@ -760,51 +767,71 @@ export default function ConversaReal({
         embaixo da outra, e prender altura ali só esconderia conteúdo.
       */}
       <div className="grid gap-5 lg:min-h-[26rem] lg:flex-1 lg:grid-cols-[18rem_minmax(0,1fr)_18rem]">
-        {/* Coluna esquerda: dados e notas */}
-        <div className="flex flex-col gap-5 lg:min-h-0 lg:overflow-y-auto">
-          <section className="shrink-0 rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
-            <h2 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
-              Dados do lead
-            </h2>
-            <dl className="mt-3 space-y-2.5 text-sm">
-              <Dado rotulo="Telefone" valor={lead.telefone} />
-              <Dado
-                rotulo="Clínica"
-                valor={
-                  clinica
-                    ? `${clinica.nome}${clinica.cidade ? ` · ${clinica.cidade}` : ""}`
-                    : lead.nomeDaClinica
-                }
-              />
-              <Dado rotulo="Origem" valor={lead.origem} />
-              <Dado rotulo="Chegou" valor={tempoRelativo(lead.minutosAtras)} />
-            </dl>
+        {/*
+          Coluna esquerda, na ordem da referência (Mavi): identidade do lead
+          primeiro — inicial em círculo, nome, telefone, origem — e as notas
+          internas logo abaixo.
+
+          Nenhum dos dois cartões estica para o fim da linha. Esticar era o
+          que criava o vazio branco: com uma nota só, o cartão ia até embaixo
+          e sobrava meio metro de nada. Agora cada cartão tem a altura do seu
+          conteúdo e a coluna acaba onde acaba, como na referência.
+
+          A coluna também não rola por fora. Quem rola, quando precisa, é a
+          lista de notas por dentro do seu próprio cartão — assim o campo de
+          escrever e o botão de salvar nunca saem da vista.
+        */}
+        <div className="flex flex-col gap-5">
+          <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
+            <div className="flex flex-col items-center">
+              <div
+                aria-hidden
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-black/[0.05] text-xl font-extrabold text-black/45"
+              >
+                {/* Inicial do nome. "?" quando o lead ainda não tem nome. */}
+                {lead.lead.trim().charAt(0).toUpperCase() || "?"}
+              </div>
+              {/*
+                O nome é o do perfil do WhatsApp, como chegou — não é editado
+                aqui nem em lugar nenhum do painel.
+              */}
+              <p className="mt-2.5 w-full truncate text-center text-sm font-extrabold text-herval-preto">
+                {lead.lead}
+              </p>
+            </div>
+
+            <div className="mt-4 space-y-2.5 text-sm text-black/70">
+              <p className="flex items-center gap-2">
+                <Phone className="h-3.5 w-3.5 shrink-0 text-black/35" />
+                <span className="min-w-0 truncate">{lead.telefone}</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-black/35" />
+                <span className="min-w-0 truncate">
+                  {lead.origem?.trim() ? lead.origem : "—"}
+                </span>
+              </p>
+            </div>
           </section>
 
-          {/*
-            O cartão de notas é o que estica: ele fica por último na coluna e
-            cresce até o fim da linha, para a coluna terminar junto com a
-            conversa. Quem rola é a lista de notas; o campo de escrever e o
-            botão ficam presos embaixo, sempre à mão.
-          */}
-          <section className="flex flex-1 flex-col rounded-card border border-black/10 bg-herval-branco p-5 shadow-card lg:min-h-0">
+          <section className="flex flex-col rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">
             <h2 className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
               <StickyNote className="h-3.5 w-3.5" />
               Notas internas ({notas.length})
             </h2>
 
             {notas.length === 0 ? (
-              <p className="mt-3 flex-1 text-sm font-medium text-black/55">
+              <p className="mt-3 text-sm font-medium text-black/55">
                 Nenhuma nota ainda.
               </p>
             ) : (
               /*
-                O piso de 7rem importa em tela baixa: sem ele, o campo de
-                escrever e o botão tomam o cartão inteiro e a lista fica com
-                quinze pixels — as notas somem sem nem parecer que existe algo
-                para rolar. Com o piso, quem rola passa a ser a coluna.
+                Teto em vez de piso: a lista cresce com as notas até 18rem e só
+                então passa a rolar por dentro. Era `flex-1` com piso de 7rem —
+                o que esticava o cartão até o fim da coluna e deixava um vazio
+                branco embaixo de uma nota só.
               */
-              <ul className="mt-3 min-h-[7rem] flex-1 space-y-3 overflow-y-auto">
+              <ul className="mt-3 max-h-[18rem] space-y-3 overflow-y-auto">
                 {notas.map((item) => (
                   <li
                     key={item.id}
@@ -845,7 +872,7 @@ export default function ConversaReal({
               className="mt-2 w-full shrink-0 rounded-full bg-herval-verde px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
             >
               {salvandoNota ? "Salvando…" : "Salvar nota"}
-            </button>
+              </button>
           </section>
         </div>
 
@@ -1345,28 +1372,57 @@ function FichaDaClinica({
     procedimentos.map((p) => [p.id, p.nome]),
   );
 
+  const faixaEtaria = formatarFaixaEtaria(
+    clinica.faixaEtariaDe,
+    clinica.faixaEtariaAte,
+  );
+
   return (
-    <div className="space-y-5 text-sm">
-      <div>
-        <p className="text-sm font-extrabold text-herval-preto">
+    <div className="space-y-4 text-sm">
+      <div className="rounded-controle border border-black/10 p-4">
+        <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
+          <Building2 className="h-3.5 w-3.5" />
+          Informações da clínica
+        </h3>
+        <p className="mt-2.5 text-sm font-extrabold text-herval-preto">
           {clinica.nome}
-          {clinica.cidade ? (
-            <span className="font-medium text-black/50">
-              {" "}
-              · {clinica.cidade}
-            </span>
-          ) : null}
         </p>
-        <dl className="mt-2.5 space-y-2.5">
-          <Dado rotulo="Endereço" valor={clinica.endereco} />
-          <Dado rotulo="Horário" valor={clinica.horarioDeFuncionamento} />
-        </dl>
+        {/*
+          Mesmo padrão da referência (Mavi): o bloco de endereço é texto
+          corrido empilhado, sem rótulo em coluna. É o dado que o CRC mais
+          confere no meio de um atendimento, e sem os rótulos "Endereço" e
+          "Horário" ele é lido de relance. A cidade desceu do cabeçalho para
+          cá, como na referência — continua aparecendo uma vez só.
+        */}
+        <div className="mt-2.5 rounded-controle bg-black/[0.03] p-3 text-sm leading-relaxed text-black/70">
+          <p>{clinica.endereco?.trim() ? clinica.endereco : "—"}</p>
+          {clinica.cidade?.trim() ? <p>{clinica.cidade}</p> : null}
+        </div>
+        {/*
+          O horário não existe na referência (Mavi). Fica em caixa cinza
+          própria, abaixo da do endereço, para não ser lido como parte dele.
+          Sempre visível, com "—" quando a clínica ainda não cadastrou: é
+          informação que o CRC precisa poder conferir, e a ausência dela é em
+          si um aviso de cadastro incompleto.
+        */}
+        <div className="mt-2 rounded-controle bg-black/[0.03] p-3 text-sm leading-relaxed text-black/70">
+          <p>
+            {clinica.horarioDeFuncionamento?.trim()
+              ? clinica.horarioDeFuncionamento
+              : "—"}
+          </p>
+        </div>
       </div>
 
-      <SecaoDaFicha titulo="Informações importantes">
-        <dl className="space-y-2.5">
-          <Dado rotulo="Descrição" valor={clinica.descricao} />
-        </dl>
+      <SecaoDaFicha titulo="Informações importantes" icone={Info}>
+        {/*
+          Mesmo tratamento dado ao endereço e ao horário: texto corrido em
+          caixa cinza, sem o rótulo "Descrição" em coluna. É texto longo, e
+          em duas colunas ele ficava espremido. "—" quando não cadastrado.
+        */}
+        <div className="rounded-controle bg-black/[0.03] p-3 text-sm leading-relaxed text-black/70">
+          <p>{clinica.descricao?.trim() ? clinica.descricao : "—"}</p>
+        </div>
         <div className="mt-3">
           <p className="text-xs font-bold text-black/45">
             Procedimentos / tratamentos
@@ -1390,7 +1446,7 @@ function FichaDaClinica({
         </div>
       </SecaoDaFicha>
 
-      <SecaoDaFicha titulo="Condições oferecidas">
+      <SecaoDaFicha titulo="Condições oferecidas" icone={Wallet}>
         <dl className="space-y-2.5">
           <Dado
             rotulo="Parcelamento"
@@ -1449,40 +1505,33 @@ function FichaDaClinica({
         </div>
       </SecaoDaFicha>
 
-      <SecaoDaFicha titulo="Público-alvo">
-        <dl className="space-y-2.5">
-          <Dado
-            rotulo="Classe"
-            valor={
-              clinica.classes.length === 0 ? null : clinica.classes.join(", ")
-            }
-          />
-          <Dado
+      <SecaoDaFicha titulo="Público-alvo" icone={Users}>
+        {/*
+          Classe, Faixa etária e Principais dores eram texto corrido separado
+          por vírgula. Viraram chip, no mesmo padrão que "Procedimentos /
+          tratamentos" já usava — consistência visual interna, mesmo dado.
+        */}
+        <div className="space-y-3">
+          <ListaDeChips rotulo="Classe" itens={clinica.classes} />
+          <ListaDeChips
             rotulo="Faixa etária"
-            valor={formatarFaixaEtaria(
-              clinica.faixaEtariaDe,
-              clinica.faixaEtariaAte,
-            )}
+            itens={faixaEtaria ? [faixaEtaria] : []}
           />
-          <Dado
+          <ListaDeChips
             rotulo="Principais dores"
-            valor={
-              clinica.principaisDores.length === 0
-                ? null
-                : clinica.principaisDores.join(", ")
-            }
+            itens={clinica.principaisDores}
           />
-        </dl>
+        </div>
       </SecaoDaFicha>
 
-      <SecaoDaFicha titulo="Dados do lead">
+      <SecaoDaFicha titulo="Dados do lead" icone={UserRound}>
         <dl className="space-y-2.5">
           <Dado rotulo="Origem" valor={origem} />
           <Dado rotulo="Chegou" valor={tempoRelativoPorExtenso(minutosAtras)} />
         </dl>
       </SecaoDaFicha>
 
-      <SecaoDaFicha titulo="Consulta de avaliação">
+      <SecaoDaFicha titulo="Consulta de avaliação" icone={Stethoscope}>
         {clinica.temAvaliacaoInicial === false ? (
           <p className="text-xs font-medium text-black/55">
             Este cliente não oferece avaliação inicial antes do procedimento.
@@ -1514,20 +1563,56 @@ function FichaDaClinica({
   );
 }
 
-/** Um bloco da ficha, com o mesmo rótulo de seção que `FichaDoAtendimento` usa. */
+/**
+ * Um bloco da ficha, como cartão próprio — borda arredondada e ícone junto do
+ * título, no estilo que a referência (Mavi) usa para separar cada seção.
+ * Antes era só uma linha divisória (`border-t`); passou a cartão fechado,
+ * sem mudar título, conteúdo nem comportamento de nenhum bloco.
+ */
 function SecaoDaFicha({
   titulo,
+  icone: Icone,
   children,
 }: {
   titulo: string;
+  icone: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-t border-black/10 pt-4">
-      <h3 className="text-[11px] font-bold uppercase tracking-wide text-black/45">
+    <div className="rounded-controle border border-black/10 p-4">
+      <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
+        <Icone className="h-3.5 w-3.5" />
         {titulo}
       </h3>
-      <div className="mt-2.5">{children}</div>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Uma lista de valores únicos (classe, faixa etária, dores) como chips — o
+ * mesmo padrão visual que "Procedimentos / tratamentos" já usava, aplicado
+ * aqui por consistência. Nenhum dado novo: é a mesma lista, só não mais
+ * unida por vírgula num texto corrido.
+ */
+function ListaDeChips({ rotulo, itens }: { rotulo: string; itens: string[] }) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-black/45">{rotulo}</p>
+      {itens.length === 0 ? (
+        <p className="mt-1.5 text-xs font-medium text-black/40">—</p>
+      ) : (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {itens.map((item) => (
+            <span
+              key={item}
+              className="rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-bold text-herval-preto"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
