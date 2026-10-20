@@ -31,32 +31,6 @@ export type Ligacao = {
 // recuperação, ficam em `metas.ts`: são números combinados com o cliente, não
 // característica do registro. Este arquivo guarda o que aconteceu.
 
-/**
- * Formato compacto, como no resto da base. Cada linha é
- *
- *   [leadId, canal, tentativa, minutosAtras, desfecho]
- *
- * com canal pela posição em `canaisDeLigacao`, desfecho 0 para não atendida e
- * 1 para atendida, e o `id` saindo da ordem de leitura.
- *
- * Vazio de propósito: o conteúdo de exemplo saiu, a estrutura ficou.
- * Quando esta tela passar a ler o banco, é este array que some.
- */
-type LinhaLigacao = [number, number, number, number, number];
-
-const registros: LinhaLigacao[] = [];
-
-export const ligacoesIniciais: Ligacao[] = registros.map(
-  ([leadId, canal, tentativa, minutosAtras, desfecho], indice) => ({
-    id: indice + 1,
-    leadId,
-    canal: canaisDeLigacao[canal],
-    tentativa,
-    minutosAtras,
-    desfecho: desfecho === 1 ? "atendida" : "não atendida",
-  }),
-);
-
 export type Ligacoes = Ligacao[] | Map<number, Ligacao[]>;
 
 /** Mesmo padrão de `indexarPorLead`: agrupa uma vez, consulta muitas. */

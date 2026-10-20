@@ -40,7 +40,6 @@ import {
   type Mensagem,
 } from "@/data/mensagens";
 import {
-  ligacoesIniciais,
   type CanalDeLigacao,
   type DesfechoDaLigacao,
   type Ligacao,
@@ -189,7 +188,7 @@ export default function ProvedorLeads({
     historicoDeEtapasInicial,
   );
   const [mensagens, setMensagens] = useState<Mensagem[]>(mensagensIniciais);
-  const [ligacoes, setLigacoes] = useState<Ligacao[]>(ligacoesIniciais);
+  const [ligacoes, setLigacoes] = useState<Ligacao[]>([]);
   const [notas, setNotas] = useState<Nota[]>(notasIniciais);
 
   /**
