@@ -31,7 +31,6 @@ import {
   textoVisivel,
   type FormatoDeMidia,
 } from "@/data/mensagens";
-import { useLeads } from "@/components/ProvedorLeads";
 import FormularioDeTarefa from "@/components/FormularioDeTarefa";
 import MarcarComoPerdido from "@/components/MarcarComoPerdido";
 import {
@@ -44,7 +43,7 @@ import {
   AbaLigacoes,
   type AbaDoAtendimento,
 } from "@/components/AbasDoAtendimento";
-import { ligacoesDoLead } from "@/data/ligacoes";
+import { ligacoesDoLead, type Ligacao } from "@/data/ligacoes";
 import { ETAPA_PERDIDA } from "@/data/leads";
 import { tempoRelativo, tempoRelativoPorExtenso } from "@/lib/tempo";
 import type {
@@ -131,17 +130,18 @@ function IconeWhatsApp({ className }: { className?: string }) {
  * A conversa de um lead, lida do banco.
  *
  * Substituiu a tela antiga de atendimento, que dependia de ligação,
- * agendamento, régua e score — nenhum deles existe no banco. Aproveitá-la
+ * agendamento, régua e score — nenhum deles existia no banco. Aproveitá-la
  * obrigaria a inventar esses campos, e um score plausível ao lado de uma
  * conversa real é pior que nenhum score: o CRC não teria como saber qual
- * metade acreditar. Ela foi removida junto com esta mudança; o Git guarda,
- * caso Ligações e Agenda voltem a ter dado de verdade.
+ * metade acreditar. Ela foi removida junto com esta mudança.
  *
- * A coluna da conversa, as notas e o histórico leem o banco. As abas Agenda e
- * Ligações ficam exatamente como eram, com os dados de exemplo e a mesma
- * aparência — foi o que a operação pediu, para a tela não mudar de cara na
- * semana da estreia. Elas não funcionam de verdade: marcar uma consulta ou
- * registrar uma ligação ali não sai do navegador.
+ * A coluna da conversa, as notas, o histórico, a Agenda (pelo prop
+ * `consultas`) e agora a aba Ligações (pelo prop `ligacoes`) leem o banco.
+ * Ligações vem vazia de verdade, e não de propósito cosmético: a tabela
+ * existe e está protegida por RLS, mas quem grava uma tentativa ainda não
+ * existe — isso depende da integração com a API de telefonia/WhatsApp.
+ * Marcar uma consulta ainda não sai do navegador; registrar ligação também
+ * não, pelo mesmo motivo.
  */
 export default function ConversaReal({
   lead,
@@ -154,6 +154,7 @@ export default function ConversaReal({
   unidades,
   equipe,
   consultas,
+  ligacoes,
 }: {
   lead: LeadEmAtendimento | null;
   mensagens: MensagemEmAtendimento[];
@@ -173,14 +174,12 @@ export default function ConversaReal({
   equipe: ProfissionalCadastrado[];
   /** As consultas já marcadas para este lead, lidas do banco. */
   consultas: Consulta[];
-}) {
   /**
-   * A aba Ligações segue no provedor de exemplo, que é de onde ela sempre
-   * veio. A Agenda já não: suas consultas agora chegam reais, pelo prop
-   * `consultas`, lidas do banco.
+   * As tentativas de ligação já registradas para este lead, lidas do banco.
+   * Hoje sempre vazia: ver o comentário no topo do arquivo.
    */
-  const { ligacoes } = useLeads();
-
+  ligacoes: Ligacao[];
+}) {
   const [conversa, setConversa] = useState(mensagens);
   const [notas, setNotas] = useState(notasIniciais);
 
@@ -313,11 +312,7 @@ export default function ConversaReal({
     return eventos.sort((a, b) => a.minutosAtras - b.minutosAtras);
   }, [lead, conversa, notas, pausa]);
 
-  /**
-   * Agenda e Ligações continuam lendo a base de exemplo, pelo id do lead. Um
-   * lead real cujo id não exista lá simplesmente aparece sem consulta e sem
-   * ligação — que é o estado verdadeiro dele, já que nada disso foi migrado.
-   */
+  /** As ligações deste lead, do prop `ligacoes` — já vêm do banco. */
   const chamadas = useMemo(
     () => (lead ? ligacoesDoLead(ligacoes, lead.id) : []),
     [ligacoes, lead],

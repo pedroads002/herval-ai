@@ -3,6 +3,7 @@ import ConversaReal from "@/components/ConversaReal";
 import { carregarConversa } from "@/lib/dados/atendimento";
 import { carregarCliente } from "@/lib/dados/profissionais";
 import { carregarConsultasDoLead } from "@/lib/dados/agenda";
+import { carregarLigacoesDoLead } from "@/lib/dados/ligacoes";
 import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autorizacao";
 
 /**
@@ -36,11 +37,12 @@ export default async function PaginaDoAtendimento({
    * `Promise.all` de cima. Lead sem clínica, ou sem id válido, não tem onde
    * marcar consulta: a Agenda do Atendimento mostra isso em vez de agendar.
    */
-  const [cliente, consultas] = await Promise.all([
+  const [cliente, consultas, ligacoes] = await Promise.all([
     lead && lead.clinicaId !== null
       ? carregarCliente(lead.clinicaId)
       : Promise.resolve({ cliente: null, especialidades: [], falha: null, aviso: null }),
     lead ? carregarConsultasDoLead(lead.id) : Promise.resolve([]),
+    lead ? carregarLigacoesDoLead(lead.id) : Promise.resolve([]),
   ]);
 
   /**
@@ -67,6 +69,7 @@ export default async function PaginaDoAtendimento({
         unidades={cliente.cliente?.unidades ?? []}
         equipe={cliente.cliente?.profissionais ?? []}
         consultas={consultas}
+        ligacoes={ligacoes}
       />
     </>
   );
