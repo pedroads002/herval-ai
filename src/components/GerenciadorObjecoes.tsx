@@ -211,7 +211,6 @@ export default function GerenciadorObjecoes({
               <tr>
                 <th className="w-64 px-6 py-4 font-bold">Objeção</th>
                 <th className="px-6 py-4 font-bold">Resposta padrão</th>
-                <th className="w-20 px-6 py-4 text-right font-bold">Usos</th>
                 <th className="w-44 px-6 py-4 font-bold">Ações</th>
               </tr>
             </thead>
@@ -219,7 +218,7 @@ export default function GerenciadorObjecoes({
               {objecoes.length === 0 && (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={3}
                     className="px-6 py-14 text-center font-medium text-black/50"
                   >
                     Nenhuma objeção cadastrada. Use o formulário acima para
@@ -246,9 +245,6 @@ export default function GerenciadorObjecoes({
                         onChange={(e) => setEdicaoResposta(e.target.value)}
                         className={campoBase}
                       />
-                    </td>
-                    <td className="px-6 py-5 text-right align-top font-bold tabular-nums text-herval-preto">
-                      {item.usos}
                     </td>
                     <td className="px-6 py-5 align-top">
                       <div className="flex flex-wrap gap-2">
@@ -288,9 +284,6 @@ export default function GerenciadorObjecoes({
                       {item.objecao}
                     </td>
                     <td className="px-6 py-5 text-black/65">{item.resposta}</td>
-                    <td className="px-6 py-5 text-right font-bold tabular-nums text-herval-preto">
-                      {item.usos}
-                    </td>
                     <td className="px-6 py-5">
                       <div className="flex gap-2">
                         <button

@@ -38,8 +38,12 @@ function linhaParaObjecao(linha: LinhaDeObjecao): Objecao {
 }
 
 /**
- * As mais usadas primeiro: é a lista que mais ajuda quem está revisando o
- * roteiro. Dentro do mesmo `usos`, pela ordem de cadastro.
+ * Pela ordem de cadastro. Já foi "as mais usadas primeiro", mas `usos` nunca
+ * chegou a ser contagem de verdade: ninguém registra o uso de uma objeção —
+ * quem usa é a Helô ou o CRC, na conversa, e isso não volta para o banco. Os
+ * números que existiam vieram do dado de exemplo, então a ordem que eles
+ * produziam também era inventada. Volta a ordenar por `usos` no dia em que o
+ * n8n passar a registrar qual objeção foi usada.
  */
 export async function carregarObjecoes(): Promise<DadosDasObjecoes> {
   if (!supabaseConfigurado()) {
@@ -53,7 +57,6 @@ export async function carregarObjecoes(): Promise<DadosDasObjecoes> {
   const { data, error } = await supabase
     .from("objecoes")
     .select(CAMPOS_DA_OBJECAO)
-    .order("usos", { ascending: false })
     .order("id", { ascending: true });
 
   if (error) {
