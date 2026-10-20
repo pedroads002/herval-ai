@@ -13,14 +13,16 @@ import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autor
  * a ordem em que as conversas pedem resposta.
  *
  * Esta foi a primeira tela do painel a ler o banco; hoje Visão Geral, Funil,
- * Agenda, Relatórios e Fila de Tarefas já leem também — e dentro desta
- * própria tela, as abas Agenda e Ligações do Atendimento (em
- * `/atendimento/[id]`) também já leem o banco. Só Teste da IA, Régua de
- * Automação, Quebra de Objeções e Templates de WhatsApp ainda seguem com
- * dado de exemplo, enquanto essas seções não são configuradas. A tarja que
- * avisava "os números não vão bater entre elas" foi embora porque deixou de
- * ser verdade para a maior parte do painel — ela voltaria a fazer sentido, de
- * forma recortada, quando entrarmos nas telas que faltam.
+ * Agenda, Relatórios, Fila de Tarefas e Quebra de Objeções já leem também —
+ * e dentro desta própria tela, as abas Agenda e Ligações do Atendimento (em
+ * `/atendimento/[id]`) também já leem o banco. Só Régua de Automação e
+ * Templates de WhatsApp ainda seguem com dado de exemplo, enquanto essas
+ * seções não são configuradas. Teste da IA é caso aparte: o roteiro ali é
+ * fixo de propósito (ver `data/testeIa.ts`) — é um simulador didático, não
+ * uma tela de cadastro, então não há "dado real" para ligar nela. A tarja
+ * que avisava "os números não vão bater entre elas" foi embora porque deixou
+ * de ser verdade para a maior parte do painel — ela voltaria a fazer
+ * sentido, de forma recortada, quando entrarmos nas telas que faltam.
  *
  * `exigirTela` é nova aqui: até agora esta era a única das quatro telas
  * opcionais sem nenhuma chamada a `carregarAutorizacao()`, porque nada nela
