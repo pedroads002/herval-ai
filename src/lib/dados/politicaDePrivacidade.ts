@@ -10,7 +10,7 @@
  * mostra no topo, e é por ela que se sabe qual versão está no ar.
  */
 
-export const ATUALIZADA_EM = "29/09/2026";
+export const ATUALIZADA_EM = "20/10/2026";
 
 export type BlocoDaPolitica =
   | { tipo: "paragrafo"; texto: string }
@@ -54,7 +54,7 @@ export const SECOES_DA_POLITICA: readonly SecaoDaPolitica[] = [
         itens: [
           {
             rotulo: "Razão social",
-            valor: "50 814 514 LAIS DE OLIVEIRA COSTA HERVAL",
+            valor: "HERVAL SERVICOS DE MARKETING E ESTRATEGIA LTDA",
           },
           { rotulo: "CNPJ", valor: "50.814.514/0001-59" },
           { rotulo: "Nome do produto", valor: "Helô - Herval AI" },
@@ -389,7 +389,7 @@ export const SECOES_DA_POLITICA: readonly SecaoDaPolitica[] = [
       {
         tipo: "paragrafo",
         texto:
-          "Durante a fase atual de desenvolvimento, testes e implantação, determinadas funcionalidades poderão utilizar tecnologias de integração como Evolution API e componentes tecnológicos associados, incluindo Baileys.",
+          "Atualmente, determinadas funcionalidades de comunicação da Helô utilizam Evolution API e componentes associados, incluindo Baileys. Essas tecnologias poderão ser substituídas ou complementadas por integrações oficiais da WhatsApp Business Platform, conforme a evolução da plataforma.",
       },
       {
         tipo: "paragrafo",
@@ -937,7 +937,7 @@ export const SECOES_DA_POLITICA: readonly SecaoDaPolitica[] = [
           },
           {
             rotulo: "Razão social",
-            valor: "50 814 514 LAIS DE OLIVEIRA COSTA HERVAL",
+            valor: "HERVAL SERVICOS DE MARKETING E ESTRATEGIA LTDA",
           },
           { rotulo: "CNPJ", valor: "50.814.514/0001-59" },
           { rotulo: "E-mail", valor: "contato@hervalmarketing.com" },
