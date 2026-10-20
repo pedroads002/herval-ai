@@ -17,7 +17,7 @@
  */
 import type { Tarefa } from "@/data/tarefas";
 import type { Objecao } from "@/data/objecoes";
-import type { MensagemFollowUp } from "@/lib/dados/followUp";
+import type { MensagemFollowUp } from "@/data/followUp";
 
 export type ClienteCriado = {
   id: number;

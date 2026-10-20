@@ -30,7 +30,7 @@ import {
   ETAPAS_DE_FOLLOW_UP,
   type EtapaDeFollowUp,
   type MensagemFollowUp,
-} from "@/lib/dados/followUp";
+} from "@/data/followUp";
 import type { ResultadoDoCadastro } from "@/lib/acoes/resultadoDoCadastro";
 
 const LIMITE_TEXTO = 1200;

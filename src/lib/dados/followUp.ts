@@ -8,30 +8,16 @@
  * 21 linhas são padrão. Esta tela só lê e grava nas linhas padrão — override
  * por clínica não é o que foi pedido aqui.
  *
- * Roda apenas no servidor.
+ * Roda apenas no servidor. Tipos e a lista de etapas moraram para
+ * `data/followUp.ts`, que não importa nada de servidor — ver o comentário lá.
  */
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
-
-export type EtapaDeFollowUp = "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7";
-
-export const ETAPAS_DE_FOLLOW_UP: EtapaDeFollowUp[] = [
-  "F1",
-  "F2",
-  "F3",
-  "F4",
-  "F5",
-  "F6",
-  "F7",
-];
-
-export type MensagemFollowUp = {
-  id: number;
-  etapa: EtapaDeFollowUp;
-  ordem: number;
-  texto: string;
-  delaySegundos: number;
-};
+import {
+  ETAPAS_DE_FOLLOW_UP,
+  type EtapaDeFollowUp,
+  type MensagemFollowUp,
+} from "@/data/followUp";
 
 type LinhaDeFollowUp = {
   id: number;
