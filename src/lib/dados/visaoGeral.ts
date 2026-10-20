@@ -288,7 +288,18 @@ function montarResumo(
   const leadsDoPeriodo = contexto.leads.filter((lead) =>
     dentroDoIntervalo(diaDoInstante(lead.criado_em), intervalo),
   );
-  const idsDoPeriodo = new Set(leadsDoPeriodo.map((lead) => lead.id));
+  // Ids dos leads qualificados do período — é o universo que `taxaAgendamento`
+  // usa como denominador logo abaixo, e precisa ser o mesmo universo do
+  // numerador (`comAgendamento`). Antes o numerador contava qualquer lead do
+  // período, qualificado ou não, e a taxa podia passar de 100% — mesmo ajuste
+  // que `montarFunil`, em `lib/relatorios.ts`, já fazia para `agendadosDaSafra`.
+  const idsQualificados = new Set(
+    leadsDoPeriodo
+      .filter((lead) =>
+        ehQualificado(lead.etapa, contexto.motivoDoLead.get(lead.id) ?? null),
+      )
+      .map((lead) => lead.id),
+  );
 
   // O "ato de agendar": a consulta entra no período em que foi marcada, não no
   // dia em que ela cairia. É o que mede o trabalho do time no período.
@@ -336,16 +347,16 @@ function montarResumo(
   ).length;
   const fechadosPorWhatsapp = comCanal.length - fechadosPorLigacao;
 
-  const qualificados = leadsDoPeriodo.filter((lead) =>
-    ehQualificado(lead.etapa, contexto.motivoDoLead.get(lead.id) ?? null),
-  ).length;
+  const qualificados = idsQualificados.size;
 
-  // Quantos leads do período chegaram a ter consulta marcada — qualquer uma, em
-  // qualquer data, porque o lead é acompanhado até onde chegou.
+  // Quantos leads QUALIFICADOS do período chegaram a ter consulta marcada —
+  // qualquer uma, em qualquer data, porque o lead é acompanhado até onde
+  // chegou. Restrito a qualificados porque é o numerador de `taxaAgendamento`
+  // logo abaixo, sobre o denominador `qualificados`.
   const comAgendamento = new Set<number>();
   for (const consulta of contexto.agendamentos) {
     if (
-      idsDoPeriodo.has(consulta.lead_id) &&
+      idsQualificados.has(consulta.lead_id) &&
       consulta.status !== STATUS_CANCELADA
     ) {
       comAgendamento.add(consulta.lead_id);

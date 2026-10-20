@@ -12,10 +12,14 @@ import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autor
  * Não é uma segunda fila: não mede nada, não repete número de relatório. É só
  * a ordem em que as conversas pedem resposta.
  *
- * **Esta é a primeira tela do painel que lê o banco.** As outras (Funil,
- * Agenda, Relatórios, Fila de Tarefas) seguem com dado de exemplo. A tarja no
- * topo existe por causa disso: duas telas mostrando listas diferentes sem
- * aviso levariam o CRC a achar que uma delas está errada.
+ * Esta foi a primeira tela do painel a ler o banco; hoje Visão Geral, Funil,
+ * Agenda, Relatórios e Fila de Tarefas já leem também — só Teste da IA, Régua
+ * de Automação, Quebra de Objeções e Templates de WhatsApp (e, dentro desta
+ * própria tela, as abas Agenda e Ligações do Atendimento) ainda seguem com
+ * dado de exemplo, enquanto essas seções não são configuradas. A tarja que
+ * avisava "os números não vão bater entre elas" foi embora porque deixou de
+ * ser verdade para a maior parte do painel — ela voltaria a fazer sentido, de
+ * forma recortada, quando entrarmos nas telas que faltam.
  *
  * `exigirTela` é nova aqui: até agora esta era a única das quatro telas
  * opcionais sem nenhuma chamada a `carregarAutorizacao()`, porque nada nela
@@ -43,12 +47,6 @@ export default async function PaginaAtendimento() {
         titulo="Atendimento"
         descricao="As conversas da fila, de quem espera há mais tempo para quem já foi respondido."
       />
-
-      <p className="mb-6 rounded-card border border-herval-verde/40 bg-herval-verde/10 px-5 py-3 text-sm font-medium text-herval-preto">
-        <span className="font-extrabold">Conversas reais.</span> Esta tela lê o
-        banco de dados. As outras telas do painel ainda mostram dados de
-        exemplo, então os números não vão bater entre elas.
-      </p>
 
       <AtualizacaoAutomatica />
       <ListaAtendimentos leads={leads} mensagens={mensagens} falha={falha} />
