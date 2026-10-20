@@ -1,12 +1,12 @@
 import { ehLeadDeMarketing, type EtapaFunil, type Lead } from "@/data/leads";
-import { clinicasIniciais, type Clinica } from "@/data/clinicas";
+import type { Clinica } from "@/data/clinicas";
 import {
   indexarPorLead,
   mudancasDoLead,
   type MudancaDeEtapa,
 } from "@/data/historicoEtapas";
 import type { Metas } from "@/data/metas";
-import { agendamentosIniciais, type Agendamento } from "@/data/agendamentos";
+import type { Agendamento } from "@/data/agendamentos";
 import { primeiraTentativa, type Ligacoes } from "@/data/ligacoes";
 import { dentroDaFaixa, taxa, type Alerta, type Faixa } from "@/lib/relatorios";
 
@@ -214,9 +214,9 @@ type EntradaDaFila = {
   historico: HistoricoDeEtapas;
   /** Registro de ligação. Só existe para os leads da fila. */
   ligacoes: Ligacoes;
-  agendamentos?: Agendamento[];
+  agendamentos: Agendamento[];
   faixa: Faixa;
-  clinicas?: Clinica[];
+  clinicas: Clinica[];
 };
 
 /**
@@ -237,9 +237,9 @@ export function montarFila({
   leads,
   historico,
   ligacoes,
-  agendamentos = agendamentosIniciais,
+  agendamentos,
   faixa,
-  clinicas = clinicasIniciais,
+  clinicas,
 }: EntradaDaFila): LinhaFila[] {
   const indice =
     historico instanceof Map ? historico : indexarPorLead(historico);

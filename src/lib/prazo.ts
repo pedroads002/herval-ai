@@ -19,7 +19,10 @@ export function grupoDoPrazo(horas: number): GrupoPrazo {
 function emTexto(horas: number) {
   const absoluto = Math.abs(horas);
   if (absoluto < 1) return `${Math.round(absoluto * 60)} min`;
-  if (absoluto < 48) return `${Math.round(absoluto)}h`;
+  if (absoluto < 48) {
+    const h = Math.round(absoluto);
+    if (h < 48) return `${h}h`;
+  }
   return `${Math.round(absoluto / 24)} dias`;
 }
 

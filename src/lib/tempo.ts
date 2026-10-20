@@ -24,7 +24,10 @@ export function tempoRelativo(minutos: number) {
 
   if (absoluto < 1) return "agora";
   if (absoluto < 60) return `há ${absoluto} min`;
-  if (absoluto < MINUTOS_POR_DIA) return `há ${Math.round(absoluto / 60)}h`;
+  if (absoluto < MINUTOS_POR_DIA) {
+    const horas = Math.round(absoluto / 60);
+    if (horas < 24) return `há ${horas}h`;
+  }
 
   const dias = Math.round(absoluto / MINUTOS_POR_DIA);
   return dias === 1 ? "há 1 dia" : `há ${dias} dias`;
@@ -48,7 +51,7 @@ export function tempoRelativoPorExtenso(minutos: number) {
   }
   if (absoluto < MINUTOS_POR_DIA) {
     const horas = Math.round(absoluto / 60);
-    return horas === 1 ? "há 1 hora" : `há ${horas} horas`;
+    if (horas < 24) return horas === 1 ? "há 1 hora" : `há ${horas} horas`;
   }
 
   const dias = Math.round(absoluto / MINUTOS_POR_DIA);
@@ -60,7 +63,10 @@ export function duracao(minutos: number) {
   const absoluto = Math.abs(Math.round(minutos));
 
   if (absoluto < 60) return `${absoluto} min`;
-  if (absoluto < MINUTOS_POR_DIA) return `${Math.round(absoluto / 60)}h`;
+  if (absoluto < MINUTOS_POR_DIA) {
+    const horas = Math.round(absoluto / 60);
+    if (horas < 24) return `${horas}h`;
+  }
 
   const dias = Math.round(absoluto / MINUTOS_POR_DIA);
   return dias === 1 ? "1 dia" : `${dias} dias`;

@@ -58,8 +58,8 @@ export async function decidirTarefa(
     return recusar(`A decisão não foi gravada: ${error.message}`);
   }
 
-  // A fila é a tela inicial do painel.
-  revalidatePath("/");
+  // A Fila de Tarefas vive na própria rota, não mais na raiz do painel.
+  revalidatePath("/fila-de-tarefas");
 
   return {
     ok: true,
@@ -106,8 +106,8 @@ export async function criarTarefa(
     return recusar(`A tarefa não foi criada: ${error.message}`);
   }
 
-  // A fila é a tela inicial do painel.
-  revalidatePath("/");
+  // A Fila de Tarefas vive na própria rota, não mais na raiz do painel.
+  revalidatePath("/fila-de-tarefas");
 
   const criada: ResultadoDoCadastro = {
     ok: true,

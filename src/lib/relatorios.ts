@@ -1,13 +1,11 @@
-import { agendamentosIniciais, type Agendamento } from "@/data/agendamentos";
-import { clinicasIniciais, type Clinica } from "@/data/clinicas";
+import type { Agendamento } from "@/data/agendamentos";
+import type { Clinica } from "@/data/clinicas";
 import {
   ehLeadDeMarketing,
   ehQualificado,
-  ETAPA_GANHA,
   MOTIVO_DISTANCIA,
   type Lead,
 } from "@/data/leads";
-import { leadsHistoricos } from "@/data/leadsHistoricos";
 import type { Metas } from "@/data/metas";
 
 /**
@@ -84,12 +82,14 @@ export function idsDeRemarcacao(agendamentos: Agendamento[]): Set<number> {
 }
 
 /**
- * A base completa de leads: os que estão na fila agora mais as safras
- * anteriores. Recebe a fila por parâmetro para acompanhar o que o usuário mexeu
- * no Funil sem recarregar a página.
+ * A base completa de leads. Existiu para somar a fila atual com as safras
+ * antigas de `leadsHistoricos` — hoje vazio, porque o histórico de exemplo
+ * saiu e a tela ainda não lê safra antiga do banco. Enquanto isso não existir,
+ * é identidade de propósito: nenhuma chamada deve voltar a depender de um
+ * array de fixture por trás dela.
  */
 export function baseDeLeads(daFila: Lead[]): Lead[] {
-  return [...daFila, ...leadsHistoricos];
+  return daFila;
 }
 
 /**
@@ -194,9 +194,9 @@ export type LinhaProducao = {
 
 type Entrada = {
   leads: Lead[];
-  agendamentos?: Agendamento[];
+  agendamentos: Agendamento[];
   faixa: Faixa;
-  clinicas?: Clinica[];
+  clinicas: Clinica[];
   /**
    * O instante em que a tela está medindo. Vem de fora pelo mesmo motivo dos
    * campos de dia: quem sabe que horas são no fuso do usuário é a tela, não o
@@ -218,9 +218,9 @@ function porClinica<T>(
  */
 export function montarFunil({
   leads,
-  agendamentos = agendamentosIniciais,
+  agendamentos,
   faixa,
-  clinicas = clinicasIniciais,
+  clinicas,
   agora,
 }: Entrada): LinhaFunil[] {
   return porClinica(clinicas, (clinica) => {
@@ -283,9 +283,9 @@ export function montarFunil({
  */
 export function montarFollow({
   leads,
-  agendamentos = agendamentosIniciais,
+  agendamentos,
   faixa,
-  clinicas = clinicasIniciais,
+  clinicas,
 }: Entrada): LinhaFollow[] {
   const safraPorLead = new Map(leads.map((l) => [l.id, l.diasAtras]));
 
@@ -310,9 +310,9 @@ export function montarFollow({
 
 /** Produção: conta pelo ato de agendar. Remarcou, conta de novo. */
 export function montarProducao({
-  agendamentos = agendamentosIniciais,
+  agendamentos,
   faixa,
-  clinicas = clinicasIniciais,
+  clinicas,
   agora,
 }: Omit<Entrada, "leads"> & { leads?: Lead[] }): LinhaProducao[] {
   // Calculado sobre a lista inteira, e não só sobre o período: o agendamento
@@ -444,55 +444,6 @@ export function montarResumo(
     fechadosPorWhatsapp: comCanal.length - porLigacao,
     percentualLigacao: taxa(porLigacao, comCanal.length),
   };
-}
-
-// --- Funil de conversão ----------------------------------------------------
-
-export type Degrau = { etapa: string; quantidade: number };
-
-/**
- * Os quatro degraus da Visão Geral, sempre sobre o mesmo grupo de gente: os
- * leads de marketing que chegaram no período. Cada degrau é um subconjunto do
- * anterior, então a queda entre eles é queda de verdade, e não comparação
- * entre grupos diferentes.
- *
- * Agendamento e comparecimento saem dos agendamentos; venda ganha sai da etapa
- * do Funil, que é onde o CRC registra o valor da venda.
- */
-export function montarConversao({
-  leads,
-  agendamentos = agendamentosIniciais,
-  faixa,
-  clinicas = clinicasIniciais,
-}: Entrada): Degrau[] {
-  const daClinica = new Set(clinicas.map((c) => c.id));
-
-  const safra = leads.filter(
-    (l) =>
-      daClinica.has(l.clinicaId) &&
-      ehLeadDeMarketing(l) &&
-      dentroDaFaixa(l.diasAtras, faixa),
-  );
-
-  const daSafra = new Set(safra.map((l) => l.id));
-  const doGrupo = agendamentos.filter((a) => daSafra.has(a.leadId));
-
-  const marcaram = new Set(
-    doGrupo.filter((a) => a.status !== "Cancelada").map((a) => a.leadId),
-  );
-  const compareceram = new Set(
-    doGrupo.filter((a) => a.status === "Compareceu").map((a) => a.leadId),
-  );
-
-  return [
-    { etapa: "Total de leads", quantidade: safra.length },
-    { etapa: "Agendamento", quantidade: marcaram.size },
-    { etapa: "Comparecimento", quantidade: compareceram.size },
-    {
-      etapa: "Venda ganha",
-      quantidade: safra.filter((l) => l.etapa === ETAPA_GANHA).length,
-    },
-  ];
 }
 
 // --- Pontos de atenção -----------------------------------------------------
