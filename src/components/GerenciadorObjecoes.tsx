@@ -1,17 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Pencil, Plus, Trash2, Check, X, AlertCircle } from "lucide-react";
-import { objecoesIniciais, type Objecao } from "@/data/objecoes";
+import type { Objecao } from "@/data/objecoes";
+import {
+  cadastrarObjecao,
+  editarObjecao,
+  excluirObjecao,
+} from "@/lib/acoes/objecoes";
+import { RESULTADO_INICIAL } from "@/lib/acoes/resultadoDoCadastro";
 
 const campoBase =
   "w-full rounded-controle border border-black/15 bg-herval-branco px-4 py-3 text-sm text-herval-preto outline-none transition-colors placeholder:text-black/35 focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20";
 
 const botaoLinha =
-  "inline-flex items-center gap-1.5 rounded-full border border-black/15 px-3.5 py-2 text-xs font-bold text-black/70 transition-colors";
+  "inline-flex items-center gap-1.5 rounded-full border border-black/15 px-3.5 py-2 text-xs font-bold text-black/70 transition-colors disabled:opacity-50";
 
-export default function GerenciadorObjecoes() {
+/**
+ * O roteiro de objeções, lido e gravado em `objecoes` — ver `lib/dados/objecoes.ts`
+ * e `lib/acoes/objecoes.ts`. É a mesma tabela que o Supervisor1 (prompt do n8n)
+ * já lia direto no SQL; esta tela ganhou a mesma leitura e passou a gravar nela.
+ *
+ * A lista local (`objecoes`) é uma cópia otimista do prop `objecoesIniciais`:
+ * cada ação espera a gravação confirmar antes de mexer na tela, mas não espera
+ * a página recarregar — `revalidatePath` cuida de quem abrir a tela depois.
+ */
+export default function GerenciadorObjecoes({
+  objecoesIniciais,
+  falha,
+}: {
+  objecoesIniciais: Objecao[];
+  falha: string | null;
+}) {
   const [objecoes, setObjecoes] = useState<Objecao[]>(objecoesIniciais);
+  const [pendente, iniciarTransicao] = useTransition();
 
   // Formulário de nova objeção
   const [novaObjecao, setNovaObjecao] = useState("");
@@ -22,6 +44,18 @@ export default function GerenciadorObjecoes() {
   const [emEdicao, setEmEdicao] = useState<number | null>(null);
   const [edicaoObjecao, setEdicaoObjecao] = useState("");
   const [edicaoResposta, setEdicaoResposta] = useState("");
+  const [erroDaLinha, setErroDaLinha] = useState("");
+
+  if (falha) {
+    return (
+      <div className="rounded-card border border-herval-vermelho/30 bg-herval-vermelho/5 px-5 py-6">
+        <p className="text-sm font-bold text-herval-preto">
+          Não deu para carregar as objeções.
+        </p>
+        <p className="mt-1 text-sm font-medium text-black/60">{falha}</p>
+      </div>
+    );
+  }
 
   function adicionar() {
     if (!novaObjecao.trim() || !novaResposta.trim()) {
@@ -29,51 +63,85 @@ export default function GerenciadorObjecoes() {
       return;
     }
 
-    const proximoId = Math.max(0, ...objecoes.map((o) => o.id)) + 1;
+    const formData = new FormData();
+    formData.set("objecao", novaObjecao.trim());
+    formData.set("resposta", novaResposta.trim());
 
-    setObjecoes((atuais) => [
-      {
-        id: proximoId,
-        objecao: novaObjecao.trim(),
-        resposta: novaResposta.trim(),
-        usos: 0,
-      },
-      ...atuais,
-    ]);
+    iniciarTransicao(async () => {
+      const resultado = await cadastrarObjecao(RESULTADO_INICIAL, formData);
 
-    setNovaObjecao("");
-    setNovaResposta("");
-    setErro("");
+      if (!resultado.ok) {
+        setErro(resultado.mensagem);
+        return;
+      }
+
+      if (resultado.objecao) {
+        setObjecoes((atuais) => [resultado.objecao as Objecao, ...atuais]);
+      }
+      setNovaObjecao("");
+      setNovaResposta("");
+      setErro("");
+    });
   }
 
   function excluir(id: number) {
-    setObjecoes((atuais) => atuais.filter((o) => o.id !== id));
-    if (emEdicao === id) cancelarEdicao();
+    iniciarTransicao(async () => {
+      const formData = new FormData();
+      formData.set("id", String(id));
+      const resultado = await excluirObjecao(RESULTADO_INICIAL, formData);
+
+      if (!resultado.ok) {
+        setErroDaLinha(resultado.mensagem);
+        return;
+      }
+
+      setObjecoes((atuais) => atuais.filter((o) => o.id !== id));
+      if (emEdicao === id) cancelarEdicao();
+    });
   }
 
   function iniciarEdicao(item: Objecao) {
     setEmEdicao(item.id);
     setEdicaoObjecao(item.objecao);
     setEdicaoResposta(item.resposta);
+    setErroDaLinha("");
   }
 
   function cancelarEdicao() {
     setEmEdicao(null);
     setEdicaoObjecao("");
     setEdicaoResposta("");
+    setErroDaLinha("");
   }
 
   function salvarEdicao(id: number) {
-    if (!edicaoObjecao.trim() || !edicaoResposta.trim()) return;
+    if (!edicaoObjecao.trim() || !edicaoResposta.trim()) {
+      setErroDaLinha("Preencha a objeção e a resposta padrão.");
+      return;
+    }
 
-    setObjecoes((atuais) =>
-      atuais.map((o) =>
-        o.id === id
-          ? { ...o, objecao: edicaoObjecao.trim(), resposta: edicaoResposta.trim() }
-          : o,
-      ),
-    );
-    cancelarEdicao();
+    const formData = new FormData();
+    formData.set("id", String(id));
+    formData.set("objecao", edicaoObjecao.trim());
+    formData.set("resposta", edicaoResposta.trim());
+
+    iniciarTransicao(async () => {
+      const resultado = await editarObjecao(RESULTADO_INICIAL, formData);
+
+      if (!resultado.ok) {
+        setErroDaLinha(resultado.mensagem);
+        return;
+      }
+
+      setObjecoes((atuais) =>
+        atuais.map((o) =>
+          o.id === id
+            ? { ...o, objecao: edicaoObjecao.trim(), resposta: edicaoResposta.trim() }
+            : o,
+        ),
+      );
+      cancelarEdicao();
+    });
   }
 
   return (
@@ -116,10 +184,11 @@ export default function GerenciadorObjecoes() {
           <button
             type="button"
             onClick={adicionar}
-            className="inline-flex items-center gap-2 rounded-full bg-herval-verde px-5 py-3 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
+            disabled={pendente}
+            className="inline-flex items-center gap-2 rounded-full bg-herval-verde px-5 py-3 text-sm font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
-            Adicionar
+            {pendente ? "Adicionando…" : "Adicionar"}
           </button>
           {erro ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-black/20 px-3.5 py-2 text-xs font-bold text-herval-preto">
@@ -128,7 +197,7 @@ export default function GerenciadorObjecoes() {
             </span>
           ) : (
             <span className="text-xs font-medium text-black/45">
-              Tela de demonstração: nada é salvo ainda.
+              A Helô e o CRC usam este roteiro de verdade na conversa real.
             </span>
           )}
         </div>
@@ -182,24 +251,32 @@ export default function GerenciadorObjecoes() {
                       {item.usos}
                     </td>
                     <td className="px-6 py-5 align-top">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => salvarEdicao(item.id)}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-3.5 py-2 text-xs font-bold text-herval-preto transition-colors hover:bg-herval-verdeEscuro"
+                          disabled={pendente}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-herval-verde px-3.5 py-2 text-xs font-bold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:opacity-50"
                         >
                           <Check className="h-3.5 w-3.5" />
-                          Salvar
+                          {pendente ? "Salvando…" : "Salvar"}
                         </button>
                         <button
                           type="button"
                           onClick={cancelarEdicao}
+                          disabled={pendente}
                           className={`${botaoLinha} hover:border-herval-preto hover:bg-black/5 hover:text-herval-preto`}
                         >
                           <X className="h-3.5 w-3.5" />
                           Cancelar
                         </button>
                       </div>
+                      {erroDaLinha && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-herval-vermelho">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          {erroDaLinha}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -219,6 +296,7 @@ export default function GerenciadorObjecoes() {
                         <button
                           type="button"
                           onClick={() => iniciarEdicao(item)}
+                          disabled={pendente}
                           className={`${botaoLinha} hover:border-herval-verde hover:bg-herval-verde/10 hover:text-herval-preto`}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -227,6 +305,7 @@ export default function GerenciadorObjecoes() {
                         <button
                           type="button"
                           onClick={() => excluir(item.id)}
+                          disabled={pendente}
                           className={`${botaoLinha} hover:border-herval-preto hover:bg-herval-preto hover:text-herval-branco`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />

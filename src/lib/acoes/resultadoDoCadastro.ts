@@ -16,6 +16,7 @@
  * deixaria o passo seguinte com a lista de lugares vazia.
  */
 import type { Tarefa } from "@/data/tarefas";
+import type { Objecao } from "@/data/objecoes";
 
 export type ClienteCriado = {
   id: number;
@@ -44,6 +45,12 @@ export type ResultadoDoCadastro = {
    * botão não funcionou.
    */
   tarefa?: Tarefa;
+  /**
+   * Só vem preenchida quando a gravação criou uma objeção, com o `id` e o
+   * `usos` que só o banco sabe — a tela não tem como adivinhar e não devia
+   * inventar.
+   */
+  objecao?: Objecao;
 };
 
 export const RESULTADO_INICIAL: ResultadoDoCadastro = {
