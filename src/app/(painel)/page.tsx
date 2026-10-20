@@ -1,19 +1,15 @@
-import Cabecalho from "@/components/Cabecalho";
-import TabelaTarefas from "@/components/TabelaTarefas";
-import { exigirHervalAdmin } from "@/lib/autorizacao";
+import { redirect } from "next/navigation";
 
-export default async function PaginaFilaDeTarefas() {
-  // Tela exclusiva da Herval: a fila é de quem atende várias clínicas, não de
-  // uma clínica só. Ver `exigirHervalAdmin`.
-  await exigirHervalAdmin();
-
-  return (
-    <>
-      <Cabecalho
-        titulo="Fila de Tarefas"
-        descricao="O que a Helô sinalizou e o que o CRC marcou para fazer, com prazo."
-      />
-      <TabelaTarefas />
-    </>
-  );
+/**
+ * A raiz do painel. Não é tela própria — é o destino de quem abre o site sem
+ * vir de lugar nenhum (link da Vercel, aba nova com sessão já salva, etc.).
+ *
+ * Visão Geral é a primeira seção do menu e já é para onde o login leva (ver
+ * `FormularioLogin.tsx`); a raiz tinha ficado destoando, com o conteúdo da
+ * Fila de Tarefas direto nela — resquício de quando aquela era a tela inicial,
+ * antes de existir Visão Geral. A Fila de Tarefas continua existindo, só que
+ * na sua própria rota: `/fila-de-tarefas`.
+ */
+export default function RaizDoPainel() {
+  redirect("/visao-geral");
 }

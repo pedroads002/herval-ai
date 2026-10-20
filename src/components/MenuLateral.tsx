@@ -23,7 +23,7 @@ import LogoHerval from "@/components/LogoHerval";
 const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
   { href: "/relatorios", rotulo: "Relatórios", Icone: BarChart3 },
-  { href: "/", rotulo: "Fila de Tarefas", Icone: ListChecks },
+  { href: "/fila-de-tarefas", rotulo: "Fila de Tarefas", Icone: ListChecks },
   { href: "/atendimento", rotulo: "Atendimento", Icone: MessagesSquare },
   { href: "/funil", rotulo: "Funil", Icone: KanbanSquare },
   { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
@@ -57,12 +57,13 @@ export default function MenuLateral() {
         {itens.map(({ href, rotulo, Icone }) => {
           /**
            * O item continua aceso nas telas internas da seção — abrir a
-           * conversa de um lead não apaga "Atendimento" no menu. A raiz fica
-           * de fora da regra: todo caminho começa com "/".
+           * conversa de um lead não apaga "Atendimento" no menu.
+           *
+           * Não precisa mais excluir a raiz "/" desta regra: nenhum item
+           * mora mais lá (Fila de Tarefas virou "/fila-de-tarefas"), e a
+           * própria raiz agora só redireciona, nunca fica com item aceso.
            */
-          const ativo =
-            caminho === href ||
-            (href !== "/" && caminho.startsWith(`${href}/`));
+          const ativo = caminho === href || caminho.startsWith(`${href}/`);
           return (
             <Link
               key={href}
