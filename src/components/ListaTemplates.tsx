@@ -106,25 +106,21 @@ function CartaoTemplate({ template }: { template: Template }) {
 }
 
 export default function ListaTemplates() {
-  const enviadosPelaIa = templatesIniciais.filter((t) => {
-    const regra = regrasIniciais.find((r) => r.id === t.regraId);
-    return regra?.executor !== "Humano";
-  }).length;
+  // Hoje sempre vazia: nenhuma integração com o WhatsApp Business existe
+  // ainda, então não há template real para mostrar. Ver o comentário em
+  // src/data/templates.ts. Quando essa integração chegar, este `if` deixa de
+  // disparar sozinho — nenhuma linha precisa mudar para isso.
+  if (templatesIniciais.length === 0) {
+    return (
+      <p className="rounded-controle border border-dashed border-black/20 bg-black/[0.03] px-5 py-4 text-sm font-medium text-black/60">
+        Nenhum template cadastrado ainda — esta tela entra em uso quando a
+        integração com o WhatsApp Business for configurada.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <p className="text-sm font-medium text-black/55">
-        <span className="font-extrabold text-herval-preto">
-          {templatesIniciais.length}
-        </span>{" "}
-        templates ·{" "}
-        <span className="font-extrabold text-herval-preto">
-          {enviadosPelaIa}
-        </span>{" "}
-        enviados pela automação. O que está entre chaves é trocado pelo dado do
-        lead na hora do envio.
-      </p>
-
       {gruposTemplate.map((grupo) => {
         const doGrupo = templatesIniciais.filter(
           (t) => grupoDoTemplate[t.id] === grupo,
@@ -147,12 +143,6 @@ export default function ListaTemplates() {
           </section>
         );
       })}
-
-      <p className="text-xs font-medium text-black/45">
-        Cada template está ligado a uma regra da Régua de Automação: o gatilho e
-        a espera vêm de lá. Desligar a regra na Régua interrompe o envio do
-        texto correspondente.
-      </p>
     </div>
   );
 }
