@@ -28,7 +28,12 @@ import {
   textoDoDia,
   type RotuloDaConsulta,
 } from "@/data/agenda";
-import type { Consulta, DadosDaAgenda, LeadDaAgenda } from "@/lib/dados/agenda";
+import type {
+  Consulta,
+  DadosDaAgenda,
+  HorarioOcupado,
+  LeadDaAgenda,
+} from "@/lib/dados/agenda";
 import type {
   ClienteDoCadastro,
   EspecialidadeDoCadastro,
@@ -78,6 +83,8 @@ export default function PainelAgenda({
   pessoas,
   clientes,
   procedimentos,
+  ocupados,
+  googleAgendaConectada,
   falha,
 }: Props) {
   // A data só é lida depois que a tela monta, para o servidor e o navegador
@@ -200,7 +207,12 @@ export default function PainelAgenda({
     diasVisiveis.some((dia) => mesmaData(dia, item.data)),
   );
 
-  const horasDaGrade = linhasDaGrade(itensVisiveis);
+  const diasVisiveisEmTexto = new Set(diasVisiveis.map(textoDoDia));
+  const ocupadosVisiveis = ocupados.filter((o) =>
+    diasVisiveisEmTexto.has(o.dia),
+  );
+
+  const horasDaGrade = linhasDaGrade(itensVisiveis, ocupadosVisiveis);
 
   function navegar(passo: number) {
     setReferencia((atual) =>
@@ -341,15 +353,33 @@ export default function PainelAgenda({
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-black/45" />
           <div className="text-sm font-medium text-black/65">
-            <p className="font-bold text-herval-preto">
-              Nada foi sincronizado com sistema de fora.
-            </p>
-            <p className="mt-1.5">
-              As consultas desta tela são as que o CRC e a Helô marcam aqui, e
-              ficam gravadas. A sincronização com Clinicorp, Simples Dental ou
-              Dental Office fica disponível quando a integração for conectada na
-              tela de Integrações.
-            </p>
+            {googleAgendaConectada ? (
+              <>
+                <p className="font-bold text-herval-preto">
+                  Sincronizado com o Google Agenda, atualizado a cada 10
+                  minutos.
+                </p>
+                <p className="mt-1.5">
+                  Os blocos cinza &quot;Ocupado&quot; vêm da Google Agenda da
+                  clínica — pode ser paciente que marcou por fora ou compromisso
+                  pessoal de quem atende. Eles não são consulta do CRM e não
+                  abrem nada ao clicar. As consultas coloridas são as que o CRC e
+                  a Helô marcam aqui.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-bold text-herval-preto">
+                  Nada foi sincronizado com sistema de fora.
+                </p>
+                <p className="mt-1.5">
+                  As consultas desta tela são as que o CRC e a Helô marcam aqui,
+                  e ficam gravadas. A sincronização com Clinicorp, Simples Dental
+                  ou Dental Office fica disponível quando a integração for
+                  conectada na tela de Integrações.
+                </p>
+              </>
+            )}
           </div>
           <button
             type="button"
@@ -429,6 +459,7 @@ export default function PainelAgenda({
           horas={horasDaGrade}
           hoje={hoje}
           itens={itens}
+          ocupados={ocupadosVisiveis}
           pessoaPorId={pessoaPorId}
           unidadePorId={unidadePorId}
           procedimentoPorId={procedimentoPorId}
@@ -438,6 +469,7 @@ export default function PainelAgenda({
           dia={referencia}
           horas={horasDaGrade}
           itens={itens}
+          ocupados={ocupadosVisiveis}
           pessoas={pessoasVisiveis}
           unidadesVisiveis={unidadesVisiveis}
           pessoaPorId={pessoaPorId}
@@ -467,12 +499,54 @@ function unidadesDosClientes(clientes: ClienteDoCadastro[]) {
  * Helô pode marcar 19:30 se a clínica combinar assim, e uma linha que não existe
  * na grade seria uma consulta invisível na tela.
  */
-function linhasDaGrade(itens: ItemAgenda[]) {
+function linhasDaGrade(itens: ItemAgenda[], ocupados: HorarioOcupado[]) {
   const horas = new Set(horariosGrade);
   for (const item of itens) {
     if (item.consulta.hora) horas.add(`${item.consulta.hora.slice(0, 2)}:00`);
   }
+  // O que está ocupado na Google Agenda cresce a grade pelo mesmo motivo: um
+  // compromisso às 19:30 fora da faixa de funcionamento não pode ficar invisível.
+  for (const ocupado of ocupados) {
+    horas.add(`${ocupado.hora.slice(0, 2)}:00`);
+  }
   return [...horas].sort();
+}
+
+/** O horário ocupado cai nesta linha da grade, pela mesma regra da consulta. */
+function ocupadoNaLinha(ocupado: HorarioOcupado, hora: string) {
+  return ocupado.hora.slice(0, 2) === hora.slice(0, 2);
+}
+
+/**
+ * Um bloco do que está ocupado na Google Agenda.
+ *
+ * Cinza, sem botão e sem nada de lead de propósito: não é consulta do CRM, é só
+ * a marca de que aquela faixa não está livre. Clicar não abre nada porque não
+ * existe consulta nossa por trás — pode ser paciente que marcou por fora ou
+ * compromisso pessoal de quem atende.
+ */
+function BlocoOcupado({ ocupado }: { ocupado: HorarioOcupado }) {
+  const faixa =
+    ocupado.horaFim && ocupado.horaFim !== ocupado.hora
+      ? `${ocupado.hora} às ${ocupado.horaFim}`
+      : ocupado.hora;
+
+  return (
+    <div
+      title={`Ocupado na Google Agenda · ${faixa}${ocupado.titulo ? ` · ${ocupado.titulo}` : ""}`}
+      className="rounded-controle border border-dashed border-black/20 bg-black/[0.06] px-2 py-1.5"
+    >
+      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-black/40">
+        Ocupado
+      </p>
+      <p className="truncate text-xs font-bold text-black/55">
+        {ocupado.titulo ?? "Sem título"}
+      </p>
+      <p className="text-[0.65rem] font-medium tabular-nums text-black/40">
+        {faixa}
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -606,12 +680,14 @@ function GradeSemana({
   horas,
   hoje,
   itens,
+  ocupados,
   ...buscadores
 }: {
   dias: Date[];
   horas: string[];
   hoje: Date;
   itens: ItemAgenda[];
+  ocupados: HorarioOcupado[];
 } & Buscadores) {
   return (
     <div className="-mx-6 overflow-x-auto px-6 pb-2 md:-mx-10 md:px-10">
@@ -654,6 +730,9 @@ function GradeSemana({
                 (item) =>
                   mesmaData(item.data, dia) && naLinha(item.consulta, hora),
               );
+              const ocupadosDoDia = ocupados.filter(
+                (o) => o.dia === textoDoDia(dia) && ocupadoNaLinha(o, hora),
+              );
 
               return (
                 <div
@@ -667,6 +746,9 @@ function GradeSemana({
                       compacto
                       {...buscadores}
                     />
+                  ))}
+                  {ocupadosDoDia.map((ocupado) => (
+                    <BlocoOcupado key={ocupado.id} ocupado={ocupado} />
                   ))}
                 </div>
               );
@@ -683,6 +765,7 @@ function GradeDia({
   dia,
   horas,
   itens,
+  ocupados,
   pessoas,
   unidadesVisiveis,
   ...buscadores
@@ -690,10 +773,20 @@ function GradeDia({
   dia: Date;
   horas: string[];
   itens: ItemAgenda[];
+  ocupados: HorarioOcupado[];
   pessoas: ProfissionalCadastrado[];
   unidadesVisiveis: number[];
 } & Buscadores) {
   const doDia = itens.filter((item) => mesmaData(item.data, dia));
+
+  /**
+   * O que está ocupado na Google Agenda ganha coluna própria, do jeito que "A
+   * definir" ganha: não pertence a profissional nenhum — pode ser paciente que
+   * marcou por fora ou compromisso pessoal — e enfiar isso na coluna de alguém
+   * diria uma coisa que a gente não sabe.
+   */
+  const ocupadosDoDia = ocupados.filter((o) => o.dia === textoDoDia(dia));
+  const mostrarOcupados = ocupadosDoDia.length > 0;
 
   /**
    * Consulta sem profissional definido não cabe em coluna de ninguém, e some da
@@ -708,7 +801,7 @@ function GradeDia({
     ...(semPessoa.length > 0 ? [null] : []),
   ];
 
-  if (colunas.length === 0) {
+  if (colunas.length === 0 && !mostrarOcupados) {
     return (
       <p className="rounded-card border border-black/10 bg-herval-branco px-5 py-6 text-sm font-medium text-black/55 shadow-card">
         Nenhum profissional ativo atende nas unidades filtradas. Cadastre quem
@@ -717,7 +810,7 @@ function GradeDia({
     );
   }
 
-  const gradeDeColunas = `5rem repeat(${colunas.length}, minmax(0,1fr))`;
+  const gradeDeColunas = `5rem repeat(${colunas.length + (mostrarOcupados ? 1 : 0)}, minmax(0,1fr))`;
 
   return (
     <div className="-mx-6 overflow-x-auto px-6 pb-2 md:-mx-10 md:px-10">
@@ -740,6 +833,16 @@ function GradeDia({
               </p>
             </div>
           ))}
+          {mostrarOcupados && (
+            <div className="border-l border-black/10 px-3 py-3">
+              <p className="text-sm font-extrabold text-black/55">
+                Google Agenda
+              </p>
+              <p className="text-xs font-medium text-black/45">
+                Horários já ocupados
+              </p>
+            </div>
+          )}
         </div>
 
         {horas.map((hora) => (
@@ -787,6 +890,16 @@ function GradeDia({
                 </div>
               );
             })}
+
+            {mostrarOcupados && (
+              <div className="min-h-[3.5rem] space-y-1.5 border-l border-black/10 bg-black/[0.02] p-1.5">
+                {ocupadosDoDia
+                  .filter((o) => ocupadoNaLinha(o, hora))
+                  .map((ocupado) => (
+                    <BlocoOcupado key={ocupado.id} ocupado={ocupado} />
+                  ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

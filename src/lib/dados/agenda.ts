@@ -57,6 +57,27 @@ export type Consulta = {
   observacao: string | null;
 };
 
+/**
+ * Um horário que está ocupado na Google Agenda da clínica.
+ *
+ * Não é consulta: a linha vem de `agenda_ocupados`, que é espelho do calendário
+ * real — lead da Helô, paciente que marcou por fora, compromisso pessoal, tudo
+ * junto. Não tem lead, não tem profissional e não abre nada ao clicar; serve só
+ * para a equipe ver que aquela faixa não está livre.
+ *
+ * `dia` e `hora` já vêm convertidos para o fuso de Brasília aqui no servidor,
+ * no mesmo formato que a grade usa para a consulta ("AAAA-MM-DD" e "HH:MM").
+ * Deixar o `timestamptz` cru chegar no navegador faria a mesma faixa aparecer em
+ * hora diferente para quem abrisse o painel de outro fuso.
+ */
+export type HorarioOcupado = {
+  id: number;
+  titulo: string | null;
+  dia: string;
+  hora: string;
+  horaFim: string;
+};
+
 /** O lead como a Agenda precisa dele: quem é, e de qual cliente. */
 export type LeadDaAgenda = {
   id: number;
@@ -88,6 +109,14 @@ export type DadosDaAgenda = {
   pessoas: ProfissionalCadastrado[];
   clientes: ClienteDoCadastro[];
   procedimentos: EspecialidadeDoCadastro[];
+  /** O que está ocupado na Google Agenda da clínica, para a grade escurecer. */
+  ocupados: HorarioOcupado[];
+  /**
+   * Verdadeiro quando a clínica tem `google_calendar_id` preenchido. É o que
+   * decide qual aviso de sincronização a tela mostra: quem tem Google Agenda
+   * conectada não precisa ler que "nada foi sincronizado".
+   */
+  googleAgendaConectada: boolean;
   falha: string | null;
   aviso: string | null;
 };
@@ -102,6 +131,8 @@ const SEM_DADOS: DadosDaAgenda = {
   pessoas: [],
   clientes: [],
   procedimentos: [],
+  ocupados: [],
+  googleAgendaConectada: false,
   falha: null,
   aviso: null,
 };
@@ -136,6 +167,13 @@ const CAMPOS_DO_AGENDAMENTO =
 const CAMPOS_DO_LEAD =
   "id, nome, telefone, etapa, clinica_id, especialidade_interesse_id";
 
+type LinhaDeOcupado = {
+  id: number;
+  titulo: string | null;
+  inicio: string;
+  fim: string;
+};
+
 export async function carregarAgenda(): Promise<DadosDaAgenda> {
   if (!supabaseConfigurado()) {
     return {
@@ -148,7 +186,13 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
 
   // O cadastro e as consultas são lidos juntos: nenhuma das duas depende da
   // outra para ser pedida.
-  const [cadastro, respostaConsultas, respostaDosLeads] = await Promise.all([
+  const [
+    cadastro,
+    respostaConsultas,
+    respostaDosLeads,
+    respostaOcupados,
+    respostaClinicas,
+  ] = await Promise.all([
     carregarProfissionais(),
     supabase
       .from("agendamentos")
@@ -163,6 +207,16 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
       .select(CAMPOS_DO_LEAD)
       .order("nome", { ascending: true })
       .limit(TETO_DE_LINHAS),
+    // O espelho da Google Agenda. A RLS já devolve só a clínica do usuário, do
+    // mesmo jeito que em `agendamentos`.
+    supabase
+      .from("agenda_ocupados")
+      .select("id, titulo, inicio, fim")
+      .order("inicio", { ascending: true })
+      .limit(TETO_DE_LINHAS),
+    // Só para saber se existe Google Agenda conectada: é isso que troca o texto
+    // do aviso de sincronização.
+    supabase.from("clinicas").select("google_calendar_id"),
   ]);
 
   if (cadastro.falha) return { ...SEM_DADOS, falha: cadastro.falha };
@@ -178,6 +232,17 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
   const linhasDeConsulta = (respostaConsultas.data ??
     []) as LinhaDeAgendamento[];
   const linhasDeLead = (respostaDosLeads.data ?? []) as LinhaDeLead[];
+
+  // Estas duas leituras não derrubam a tela: a Agenda é a lista de consultas, e
+  // o espelho do Google é informação a mais. Se ele falhar, a grade continua
+  // mostrando o que o CRC marcou, em vez de virar uma tela de erro.
+  const ocupados = ((respostaOcupados.data ?? []) as LinhaDeOcupado[])
+    .map(linhaParaOcupado)
+    .filter((o): o is HorarioOcupado => o !== null);
+
+  const googleAgendaConectada = (
+    (respostaClinicas.data ?? []) as { google_calendar_id: string | null }[]
+  ).some((c) => (c.google_calendar_id ?? "").trim() !== "");
 
   // Consulta de lead que ficou fora do teto de linhas: sem esta segunda leitura
   // o cartão dele apareceria na grade sem nome, porque o lead não veio.
@@ -237,12 +302,66 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
     pessoas: cadastro.profissionais,
     clientes: cadastro.clientes,
     procedimentos: cadastro.especialidades,
+    ocupados,
+    googleAgendaConectada,
     falha: null,
     // O aviso do cadastro vem de outra leitura e vale tanto quanto este.
     aviso:
       cortadas.length > 0
         ? `A tela está mostrando no máximo ${TETO_DE_LINHAS} linhas de ${cortadas.join(" e ")}. Nada foi perdido no banco, mas esta lista não está completa.`
         : cadastro.aviso,
+  };
+}
+
+const FUSO_DE_BRASILIA = "America/Sao_Paulo";
+
+const PARTES_EM_BRASILIA = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: FUSO_DE_BRASILIA,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/**
+ * Um `timestamptz` do banco vira o par dia/hora que a grade compara.
+ *
+ * `formatToParts` em vez de montar a string: é o jeito de pegar ano, mês, dia e
+ * hora já no fuso de Brasília sem depender da ordem com que cada locale escreve
+ * a data.
+ */
+function emBrasilia(iso: string) {
+  const quando = new Date(iso);
+  if (Number.isNaN(quando.getTime())) return null;
+
+  const partes: Record<string, string> = {};
+  for (const parte of PARTES_EM_BRASILIA.formatToParts(quando)) {
+    if (parte.type !== "literal") partes[parte.type] = parte.value;
+  }
+
+  const { year, month, day, hour, minute } = partes;
+  if (!year || !month || !day || !hour || !minute) return null;
+
+  // "24:00" aparece em alguns ambientes para a meia-noite com hour12 false.
+  const horaCheia = hour === "24" ? "00" : hour;
+
+  return { dia: `${year}-${month}-${day}`, hora: `${horaCheia}:${minute}` };
+}
+
+/** Uma linha de `agenda_ocupados` como a grade usa. */
+function linhaParaOcupado(linha: LinhaDeOcupado): HorarioOcupado | null {
+  const inicio = emBrasilia(linha.inicio);
+  const fim = emBrasilia(linha.fim);
+  if (!inicio) return null;
+
+  return {
+    id: linha.id,
+    titulo: (linha.titulo ?? "").trim() || null,
+    dia: inicio.dia,
+    hora: inicio.hora,
+    horaFim: fim ? fim.hora : inicio.hora,
   };
 }
 
