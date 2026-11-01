@@ -224,18 +224,27 @@ export default function PainelAgenda({
   );
 
   const diasVisiveisEmTexto = new Set(diasVisiveis.map(textoDoDia));
-  const ocupadosVisiveis = ocupados.filter(
-    (o) => clientesVisiveis.has(o.clienteId) && diasVisiveisEmTexto.has(o.dia),
-  );
-
   /**
-   * O aviso de sincronização fala do que está na tela. Se a grade está olhando
-   * um cliente sem Google Agenda, ele lê o aviso de quem não tem integração —
-   * mesmo que outro cliente do painel tenha.
+   * O cliente que a grade está olhando, quando é um só.
+   *
+   * Nulo em "Todas as unidades", e é de propósito: a Google Agenda é de uma
+   * clínica, e misturar a de várias numa grade só faria parecer que o horário
+   * ocupado de uma pertence à outra. Com mais de um cliente na tela, os blocos
+   * do Google ficam de fora e só as consultas aparecem.
    */
-  const googleAgendaNaTela = clientesComGoogleAgenda.some((id) =>
-    clientesVisiveis.has(id),
-  );
+  const clienteNaTela =
+    clientesVisiveis.size === 1 ? [...clientesVisiveis][0] : null;
+
+  const ocupadosVisiveis =
+    clienteNaTela === null
+      ? []
+      : ocupados.filter(
+          (o) =>
+            o.clienteId === clienteNaTela && diasVisiveisEmTexto.has(o.dia),
+        );
+
+  const googleAgendaNaTela =
+    clienteNaTela !== null && clientesComGoogleAgenda.includes(clienteNaTela);
 
   const horasDaGrade = linhasDaGrade(itensVisiveis, ocupadosVisiveis);
 
@@ -378,7 +387,19 @@ export default function PainelAgenda({
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-black/45" />
           <div className="text-sm font-medium text-black/65">
-            {googleAgendaNaTela ? (
+            {clienteNaTela === null && clientesComGoogleAgenda.length > 0 ? (
+              <>
+                <p className="font-bold text-herval-preto">
+                  A tela está mostrando mais de um cliente.
+                </p>
+                <p className="mt-1.5">
+                  Os horários da Google Agenda são de uma clínica só, então
+                  aparecem quando você escolhe a unidade dela no filtro acima.
+                  Aqui a grade mostra apenas as consultas que o CRC e a Helô
+                  marcaram.
+                </p>
+              </>
+            ) : googleAgendaNaTela ? (
               <>
                 <p className="font-bold text-herval-preto">
                   Sincronizado com o Google Agenda, atualizado a cada 10
