@@ -84,7 +84,7 @@ export default function PainelAgenda({
   clientes,
   procedimentos,
   ocupados,
-  googleAgendaConectada,
+  clientesComGoogleAgenda,
   falha,
 }: Props) {
   // A data só é lida depois que a tela monta, para o servidor e o navegador
@@ -132,6 +132,22 @@ export default function PainelAgenda({
         ? unidades.map((u) => u.id)
         : [filtroUnidade as number],
     [filtroUnidade, unidades],
+  );
+
+  /**
+   * De quais clientes é a grade agora.
+   *
+   * O filtro da tela é por unidade, mas a Google Agenda é por cliente: é esta
+   * tradução que impede a agenda de uma clínica de aparecer dentro de outra.
+   */
+  const clientesVisiveis = useMemo(
+    () =>
+      new Set(
+        unidadesVisiveis
+          .map((id) => unidadePorId.get(id)?.clienteId)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    [unidadesVisiveis, unidadePorId],
   );
 
   /** Quem atende em alguma das unidades visíveis. */
@@ -208,8 +224,17 @@ export default function PainelAgenda({
   );
 
   const diasVisiveisEmTexto = new Set(diasVisiveis.map(textoDoDia));
-  const ocupadosVisiveis = ocupados.filter((o) =>
-    diasVisiveisEmTexto.has(o.dia),
+  const ocupadosVisiveis = ocupados.filter(
+    (o) => clientesVisiveis.has(o.clienteId) && diasVisiveisEmTexto.has(o.dia),
+  );
+
+  /**
+   * O aviso de sincronização fala do que está na tela. Se a grade está olhando
+   * um cliente sem Google Agenda, ele lê o aviso de quem não tem integração —
+   * mesmo que outro cliente do painel tenha.
+   */
+  const googleAgendaNaTela = clientesComGoogleAgenda.some((id) =>
+    clientesVisiveis.has(id),
   );
 
   const horasDaGrade = linhasDaGrade(itensVisiveis, ocupadosVisiveis);
@@ -353,7 +378,7 @@ export default function PainelAgenda({
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-black/45" />
           <div className="text-sm font-medium text-black/65">
-            {googleAgendaConectada ? (
+            {googleAgendaNaTela ? (
               <>
                 <p className="font-bold text-herval-preto">
                   Sincronizado com o Google Agenda, atualizado a cada 10

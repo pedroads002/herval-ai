@@ -72,6 +72,11 @@ export type Consulta = {
  */
 export type HorarioOcupado = {
   id: number;
+  /**
+   * De qual cliente é esta agenda. A grade filtra por isso: a Google Agenda de
+   * uma clínica não pode aparecer quando a tela está olhando outra.
+   */
+  clienteId: number;
   titulo: string | null;
   dia: string;
   hora: string;
@@ -112,11 +117,14 @@ export type DadosDaAgenda = {
   /** O que está ocupado na Google Agenda da clínica, para a grade escurecer. */
   ocupados: HorarioOcupado[];
   /**
-   * Verdadeiro quando a clínica tem `google_calendar_id` preenchido. É o que
-   * decide qual aviso de sincronização a tela mostra: quem tem Google Agenda
-   * conectada não precisa ler que "nada foi sincronizado".
+   * Os clientes que têm `google_calendar_id` preenchido. É o que decide qual
+   * aviso de sincronização a tela mostra: quem tem Google Agenda conectada não
+   * precisa ler que "nada foi sincronizado".
+   *
+   * É uma lista, e não um sim/não, porque a grade filtra por unidade: o aviso
+   * tem de falar do cliente que está na tela, não de qualquer um que exista.
    */
-  googleAgendaConectada: boolean;
+  clientesComGoogleAgenda: number[];
   falha: string | null;
   aviso: string | null;
 };
@@ -132,7 +140,7 @@ const SEM_DADOS: DadosDaAgenda = {
   clientes: [],
   procedimentos: [],
   ocupados: [],
-  googleAgendaConectada: false,
+  clientesComGoogleAgenda: [],
   falha: null,
   aviso: null,
 };
@@ -169,6 +177,7 @@ const CAMPOS_DO_LEAD =
 
 type LinhaDeOcupado = {
   id: number;
+  clinica_id: number;
   titulo: string | null;
   inicio: string;
   fim: string;
@@ -207,16 +216,18 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
       .select(CAMPOS_DO_LEAD)
       .order("nome", { ascending: true })
       .limit(TETO_DE_LINHAS),
-    // O espelho da Google Agenda. A RLS já devolve só a clínica do usuário, do
-    // mesmo jeito que em `agendamentos`.
+    // O espelho da Google Agenda. A RLS devolve só o que o usuário pode ver, do
+    // mesmo jeito que em `agendamentos` — e, para quem é da Herval, isso é a
+    // agenda de todas as clínicas. Por isso `clinica_id` vem junto: é a tela que
+    // tem de mostrar cada agenda apenas no cliente a que ela pertence.
     supabase
       .from("agenda_ocupados")
-      .select("id, titulo, inicio, fim")
+      .select("id, clinica_id, titulo, inicio, fim")
       .order("inicio", { ascending: true })
       .limit(TETO_DE_LINHAS),
-    // Só para saber se existe Google Agenda conectada: é isso que troca o texto
-    // do aviso de sincronização.
-    supabase.from("clinicas").select("google_calendar_id"),
+    // Quais clientes têm Google Agenda conectada: é isso que troca o texto do
+    // aviso de sincronização, cliente por cliente.
+    supabase.from("clinicas").select("id, google_calendar_id"),
   ]);
 
   if (cadastro.falha) return { ...SEM_DADOS, falha: cadastro.falha };
@@ -240,9 +251,14 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
     .map(linhaParaOcupado)
     .filter((o): o is HorarioOcupado => o !== null);
 
-  const googleAgendaConectada = (
-    (respostaClinicas.data ?? []) as { google_calendar_id: string | null }[]
-  ).some((c) => (c.google_calendar_id ?? "").trim() !== "");
+  const clientesComGoogleAgenda = (
+    (respostaClinicas.data ?? []) as {
+      id: number;
+      google_calendar_id: string | null;
+    }[]
+  )
+    .filter((c) => (c.google_calendar_id ?? "").trim() !== "")
+    .map((c) => c.id);
 
   // Consulta de lead que ficou fora do teto de linhas: sem esta segunda leitura
   // o cartão dele apareceria na grade sem nome, porque o lead não veio.
@@ -303,7 +319,7 @@ export async function carregarAgenda(): Promise<DadosDaAgenda> {
     clientes: cadastro.clientes,
     procedimentos: cadastro.especialidades,
     ocupados,
-    googleAgendaConectada,
+    clientesComGoogleAgenda,
     falha: null,
     // O aviso do cadastro vem de outra leitura e vale tanto quanto este.
     aviso:
@@ -358,6 +374,7 @@ function linhaParaOcupado(linha: LinhaDeOcupado): HorarioOcupado | null {
 
   return {
     id: linha.id,
+    clienteId: linha.clinica_id,
     titulo: (linha.titulo ?? "").trim() || null,
     dia: inicio.dia,
     hora: inicio.hora,
