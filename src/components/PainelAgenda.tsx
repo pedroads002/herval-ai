@@ -54,7 +54,6 @@ import {
   useQuandoDerCerto,
 } from "@/components/cadastro/comuns";
 import { RESULTADO_INICIAL } from "@/lib/acoes/resultadoDoCadastro";
-import { formatarDuracao } from "@/lib/formato";
 
 type Modo = "Dia" | "Semana";
 
@@ -978,7 +977,12 @@ function CartaoConsulta({
     <article className="rounded-controle border border-black/10 bg-herval-branco p-2.5 shadow-card">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-extrabold tabular-nums text-herval-preto">
-          {consulta.hora}
+          {consulta.hora === null
+            ? "—"
+            : `${consulta.hora} às ${fimDaConsulta(
+                consulta.hora,
+                procedimento?.duracaoMinutos ?? null,
+              )}`}
         </p>
         <span
           className={[
@@ -996,8 +1000,7 @@ function CartaoConsulta({
 
       {procedimento && (
         <p className="mt-0.5 text-[11px] font-medium leading-tight text-black/50">
-          {procedimento.nome} ·{" "}
-          {formatarDuracao(procedimento.duracaoMinutos ?? 0)}
+          {procedimento.nome}
         </p>
       )}
 
@@ -1067,6 +1070,30 @@ function Desfecho({ consulta }: { consulta: Consulta }) {
       )}
     </form>
   );
+}
+
+/**
+ * Quanto dura uma consulta quando ela não tem procedimento definido. Mesmo
+ * número que o sub-workflow da agenda usa no n8n, para o painel e a Google
+ * Agenda nunca mostrarem janelas diferentes para a mesma consulta.
+ */
+const DURACAO_PADRAO_MINUTOS = 40;
+
+/**
+ * A hora em que a consulta termina. Não existe no banco: `agendamentos` guarda
+ * só o início. A duração vem do cadastro de Especialidades — a mesma que fecha
+ * a janela do evento na Google Agenda.
+ */
+function fimDaConsulta(hora: string, duracaoMinutos: number | null) {
+  const [h, m] = hora.split(":");
+  const duracao =
+    duracaoMinutos !== null && duracaoMinutos > 0
+      ? duracaoMinutos
+      : DURACAO_PADRAO_MINUTOS;
+  const minutos = (Number(h) * 60 + Number(m) + duracao) % 1440;
+  const hh = String(Math.floor(minutos / 60)).padStart(2, "0");
+  const mm = String(minutos % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 /** "Dra. Camila Rocha" vira "Dra. Camila", que cabe na coluna do dia. */
