@@ -20,11 +20,16 @@ import {
  * Grava com o cliente da sessão, e não com chave de serviço, para a RLS de
  * `leads` continuar valendo de verdade.
  *
- * O que esta rota **não** faz: calar a Helô. Hoje nenhum node do cérebro lê
- * `leads.atendimento_ia` para decidir se responde — o freio é a parte 2 desta
- * seção, no n8n. Até ela ser publicada, o botão registra a decisão e o Log
- * mostra quem tomou, mas a IA continua respondendo. Está dito aqui porque é
- * exatamente o tipo de coisa que, esquecida, viraria "o botão está quebrado".
+ * Esta rota grava a decisão; quem cala a Helô é o cérebro no n8n — e esse freio
+ * existe e já está publicado. O node `Contexto e Travas`, no workflow
+ * `Helô - base`, deriva `trava4_ok` de `coalesce(atendimento_ia, '') <> 'pause'` e
+ * para a cadeia antes de qualquer resposta sair. Ou seja: o botão que chama esta
+ * rota cala a Helô de verdade, e não apenas registra uma intenção.
+ *
+ * O cuidado que isso cobra: o que significa "pausada" mora nos dois lados, aqui
+ * e naquele SQL. Se um mudar sozinho, o painel passa a dizer "pausada" com a
+ * Helô respondendo, ou o contrário — e ninguém veria. É por isso que o valor tem
+ * um dono só deste lado, em `lib/pausaDaIa.ts`.
  */
 
 type Pedido = { leadId?: unknown; pausar?: unknown };
