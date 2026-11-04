@@ -109,6 +109,14 @@ export type ResumoDoPeriodo = {
   cancelamentos: number;
   /** Agendamentos do período cuja consulta já passou. */
   consultasAteAData: number;
+  /**
+   * Dessas, quantas têm desfecho registrado (Compareceu ou Faltou). É o
+   * denominador do show-rate e do no-show — e não `consultasAteAData`, que
+   * inclui a consulta que passou e continua em "Agendada".
+   */
+  comDesfecho: number;
+  /** Já aconteceram e ninguém deu baixa. Não é falta nem presença. */
+  aguardandoBaixa: number;
   remarcacoes: number;
   fechadosPelaIa: number;
   fechadosPeloCrc: number;
@@ -148,6 +156,8 @@ const RESUMO_VAZIO: ResumoDoPeriodo = {
   faltas: 0,
   cancelamentos: 0,
   consultasAteAData: 0,
+  comDesfecho: 0,
+  aguardandoBaixa: 0,
   remarcacoes: 0,
   fechadosPelaIa: 0,
   fechadosPeloCrc: 0,
@@ -320,6 +330,14 @@ function montarResumo(
   const comparecimentos = jaAconteceram.filter(
     (consulta) => consulta.status === STATUS_COMPARECEU,
   ).length;
+  // A base das duas taxas de presença. Antes elas dividiam por tudo que já
+  // tinha acontecido, e aí a consulta que passou sem ninguém dar baixa entrava
+  // no denominador: o show-rate caía e o no-show caía junto, os dois por
+  // trabalho pendente e não por ausência. Uma consulta sem baixa não tem
+  // desfecho para ser contado — ela sai da conta e vira o alerta "sem
+  // desfecho", que é o fato que existe de verdade. Mesma regra de
+  // `montarProducao`, em `lib/relatorios.ts`.
+  const comDesfecho = comparecimentos + faltas;
   const cancelamentos = producao.filter(
     (consulta) => consulta.status === STATUS_CANCELADA,
   ).length;
@@ -375,6 +393,8 @@ function montarResumo(
     faltas,
     cancelamentos,
     consultasAteAData: jaAconteceram.length,
+    comDesfecho,
+    aguardandoBaixa: jaAconteceram.length - comDesfecho,
     remarcacoes,
     fechadosPelaIa,
     fechadosPeloCrc,
@@ -383,12 +403,12 @@ function montarResumo(
     fechadosPorWhatsapp,
     qualificados,
     leadsComAgendamento: comAgendamento.size,
-    taxaNoShow: taxa(faltas, jaAconteceram.length),
+    taxaNoShow: taxa(faltas, comDesfecho),
     taxaReagendamento: taxa(remarcacoes, producao.length),
     percentualIa: taxa(fechadosPelaIa, producao.length),
     percentualLigacao: taxa(fechadosPorLigacao, comCanal.length),
     taxaCancelamento: taxa(cancelamentos, producao.length),
-    showRate: taxa(comparecimentos, jaAconteceram.length),
+    showRate: taxa(comparecimentos, comDesfecho),
     taxaAgendamento: taxa(comAgendamento.size, qualificados),
   };
 }
@@ -466,15 +486,18 @@ function montarAlertas(
 
   if (
     resumo.showRate !== null &&
-    resumo.consultasAteAData >= metas.amostraMinima &&
+    // A amostra é o que tem desfecho, não tudo que já passou: alertar com base
+    // em consulta sem baixa seria alarme falso, porque o número que dispara o
+    // alerta não teria vindo de ausência nenhuma.
+    resumo.comDesfecho >= metas.amostraMinima &&
     resumo.showRate < metas.pisoShowRate
   ) {
     alertas.push({
       id: "show-rate",
       severidade:
         resumo.showRate < metas.showRateCritico ? "critico" : "atencao",
-      problema: `Comparecimento em ${resumo.showRate}% das consultas que já aconteceram, abaixo do piso de ${metas.pisoShowRate}%.`,
-      acao: `${resumo.faltas} faltas em ${resumo.consultasAteAData} consultas até a data.`,
+      problema: `Comparecimento em ${resumo.showRate}% das consultas com desfecho registrado, abaixo do piso de ${metas.pisoShowRate}%.`,
+      acao: `${resumo.faltas} faltas em ${resumo.comDesfecho} consultas com desfecho registrado.`,
     });
   }
 

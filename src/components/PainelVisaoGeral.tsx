@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  Minus,
   TrendingUp,
   TrendingDown,
   TriangleAlert,
@@ -84,7 +85,12 @@ export default function PainelVisaoGeral({
             variacao={pontos(atual.taxaNoShow, anterior.taxaNoShow)}
             // Aqui subir é ruim: é paciente que marcou e não apareceu.
             quantoMaiorPior
-            detalhe={`${formatarNumero(atual.faltas)} faltas em ${formatarNumero(atual.consultasAteAData)} consultas até a data`}
+            detalhe={
+              `${formatarNumero(atual.faltas)} faltas em ${formatarNumero(atual.comDesfecho)} consultas com desfecho registrado` +
+              (atual.aguardandoBaixa > 0
+                ? ` · ${formatarNumero(atual.aguardandoBaixa)} ${atual.aguardandoBaixa === 1 ? "consulta já aconteceu e está sem baixa, fora da conta" : "consultas já aconteceram e estão sem baixa, fora da conta"}`
+                : "")
+            }
           />
           <Indicador
             rotulo="Taxa de reagendamento"
@@ -215,9 +221,16 @@ export default function PainelVisaoGeral({
             {conversao.map((etapa, indice) => {
               const anteriorDegrau = conversao[indice - 1];
               const larguraRelativa = percentual(etapa.quantidade, totalFunil);
-              const queda = anteriorDegrau
-                ? 100 - percentual(etapa.quantidade, anteriorDegrau.quantidade)
-                : 0;
+              // Nulo quando o degrau de cima está zerado: sem ninguém para
+              // cair, não existe queda. `percentual` devolve 0 nesse caso, e
+              // `100 - 0` dizia "Queda de 100%" para um cliente que ainda não
+              // tem lead nenhum — três linhas de queda inventada na primeira
+              // vez que ele abre a tela.
+              const queda =
+                anteriorDegrau && anteriorDegrau.quantidade > 0
+                  ? 100 -
+                    percentual(etapa.quantidade, anteriorDegrau.quantidade)
+                  : null;
 
               return (
                 <div key={etapa.etapa}>
@@ -242,11 +255,20 @@ export default function PainelVisaoGeral({
 
                   {anteriorDegrau && (
                     <p className="mt-1.5 text-xs font-medium text-black/50">
-                      Queda de{" "}
-                      <span className="font-extrabold text-herval-preto">
-                        {queda}%
-                      </span>{" "}
-                      em relação a {anteriorDegrau.etapa.toLowerCase()}
+                      {queda === null ? (
+                        <>
+                          Sem base para comparar com{" "}
+                          {anteriorDegrau.etapa.toLowerCase()}
+                        </>
+                      ) : (
+                        <>
+                          Queda de{" "}
+                          <span className="font-extrabold text-herval-preto">
+                            {queda}%
+                          </span>{" "}
+                          em relação a {anteriorDegrau.etapa.toLowerCase()}
+                        </>
+                      )}
                     </p>
                   )}
                 </div>
@@ -326,7 +348,22 @@ function Variacao({
   emPontos: boolean;
   quantoMaiorPior: boolean;
 }) {
-  const subiu = diferenca >= 0;
+  /*
+    Zero não é alta. Antes `subiu` era `diferenca >= 0`, então um período
+    idêntico ao anterior vinha com seta para cima, selo verde e "+0%" — lido
+    como melhora onde nada mudou. Empate agora tem a sua própria cara: traço,
+    selo neutro e o texto dizendo o que aconteceu.
+  */
+  if (diferenca === 0) {
+    return (
+      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-black/15 px-2.5 py-1 text-[11px] font-bold text-black/50">
+        <Minus className="h-3 w-3" />
+        sem mudança vs. período anterior
+      </span>
+    );
+  }
+
+  const subiu = diferenca > 0;
   const bom = quantoMaiorPior ? !subiu : subiu;
 
   return (
