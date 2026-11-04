@@ -9,7 +9,18 @@ export const metadata: Metadata = {
   title: "Entrar · Herval AI",
 };
 
-export default function PaginaLogin() {
+/**
+ * `senhaAlterada` chega de `/redefinir-senha`, que encerra a sessão e manda
+ * para cá. Sem esse aviso, a pessoa que acabou de trocar a senha cairia na
+ * tela de entrar sem nenhum sinal de que deu certo — e a leitura natural
+ * disso é "não funcionou", não "agora entre com a senha nova".
+ */
+export default async function PaginaLogin({
+  searchParams,
+}: {
+  searchParams: Promise<{ senhaAlterada?: string }>;
+}) {
+  const { senhaAlterada } = await searchParams;
   const configurado = supabaseConfigurado();
 
   return (
@@ -39,7 +50,7 @@ export default function PaginaLogin() {
 
         <div className="rounded-card bg-herval-branco p-7 shadow-card">
           {configurado ? (
-            <FormularioLogin />
+            <FormularioLogin senhaAlterada={senhaAlterada === "1"} />
           ) : (
             <div className="space-y-3">
               <p className="flex items-start gap-2 text-sm font-bold text-herval-preto">

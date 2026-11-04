@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 
 /** Traduz os erros mais comuns do Supabase para português simples. */
@@ -16,7 +17,10 @@ function mensagemDeErro(codigo: string | undefined, texto: string) {
   return "Não foi possível entrar. Tente novamente em instantes.";
 }
 
-export default function FormularioLogin() {
+export default function FormularioLogin({
+  /** Vem de quem acabou de trocar a senha em `/redefinir-senha`. */
+  senhaAlterada = false,
+}: Readonly<{ senhaAlterada?: boolean }>) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -53,6 +57,13 @@ export default function FormularioLogin() {
 
   return (
     <form onSubmit={entrar} className="space-y-4" noValidate>
+      {senhaAlterada && !erro && (
+        <p className="flex items-start gap-2 rounded-controle bg-herval-verde/15 px-3.5 py-3 text-sm font-medium text-herval-preto">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          Senha alterada. Entre com a senha nova.
+        </p>
+      )}
+
       <div className="space-y-1.5">
         <label
           htmlFor="email"
@@ -109,6 +120,15 @@ export default function FormularioLogin() {
         {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
         {enviando ? "Entrando..." : "Entrar"}
       </button>
+
+      {/* Abaixo do botão, e não acima: quem sabe a senha não precisa tropeçar
+          nele, e quem não sabe só procura depois de tentar. */}
+      <Link
+        href="/esqueci-senha"
+        className="block text-center text-sm font-bold text-black/55 transition-colors hover:text-herval-preto"
+      >
+        Esqueci minha senha
+      </Link>
     </form>
   );
 }

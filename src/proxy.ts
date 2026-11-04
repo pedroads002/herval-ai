@@ -25,6 +25,17 @@ const PRIMEIRA_TELA = "/visao-geral";
  * o `proxy` barra a pessoa antes mesmo dela chegar lá, mandando-a pro login
  * — exatamente o bug observado (convite abrindo a tela de login).
  *
+ * As três telas de recuperação de senha estão aqui pelo mesmo motivo do
+ * convite: quem esqueceu a senha, por definição, não consegue entrar — não
+ * existe sessão nenhuma para este `proxy` conferir. Sem esta entrada, o pedido
+ * de recuperação e o próprio link do e-mail seriam barrados e mandados para o
+ * login, que é exatamente a tela de onde a pessoa está fugindo.
+ *
+ * Ser público aqui não é ser aberto: `/api/recuperar-senha` só aceita um
+ * `token_hash` que o Supabase assinou, e `/redefinir-senha` só mostra o
+ * formulário se essa troca tiver criado sessão de verdade — quem abrir o
+ * endereço na mão vê o aviso de link inválido e nada mais.
+ *
  * Esta lista é a exceção, não a regra — qualquer outra tela nova continua
  * nascendo protegida sozinha. Só entra aqui o que for público de propósito, e
  * nada que leia ou grave dado de paciente, lead ou cliente.
@@ -33,6 +44,9 @@ const TELAS_PUBLICAS: readonly string[] = [
   "/privacidade",
   "/convite",
   "/api/convite/completar",
+  "/esqueci-senha",
+  "/api/recuperar-senha",
+  "/redefinir-senha",
 ];
 
 /**
