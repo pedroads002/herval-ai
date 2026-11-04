@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
+import MenuGaveta from "@/components/MenuGaveta";
 
 /**
  * O menu de quem é cliente (`cliente_admin` ou `cliente_operacional`).
@@ -49,8 +50,18 @@ import LogoHerval from "@/components/LogoHerval";
  * são eles que fazem digitar o endereço na mão não servir de nada.
  */
 const itensFixos = [
-  { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard, tela: null },
-  { href: "/funil", rotulo: "Leads", Icone: KanbanSquare, tela: "funil" as const },
+  {
+    href: "/visao-geral",
+    rotulo: "Visão Geral",
+    Icone: LayoutDashboard,
+    tela: null,
+  },
+  {
+    href: "/funil",
+    rotulo: "Leads",
+    Icone: KanbanSquare,
+    tela: "funil" as const,
+  },
   {
     href: "/atendimento",
     rotulo: "Conversas",
@@ -63,7 +74,12 @@ const itensFixos = [
     Icone: BarChart3,
     tela: "relatorios" as const,
   },
-  { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays, tela: "agenda" as const },
+  {
+    href: "/agenda",
+    rotulo: "Agenda",
+    Icone: CalendarDays,
+    tela: "agenda" as const,
+  },
 ];
 
 const itemDeEquipe = {
@@ -88,13 +104,17 @@ export default function MenuLateralCliente({
 
   const itensLiberados = itensFixos.filter(
     (item) =>
-      item.tela === null || telasPermitidas === null || telasPermitidas.includes(item.tela),
+      item.tela === null ||
+      telasPermitidas === null ||
+      telasPermitidas.includes(item.tela),
   );
 
-  const itens = mostrarEquipe ? [...itensLiberados, itemDeEquipe] : itensLiberados;
+  const itens = mostrarEquipe
+    ? [...itensLiberados, itemDeEquipe]
+    : itensLiberados;
 
   return (
-    <aside className="fixed bottom-0 left-0 top-16 z-20 flex w-56 flex-col bg-herval-preto md:w-64">
+    <MenuGaveta>
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-6">
         {itens.map(({ href, rotulo, Icone }) => {
           const ativo =
@@ -128,6 +148,6 @@ export default function MenuLateralCliente({
           </p>
         </div>
       </div>
-    </aside>
+    </MenuGaveta>
   );
 }

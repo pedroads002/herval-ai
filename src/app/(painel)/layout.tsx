@@ -85,7 +85,7 @@ export default async function LayoutPainel({
 
   return (
     <>
-      <CabecalhoTopo />
+      <CabecalhoTopo comMenu />
       {cliente ? (
         <MenuLateralCliente
           mostrarEquipe={autorizacao.papel === PAPEIS.CLIENTE_ADMIN}
@@ -112,7 +112,7 @@ export default async function LayoutPainel({
         próprio por dentro (`p-5`), então a folga aqui só precisa separar da
         borda, não repetir esse respiro.
       */}
-      <main className="ml-56 mt-16 h-[calc(100dvh-4rem)] overflow-y-auto p-3 md:ml-64">
+      <main className="mt-16 h-[calc(100dvh-4rem)] overflow-y-auto p-3 md:ml-64">
         <ProvedorLeads
           usuario={perfil?.nomeCompleto}
           tarefasDoBanco={fila.tarefas}

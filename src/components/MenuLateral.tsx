@@ -19,6 +19,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
+import MenuGaveta from "@/components/MenuGaveta";
 
 const itens = [
   { href: "/visao-geral", rotulo: "Visão Geral", Icone: LayoutDashboard },
@@ -51,7 +52,7 @@ export default function MenuLateral() {
   const caminho = usePathname();
 
   return (
-    <aside className="fixed bottom-0 left-0 top-16 z-20 flex w-56 flex-col bg-herval-preto md:w-64">
+    <MenuGaveta>
       {/* Com o menu maior, a lista rola sozinha em telas baixas. */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-6">
         {itens.map(({ href, rotulo, Icone }) => {
@@ -102,6 +103,6 @@ export default function MenuLateral() {
           </p>
         </div>
       </div>
-    </aside>
+    </MenuGaveta>
   );
 }

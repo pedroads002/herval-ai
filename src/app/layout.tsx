@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,21 @@ export const metadata: Metadata = {
     ],
     apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
   },
+};
+
+/**
+ * Sem isto o celular finge ter 980px de largura e encolhe a página inteira
+ * para caber na tela — era por isso que o painel aparecia minúsculo em
+ * qualquer aparelho, independente do tamanho real da tela. `device-width`
+ * manda o navegador usar a largura de verdade, e é o que faz as regras
+ * responsivas do Tailwind (`md:`, `sm:`) valerem alguma coisa no telefone.
+ *
+ * `maximumScale` fica de fora de proposito: limitar o zoom impede quem precisa
+ * aproximar para ler de fazer isso.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
