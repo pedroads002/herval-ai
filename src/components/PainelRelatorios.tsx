@@ -544,10 +544,10 @@ export default function PainelRelatorios({
                 Canal de fechamento
               </span>{" "}
               mede como o agendamento foi fechado com o lead: por Ligação
-              (direta ou por WhatsApp) ou por mensagem de WhatsApp. É
-              diferente de quem fechou — aqui o que importa é o meio, não a
-              pessoa. Consulta marcada antes deste campo existir fica fora da
-              conta, e não é contada como WhatsApp por eliminação.
+              (direta ou por WhatsApp) ou por mensagem de WhatsApp. É diferente
+              de quem fechou — aqui o que importa é o meio, não a pessoa.
+              Consulta marcada antes deste campo existir fica fora da conta, e
+              não é contada como WhatsApp por eliminação.
             </span>
           </p>
 
@@ -695,7 +695,7 @@ export default function PainelRelatorios({
           </Tabela>
 
           {/* Qual tabela usar */}
-          <section className="rounded-card border border-black/10 bg-black/[0.03] p-8">
+          <section className="rounded-card border border-black/10 bg-black/[0.03] p-5 md:p-8">
             <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
               <Info className="h-4 w-4" />
               Qual tabela usar?

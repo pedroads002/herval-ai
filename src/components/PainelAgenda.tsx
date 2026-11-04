@@ -90,14 +90,34 @@ export default function PainelAgenda({
   // nunca renderizarem dias diferentes.
   const [hoje, setHoje] = useState<Date | null>(null);
   const [referencia, setReferencia] = useState<Date | null>(null);
+  // Declarado antes do efeito porque é lá que o modo inicial é decidido.
+  const [modo, setModo] = useState<Modo>("Semana");
 
   useEffect(() => {
     const agora = inicioDoDia(new Date());
     setHoje(agora);
     setReferencia(agora);
+
+    /**
+     * No celular a tela começa no dia, não na semana.
+     *
+     * Sete dias não cabem numa tela de 390px de jeito nenhum: a grade da
+     * semana precisa de 1024px e vira rolagem lateral obrigatória. O dia tem
+     * uma coluna por profissional, e a maioria das clínicas tem de um a três —
+     * esse cabe. O botão "Semana" continua ali para quem quiser, com a mesma
+     * rolagem de antes.
+     *
+     * A escolha é só no primeiro desenho, e por isso mora aqui junto com a
+     * data: as duas coisas dependem do navegador e o servidor não tem como
+     * saber nenhuma delas. Trocar de modo depois é do usuário, e o tamanho da
+     * tela não volta a mandar.
+     *
+     * O corte de 768px é o mesmo do menu em gaveta: é a largura em que o
+     * painel deixa de ser tela de celular.
+     */
+    if (window.matchMedia("(max-width: 767px)").matches) setModo("Dia");
   }, []);
 
-  const [modo, setModo] = useState<Modo>("Semana");
   const [filtroUnidade, setFiltroUnidade] = useState<"todas" | number>("todas");
   const [filtroPessoa, setFiltroPessoa] = useState<"todos" | number>("todos");
   const [formAberto, setFormAberto] = useState(false);
@@ -408,8 +428,8 @@ export default function PainelAgenda({
                   Os blocos cinza &quot;Ocupado&quot; vêm da Google Agenda da
                   clínica — pode ser paciente que marcou por fora ou compromisso
                   pessoal de quem atende. Eles não são consulta do CRM e não
-                  abrem nada ao clicar. As consultas coloridas são as que o CRC e
-                  a Helô marcam aqui.
+                  abrem nada ao clicar. As consultas coloridas são as que o CRC
+                  e a Helô marcam aqui.
                 </p>
               </>
             ) : (
@@ -419,9 +439,9 @@ export default function PainelAgenda({
                 </p>
                 <p className="mt-1.5">
                   As consultas desta tela são as que o CRC e a Helô marcam aqui,
-                  e ficam gravadas. A sincronização com Clinicorp, Simples Dental
-                  ou Dental Office fica disponível quando a integração for
-                  conectada na tela de Integrações.
+                  e ficam gravadas. A sincronização com Clinicorp, Simples
+                  Dental ou Dental Office fica disponível quando a integração
+                  for conectada na tela de Integrações.
                 </p>
               </>
             )}
@@ -735,7 +755,17 @@ function GradeSemana({
   ocupados: HorarioOcupado[];
 } & Buscadores) {
   return (
-    <div className="-mx-6 overflow-x-auto px-6 pb-2 md:-mx-10 md:px-10">
+    /*
+      As margens negativas anulam a folga da área de conteúdo para a grade
+      poder correr de ponta a ponta, e precisam bater com ela. Estavam em
+      `-mx-6`/`md:-mx-10` de quando a folga era `px-6`/`md:px-10`; hoje ela é
+      `p-3` (ver `app/(painel)/layout.tsx`), e a diferença fazia a grade sangrar
+      12px no celular e 28px no computador, entrando por baixo do menu lateral.
+
+      A semana continua pedindo 1024px: sete dias não cabem numa tela de
+      celular de jeito nenhum, e por isso o telefone abre no modo "Dia".
+    */
+    <div className="-mx-3 overflow-x-auto px-3 pb-2">
       <div className="min-w-[64rem] overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
         {/* Cabeçalho dos dias */}
         <div className="grid grid-cols-[5rem_repeat(7,minmax(0,1fr))] border-b border-black/10 bg-black/[0.03]">
@@ -855,11 +885,26 @@ function GradeDia({
     );
   }
 
-  const gradeDeColunas = `5rem repeat(${colunas.length + (mostrarOcupados ? 1 : 0)}, minmax(0,1fr))`;
+  /**
+   * Cada coluna tem um mínimo próprio de 8rem em vez de poder encolher até
+   * zero. É isso que deixa a grade do dia caber no celular sem virar papa:
+   * com um ou dois profissionais ela entra inteira numa tela de 390px, e com
+   * muitos ela cresce e rola de lado — rolagem é ruim, coluna de 40px com o
+   * nome do paciente dentro é pior.
+   *
+   * No computador não muda nada: a moldura tem no mínimo 64rem e, com até
+   * sete colunas, a fatia natural de cada uma já passa de 8rem, então o `1fr`
+   * continua mandando como antes.
+   */
+  const gradeDeColunas = `5rem repeat(${colunas.length + (mostrarOcupados ? 1 : 0)}, minmax(8rem,1fr))`;
 
   return (
-    <div className="-mx-6 overflow-x-auto px-6 pb-2 md:-mx-10 md:px-10">
-      <div className="min-w-[64rem] overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
+    /* Mesma correção de folga da grade da semana: `-mx-3` para bater com o
+       `p-3` da área de conteúdo. Mas aqui o `min-w` sai no celular — a grade
+       do dia tem uma coluna por profissional, e carregar os 1024px da semana
+       obrigava a rolar de lado até para ver um profissional só. */
+    <div className="-mx-3 overflow-x-auto px-3 pb-2">
+      <div className="overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card md:min-w-[64rem]">
         <div
           className="grid border-b border-black/10 bg-black/[0.03]"
           style={{ gridTemplateColumns: gradeDeColunas }}

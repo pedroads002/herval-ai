@@ -107,7 +107,10 @@ export default function PainelVisaoGeral({
           <Indicador
             rotulo="Canal de fechamento"
             valor={`${comPercentual(atual.percentualLigacao)} Ligação`}
-            variacao={pontos(atual.percentualLigacao, anterior.percentualLigacao)}
+            variacao={pontos(
+              atual.percentualLigacao,
+              anterior.percentualLigacao,
+            )}
             detalhe={
               `${comPercentual(
                 atual.percentualLigacao === null
@@ -123,7 +126,7 @@ export default function PainelVisaoGeral({
       </section>
 
       {/* Pontos de atenção */}
-      <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+      <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
             <span className="h-4 w-1 rounded-full bg-herval-verde" />
@@ -196,7 +199,7 @@ export default function PainelVisaoGeral({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {/* Funil de conversão */}
-        <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+        <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
           <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
             <span className="h-4 w-1 rounded-full bg-herval-verde" />
             Funil de conversão
@@ -253,7 +256,7 @@ export default function PainelVisaoGeral({
         </section>
 
         {/* Motivos de perda */}
-        <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+        <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
           <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
             <span className="h-4 w-1 rounded-full bg-herval-verde" />
             Motivos de perda

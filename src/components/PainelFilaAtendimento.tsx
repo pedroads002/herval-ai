@@ -322,7 +322,7 @@ export default function PainelFilaAtendimento({
       )}
 
       {/* Distribuição da espera */}
-      <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+      <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
         <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
           <span className="h-4 w-1 rounded-full bg-herval-verde" />
           Quanto cada lead esperou

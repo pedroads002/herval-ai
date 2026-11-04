@@ -83,7 +83,7 @@ export function Tabela({
 }) {
   return (
     <section className="rounded-card border border-black/10 bg-herval-branco shadow-card">
-      <div className="border-b border-black/10 p-8 pb-6">
+      <div className="border-b border-black/10 p-5 pb-4 md:p-8 md:pb-6">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
             <span className="h-4 w-1 rounded-full bg-herval-verde" />
@@ -266,7 +266,7 @@ export function PontosDeAtencao({
   const mostrados = todos ? alertas : alertas.slice(0, visiveis);
 
   return (
-    <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+    <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
           <span className="h-4 w-1 rounded-full bg-herval-verde" />

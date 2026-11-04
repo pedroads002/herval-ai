@@ -166,7 +166,7 @@ export default function FormularioEstrategia({
 
   if (ficha === null) {
     return (
-      <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+      <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
         <p className="text-sm font-medium text-black/55">
           Nenhum cliente cadastrado ainda.
         </p>
@@ -353,7 +353,7 @@ function VisaoGeral({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="space-y-6">
-        <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+        <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
           <h3 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
             <span className="h-4 w-1 rounded-full bg-herval-verde" />O que esta
             estratégia faz a Helô fazer
@@ -373,7 +373,7 @@ function VisaoGeral({
           </dl>
         </section>
 
-        <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+        <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h3 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
@@ -535,7 +535,7 @@ function Cartao({
   const travado = blocoAberto !== null && !editando;
 
   return (
-    <section className="rounded-card border border-black/10 bg-herval-branco p-8 shadow-card">
+    <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-herval-preto">
@@ -903,8 +903,8 @@ function FormAvaliacao({
               )}
             />
             <p className="mt-2 text-xs font-medium text-black/45">
-              Preço da consulta em si, não do procedimento. Cada clínica cobra
-              o que quiser — é por isso que não há faixa aqui.
+              Preço da consulta em si, não do procedimento. Cada clínica cobra o
+              que quiser — é por isso que não há faixa aqui.
             </p>
           </div>
           <Escolha

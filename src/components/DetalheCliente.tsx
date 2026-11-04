@@ -603,7 +603,7 @@ function ExcluirCliente({ cliente }: { cliente: ClienteDoCadastro }) {
   const quantos = cliente.profissionais.length;
 
   return (
-    <section className="rounded-card border border-black/10 bg-herval-branco p-7 shadow-card">
+    <section className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card md:p-7">
       <h2 className="mb-2 flex items-center gap-2.5 text-sm font-extrabold uppercase tracking-wide text-herval-preto">
         <span className="h-4 w-1 rounded-full bg-herval-vermelho" />
         Excluir cliente
