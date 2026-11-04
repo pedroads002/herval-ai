@@ -242,12 +242,24 @@ export default function PainelFunil({
         era `px-6`/`md:px-10`, eram `-mx-6`/`md:-mx-10`; agora que é `p-3`,
         passam a `-mx-3`. Fora de sincronia, o quadro sangra para debaixo do
         menu lateral.
+
+        No celular o quadro ganha encaixe de rolagem (`snap`). A coluna tem
+        85% da largura da tela, então a arrastada sempre para numa etapa
+        inteira, com uma fatia da seguinte aparecendo de lado para avisar que
+        há mais. Sem o encaixe, a rolagem parava onde a inércia do dedo
+        quisesse — em geral no meio de duas etapas, mostrando metade de cada.
+
+        `scroll-pl-3` existe para o encaixe respeitar a folga da esquerda: sem
+        ele, a coluna encostaria na borda da tela e comeria os 12px de `px-3`.
+
+        Nada disso vale de 768px para cima: lá a coluna volta aos 256px e a
+        rolagem volta a ser livre, como sempre foi no computador.
       */}
-      <div className="-mx-3 flex min-h-0 flex-1 items-start gap-4 overflow-x-auto px-3 pb-2">
+      <div className="-mx-3 flex min-h-0 flex-1 snap-x snap-mandatory items-start gap-4 overflow-x-auto scroll-pl-3 px-3 pb-2 md:snap-none md:scroll-pl-0">
         {colunas.map(({ etapa, cards }) => (
           <section
             key={etapa}
-            className="flex max-h-full w-64 shrink-0 flex-col rounded-card border border-black/10 bg-black/[0.03]"
+            className="flex max-h-full w-[85vw] shrink-0 snap-start flex-col rounded-card border border-black/10 bg-black/[0.03] md:w-64"
           >
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-black/10 px-4 py-3.5">
               <h2 className="text-sm font-extrabold tracking-tight text-herval-preto">
