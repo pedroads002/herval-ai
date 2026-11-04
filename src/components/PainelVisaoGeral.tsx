@@ -53,7 +53,11 @@ export default function PainelVisaoGeral({
           rotulo="Leads"
           valor={formatarNumero(atual.leads)}
           variacao={variacao(atual.leads, anterior.leads)}
-          detalhe={`entraram na base ${quando}`}
+          // "de qualquer origem" não é enfeite: Relatórios tem um card
+          // chamado "Leads de marketing" que conta só Meta Ads e Google Ads,
+          // e sem esta linha os dois números pareciam o mesmo medido duas
+          // vezes — um deles errado.
+          detalhe={`entraram na base ${quando}, de qualquer origem`}
         />
         <Kpi
           rotulo="Agendamentos"

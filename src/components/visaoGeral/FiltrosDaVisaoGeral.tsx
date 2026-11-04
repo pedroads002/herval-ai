@@ -146,6 +146,9 @@ export default function FiltrosDaVisaoGeral({
           {clinicas.map((clinica) => (
             <option key={clinica.id} value={clinica.id}>
               {clinica.nome}
+              {/* Mesma marca que o seletor de Relatórios usa, palavra por
+                  palavra: é a mesma lista nas duas telas. */}
+              {clinica.ativa ? "" : " (pausada)"}
             </option>
           ))}
         </select>

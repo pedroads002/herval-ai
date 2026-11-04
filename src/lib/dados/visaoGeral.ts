@@ -80,7 +80,11 @@ type LinhaDeAgendamento = {
   criado_em: string;
 };
 
-export type ClinicaDaLista = { id: number; nome: string };
+/**
+ * Uma clínica do seletor. `ativa` vem junto porque o seletor marca a pausada,
+ * e não a esconde — ver o motivo em `carregarVisaoGeral`.
+ */
+export type ClinicaDaLista = { id: number; nome: string; ativa: boolean };
 
 export type DegrauDaConversao = { etapa: string; quantidade: number };
 
@@ -627,10 +631,15 @@ export async function carregarVisaoGeral(
     // `agendamentos` guarda a unidade, não a clínica. O recorte por cliente
     // passa por aqui — sem isso não há como filtrar consulta por clínica.
     supabase.from("unidades").select("id, clinica_id").limit(TETO_DE_LINHAS),
+    // Todos os clientes, inclusive os pausados, e pelo mesmo motivo de
+    // `dados/relatorios.ts`: o seletor escreve "(pausada)" ao lado do nome, e
+    // esconder o pausado tornava o histórico dele inalcançável — não havia
+    // como filtrar a Visão Geral por um cliente que parou, nem para conferir
+    // o que ele produziu enquanto estava rodando. As duas telas também
+    // ofereciam listas diferentes, então trocar de tela mudava as opções.
     supabase
       .from("clinicas")
-      .select("id, nome")
-      .eq("ativa", true)
+      .select("id, nome, ativa")
       .order("nome")
       .limit(TETO_DE_LINHAS),
   ]);
@@ -735,6 +744,7 @@ export async function carregarVisaoGeral(
     clinicas: (respostaDasClinicas.data ?? []).map((clinica) => ({
       id: clinica.id as number,
       nome: ((clinica.nome as string | null) ?? "").trim() || "Sem nome",
+      ativa: ((clinica.ativa as boolean | null) ?? true) === true,
     })),
     falha: null,
     aviso: montarAviso(leads.length, todosOsAgendamentos.length),

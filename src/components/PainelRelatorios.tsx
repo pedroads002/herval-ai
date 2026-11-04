@@ -456,7 +456,7 @@ export default function PainelRelatorios({
             <Kpi
               rotulo="Leads de marketing"
               valor={formatarNumero(resumo.leadsMarketing)}
-              detalhe={`${formatarNumero(resumo.qualificados)} qualificados`}
+              detalhe={`só Meta Ads e Google Ads · ${formatarNumero(resumo.qualificados)} qualificados`}
             />
             <Kpi
               rotulo="Agendados (funil)"
@@ -523,7 +523,27 @@ export default function PainelRelatorios({
             />
           </div>
 
-          {/* Fica fora do card para não esticar a linha inteira de indicadores. */}
+          {/* Fica fora do card para não esticar a linha inteira de
+              indicadores, igual às duas notas abaixo. Esta existe porque o
+              mesmo lead era contado de dois jeitos em duas telas, sem nada
+              dizer isso: a Visão Geral mostra todo lead que entrou, aqui só
+              entra campanha paga. Quem comparasse os dois números concluiria
+              que um deles está errado. */}
+          <p className="-mt-4 flex items-start gap-2 text-xs font-medium leading-relaxed text-black/50">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-bold text-herval-preto">
+                Leads de marketing
+              </span>{" "}
+              conta só quem chegou por Meta Ads ou Google Ads, porque estas
+              tabelas medem retorno de campanha. Quem chegou por Instagram,
+              indicação, site ou WhatsApp não aparece aqui — aparece no card{" "}
+              <span className="font-bold text-herval-preto">Leads</span> da
+              Visão Geral, que conta todas as origens. Os dois números serem
+              diferentes é esperado.
+            </span>
+          </p>
+
           <p className="-mt-4 flex items-start gap-2 text-xs font-medium leading-relaxed text-black/50">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
