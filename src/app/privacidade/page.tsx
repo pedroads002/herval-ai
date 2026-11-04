@@ -91,7 +91,11 @@ function Blocos({ blocos }: { blocos: readonly BlocoDaPolitica[] }) {
 
 export default function PaginaPoliticaDePrivacidade() {
   return (
-    <main className="min-h-screen bg-[#F7F7F7] px-6 py-12">
+    <main
+      /* `dvh` em vez de `screen` pelo mesmo motivo do login: no celular
+         `100vh` conta a área atrás da barra do navegador. */
+      className="min-h-[100dvh] bg-[#F7F7F7] px-6 py-12"
+    >
       <div className="mx-auto w-full max-w-3xl">
         <header className="flex flex-col items-center gap-3 text-center">
           <LogoHerval className="h-20 w-20 rounded-card p-2" />

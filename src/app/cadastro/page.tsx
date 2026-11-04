@@ -16,7 +16,11 @@ export const metadata: Metadata = {
  */
 export default function PaginaCadastro() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F7F7F7] px-6 py-12">
+    <main
+      /* `dvh` em vez de `screen` pelo mesmo motivo do login: no celular
+         `100vh` conta a área atrás da barra do navegador. */
+      className="flex min-h-[100dvh] items-center justify-center bg-[#F7F7F7] px-6 py-12"
+    >
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <LogoHerval className="h-24 w-24 rounded-card p-2.5" />
@@ -30,9 +34,9 @@ export default function PaginaCadastro() {
         <div className="rounded-card bg-herval-branco p-7 shadow-card">
           <p className="flex items-start gap-2 text-sm font-medium text-black/65">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-herval-preto" />
-            Este cadastro agora é feito por um link enviado pela Herval, não
-            por esta página. Se você é cliente da Herval, peça o link de
-            convite a quem cuida da sua conta.
+            Este cadastro agora é feito por um link enviado pela Herval, não por
+            esta página. Se você é cliente da Herval, peça o link de convite a
+            quem cuida da sua conta.
           </p>
         </div>
 

@@ -28,13 +28,19 @@ export default async function PaginaDoConvite({
   const valido = await convitePendente(token);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F7F7F7] px-6 py-12">
+    <main
+      /* `dvh` em vez de `screen` pelo mesmo motivo do login: no celular
+         `100vh` conta a área atrás da barra do navegador. */
+      className="flex min-h-[100dvh] items-center justify-center bg-[#F7F7F7] px-6 py-12"
+    >
       <div className="w-full max-w-md">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <LogoHerval className="h-24 w-24 rounded-card p-2.5" />
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-herval-preto">
-              {valido ? `Bem-vindo${valido.nome ? `, ${valido.nome}` : ""}` : "Herval AI"}
+              {valido
+                ? `Bem-vindo${valido.nome ? `, ${valido.nome}` : ""}`
+                : "Herval AI"}
             </h1>
             <p className="mt-1 text-sm font-medium text-black/55">
               {valido
@@ -55,8 +61,8 @@ export default async function PaginaDoConvite({
               </p>
               <p className="text-sm leading-relaxed text-black/65">
                 Ele pode ter expirado, já ter sido usado, ou o endereço está
-                incompleto. Peça um novo convite para quem cuida da sua conta
-                na Herval.
+                incompleto. Peça um novo convite para quem cuida da sua conta na
+                Herval.
               </p>
             </div>
           )}
@@ -83,6 +89,8 @@ async function convitePendente(token: string) {
   if (!data || data.usado_em !== null) return null;
   if (new Date(data.expira_em).getTime() <= Date.now()) return null;
 
-  const clinica = Array.isArray(data.clinicas) ? data.clinicas[0] : data.clinicas;
+  const clinica = Array.isArray(data.clinicas)
+    ? data.clinicas[0]
+    : data.clinicas;
   return { nome: (clinica as { nome?: string } | null)?.nome ?? "" };
 }

@@ -120,7 +120,12 @@ function lerComoBase64(arquivo: File) {
  */
 function IconeWhatsApp({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.004c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2Zm0 1.67c2.21 0 4.29.86 5.86 2.43a8.23 8.23 0 0 1 2.42 5.86c0 4.56-3.72 8.28-8.29 8.28a8.3 8.3 0 0 1-4.22-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.4c0-4.57 3.72-8.31 8.28-8.31Zm-4.5 4.37c-.17 0-.44.06-.67.32-.23.26-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.6.13.17 1.76 2.8 4.37 3.82 2.17.86 2.61.69 3.08.65.47-.04 1.52-.62 1.73-1.22.22-.6.22-1.11.15-1.22-.07-.1-.24-.17-.5-.3-.27-.13-1.53-.76-1.77-.84-.24-.1-.41-.13-.59.13-.17.27-.67.84-.82 1.01-.15.17-.3.19-.57.07-.27-.13-1.13-.42-2.15-1.33-.8-.72-1.33-1.6-1.49-1.87-.15-.27-.02-.42.12-.55.12-.12.27-.3.4-.46.13-.15.17-.26.26-.43.09-.17.04-.33-.02-.46-.07-.13-.59-1.46-.82-2-.22-.52-.44-.45-.6-.46-.15 0-.33 0-.5 0Z" />
     </svg>
   );
@@ -867,7 +872,7 @@ export default function ConversaReal({
               className="mt-2 w-full shrink-0 rounded-full bg-herval-verde px-4 py-2 text-xs font-extrabold text-herval-preto transition-colors hover:bg-herval-verdeEscuro disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
             >
               {salvandoNota ? "Salvando…" : "Salvar nota"}
-              </button>
+            </button>
           </section>
         </div>
 
@@ -881,13 +886,28 @@ export default function ConversaReal({
           lista de mensagens, e cabeçalho e caixa de envio ficam sempre à vista —
           como em qualquer aplicativo de mensagem.
 
-          O `min-h` continua como piso para telas baixas, onde `100vh` menos o
+          O `min-h` continua como piso para telas baixas, onde `100dvh` menos o
           cabeçalho sobraria pouco demais para ler qualquer coisa.
+
+          A conta usa `dvh`, não `vh`. No celular as duas medidas são
+          diferentes: `100vh` é a tela como se a barra do navegador não
+          existisse, e `100dvh` é o que está de fato visível agora. Com `vh`, a
+          caixa de mensagens nascia mais alta do que a tela, e o fim da
+          conversa — justamente a mensagem mais recente, e a caixa de responder
+          — ficava embaixo da barra do Safari. A moldura do painel já usava
+          `100dvh`; esta conta era a única que ainda discordava dela.
 
           A partir de `lg` quem manda na altura é a linha das três colunas, e
           aqui basta ocupá-la inteira.
+
+          `order-first` é só no celular. Empilhadas, as três colunas ficavam na
+          ordem do código: dados do lead, todas as notas internas, e só então a
+          conversa — era preciso rolar por tudo isso para chegar na mensagem,
+          que é o motivo de abrir esta tela. No telefone a conversa vem
+          primeiro e o resto fica abaixo dela; de `lg` para cima a ordem volta
+          a ser a das colunas, onde nada disso está empilhado.
         */}
-        <section className="flex h-[calc(100vh-15rem)] min-h-[26rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card lg:h-full lg:min-h-0">
+        <section className="order-first flex h-[calc(100dvh-15rem)] min-h-[26rem] flex-col rounded-card border border-black/10 bg-herval-branco shadow-card lg:order-none lg:h-full lg:min-h-0">
           <h2 className="shrink-0 border-b border-black/10 px-5 py-4 text-[11px] font-bold uppercase tracking-wide text-black/45">
             Conversa
           </h2>
@@ -1363,9 +1383,7 @@ function FichaDaClinica({
     );
   }
 
-  const nomeDoProcedimento = new Map(
-    procedimentos.map((p) => [p.id, p.nome]),
-  );
+  const nomeDoProcedimento = new Map(procedimentos.map((p) => [p.id, p.nome]));
 
   const faixaEtaria = formatarFaixaEtaria(
     clinica.faixaEtariaDe,
@@ -1461,9 +1479,7 @@ function FichaDaClinica({
           />
           <Dado
             rotulo="Boleto"
-            valor={
-              clinica.formasDePagamento.includes("Boleto") ? "Sim" : "Não"
-            }
+            valor={clinica.formasDePagamento.includes("Boleto") ? "Sim" : "Não"}
           />
           <Dado
             rotulo="Convênios"

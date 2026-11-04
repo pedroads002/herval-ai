@@ -13,7 +13,17 @@ export default function PaginaLogin() {
   const configurado = supabaseConfigurado();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F7F7F7] px-6 py-12">
+    <main
+      /*
+        `min-h-[100dvh]` e não `min-h-screen`: no celular `screen` vale
+        `100vh`, que é a tela como se a barra do navegador não existisse. A
+        caixa de login ficava centralizada numa altura maior que a visível,
+        aparecia empurrada para baixo e a tela ganhava uma rolagem que não
+        devia existir. `dvh` é o que está de fato visível. No computador as
+        duas medidas são iguais.
+      */
+      className="flex min-h-[100dvh] items-center justify-center bg-[#F7F7F7] px-6 py-12"
+    >
       <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <LogoHerval className="h-24 w-24 rounded-card p-2.5" />
@@ -39,10 +49,8 @@ export default function PaginaLogin() {
               <p className="text-sm leading-relaxed text-black/65">
                 As chaves do Supabase ainda não foram preenchidas. Crie o
                 arquivo <code className="font-bold">.env.local</code> na raiz do
-                projeto com <code className="font-bold">
-                  NEXT_PUBLIC_SUPABASE_URL
-                </code>{" "}
-                e{" "}
+                projeto com{" "}
+                <code className="font-bold">NEXT_PUBLIC_SUPABASE_URL</code> e{" "}
                 <code className="font-bold">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
                 , depois reinicie o servidor.
               </p>
