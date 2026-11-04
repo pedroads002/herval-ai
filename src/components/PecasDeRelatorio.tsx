@@ -109,7 +109,30 @@ export function Tabela({
         // A primeira coluna fica presa para o nome da clínica não sumir ao
         // rolar de lado: são muitas colunas.
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[56rem] border-collapse text-sm">
+          <table
+            className="tabela-empilha w-full border-collapse text-sm md:min-w-[56rem]"
+            /*
+              Os rótulos das colunas viram variáveis de CSS para que, no
+              celular, cada célula possa escrever o seu ao lado do número — lá
+              a linha é um cartão e o cabeçalho da tabela não existe mais (a
+              regra está em `globals.css`, procure por `.tabela-empilha`).
+
+              Fazer isso aqui, e não em cada tela, é o que mantém as quatro
+              telas que usam este molde sem nenhuma alteração: o rótulo que já
+              é passado em `cabecalhos` passa a servir duas vezes.
+
+              O `min-w` ficou só no `md:` porque largura mínima de 56rem é
+              exatamente o que forçava a rolagem lateral no telefone.
+            */
+            style={
+              Object.fromEntries(
+                cabecalhos.map((texto, indice) => [
+                  `--r${indice + 1}`,
+                  JSON.stringify(texto),
+                ]),
+              ) as React.CSSProperties
+            }
+          >
             <thead>
               <tr className="bg-black/[0.03]">
                 {cabecalhos.map((texto, indice) => (

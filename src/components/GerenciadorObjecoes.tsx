@@ -136,7 +136,11 @@ export default function GerenciadorObjecoes({
       setObjecoes((atuais) =>
         atuais.map((o) =>
           o.id === id
-            ? { ...o, objecao: edicaoObjecao.trim(), resposta: edicaoResposta.trim() }
+            ? {
+                ...o,
+                objecao: edicaoObjecao.trim(),
+                resposta: edicaoResposta.trim(),
+              }
             : o,
         ),
       );
@@ -206,12 +210,30 @@ export default function GerenciadorObjecoes({
       {/* Tabela */}
       <div className="overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table
+            className="tabela-empilha w-full text-sm md:min-w-[900px]"
+            /*
+              No celular esta tabela vira um cartão por objeção: a objeção como
+              título, a resposta e os botões embaixo, cada um com o seu rótulo.
+              A regra está em `globals.css` (`.tabela-empilha`) e é a mesma das
+              tabelas de Relatórios; aqui só dizemos quais são os rótulos.
+
+              A largura mínima e as larguras fixas de coluna continuam, mas só
+              de 768px para cima — eram elas que obrigavam a arrastar a tela de
+              lado para ler uma resposta inteira no telefone.
+            */
+            style={
+              {
+                "--r2": '"Resposta padrão"',
+                "--r3": '"Ações"',
+              } as React.CSSProperties
+            }
+          >
             <thead className="border-b border-black/10 bg-black/[0.03] text-left text-xs uppercase tracking-wider text-black/50">
               <tr>
-                <th className="w-64 px-6 py-4 font-bold">Objeção</th>
+                <th className="px-6 py-4 font-bold md:w-64">Objeção</th>
                 <th className="px-6 py-4 font-bold">Resposta padrão</th>
-                <th className="w-44 px-6 py-4 font-bold">Ações</th>
+                <th className="px-6 py-4 font-bold md:w-44">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.07]">

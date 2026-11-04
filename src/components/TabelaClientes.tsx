@@ -57,36 +57,62 @@ export default function TabelaClientes({
       {clientes.length === 0 ? (
         <Vazio />
       ) : (
-        <div className="overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm">
-              <thead className="border-b border-black/10 bg-black/[0.03] text-left text-xs uppercase tracking-wider text-black/50">
-                <tr>
-                  <th className="px-6 py-4 font-bold">Cliente</th>
-                  <th className="px-6 py-4 font-bold">Como funciona</th>
-                  <th className="px-6 py-4 font-bold">Área de atuação</th>
-                  <th className="px-6 py-4 font-bold">Onde atende</th>
-                  <th className="px-6 py-4 font-bold">Profissionais</th>
-                  <th className="px-6 py-4" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.07]">
-                {clientes.map((cliente) => (
-                  <Linha key={cliente.id} cliente={cliente} />
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/*
+            Duas formas do mesmo dado, uma por largura de tela. A tabela precisa
+            de 820px para as seis colunas caberem; num celular de 390px isso
+            vira rolagem lateral obrigatória para ler uma linha inteira. Abaixo
+            de `md` cada cliente vira um cartão empilhado, com o rótulo junto do
+            valor. De `md` para cima a tabela é exatamente a de antes.
+          */}
+          <div className="space-y-3 md:hidden">
+            {clientes.map((cliente) => (
+              <Cartao key={cliente.id} cliente={cliente} />
+            ))}
           </div>
-        </div>
+
+          <div className="hidden overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead className="border-b border-black/10 bg-black/[0.03] text-left text-xs uppercase tracking-wider text-black/50">
+                  <tr>
+                    <th className="px-6 py-4 font-bold">Cliente</th>
+                    <th className="px-6 py-4 font-bold">Como funciona</th>
+                    <th className="px-6 py-4 font-bold">Área de atuação</th>
+                    <th className="px-6 py-4 font-bold">Onde atende</th>
+                    <th className="px-6 py-4 font-bold">Profissionais</th>
+                    <th className="px-6 py-4" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.07]">
+                  {clientes.map((cliente) => (
+                    <Linha key={cliente.id} cliente={cliente} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
+/**
+ * Os dados que a linha calcula a partir do cliente. Ficam numa função só para
+ * a versão de celular não poder divergir da de computador — é o mesmo cliente,
+ * visto em duas larguras de tela.
+ */
+function resumo(cliente: ClienteDoCadastro) {
+  return {
+    individual: cliente.tipoOperacao === "individual",
+    ativos: cliente.profissionais.filter((p) => p.ativo).length,
+    lugar: [cliente.cidade, cliente.estado].filter(Boolean).join(" · "),
+  };
+}
+
 function Linha({ cliente }: { cliente: ClienteDoCadastro }) {
-  const individual = cliente.tipoOperacao === "individual";
-  const ativos = cliente.profissionais.filter((p) => p.ativo).length;
-  const lugar = [cliente.cidade, cliente.estado].filter(Boolean).join(" · ");
+  const { individual, ativos, lugar } = resumo(cliente);
 
   return (
     <tr className="transition-colors hover:bg-herval-verde/[0.06]">
@@ -168,6 +194,92 @@ function Linha({ cliente }: { cliente: ClienteDoCadastro }) {
         </Link>
       </td>
     </tr>
+  );
+}
+
+/**
+ * O mesmo cliente da `Linha`, empilhado. Nenhuma informação sai: o que era
+ * coluna vira par rótulo/valor, porque no celular não há cabeçalho de tabela
+ * para explicar o que o número significa.
+ */
+function Cartao({ cliente }: { cliente: ClienteDoCadastro }) {
+  const { individual, ativos, lugar } = resumo(cliente);
+
+  return (
+    <Link
+      href={`/clientes/${cliente.id}`}
+      className="block rounded-card border border-black/10 bg-herval-branco p-4 shadow-card transition-colors active:bg-herval-verde/[0.06]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="block font-bold text-herval-preto">
+            {cliente.nome}
+          </span>
+          {(cliente.nomeExibicao || cliente.responsavelPrincipal) && (
+            <span className="mt-0.5 block text-xs font-medium text-black/50">
+              {individual
+                ? cliente.nomeExibicao
+                : `Responsável: ${cliente.responsavelPrincipal}`}
+            </span>
+          )}
+        </div>
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-black/35" />
+      </div>
+
+      {!cliente.ativa && (
+        <span className="mt-2 inline-block rounded-full border border-black/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-black/45">
+          Inativo
+        </span>
+      )}
+
+      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-black/20 px-3 py-1 text-xs font-bold text-black/65">
+        {individual ? (
+          <User className="h-3.5 w-3.5" />
+        ) : (
+          <Building2 className="h-3.5 w-3.5" />
+        )}
+        {individual ? "Profissional individual" : "Clínica ou equipe"}
+      </span>
+
+      <dl className="mt-3 space-y-1.5 text-sm">
+        <Campo rotulo="Área de atuação" valor={cliente.areaAtuacao} />
+        <Campo rotulo="Onde atende" valor={lugar} />
+        <Campo
+          rotulo="Profissionais"
+          vazio="Ninguém"
+          valor={
+            cliente.profissionais.length === 0
+              ? ""
+              : ativos < cliente.profissionais.length
+                ? `${cliente.profissionais.length} (${ativos} ${ativos === 1 ? "ativo" : "ativos"})`
+                : String(cliente.profissionais.length)
+          }
+        />
+      </dl>
+    </Link>
+  );
+}
+
+function Campo({
+  rotulo,
+  valor,
+  vazio = "Não informado",
+}: {
+  rotulo: string;
+  valor: string;
+  vazio?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="shrink-0 text-xs font-bold uppercase tracking-wide text-black/45">
+        {rotulo}
+      </dt>
+      <dd className="min-w-0 text-right font-medium text-black/65">
+        {valor || (
+          <span className="text-xs font-medium text-black/35">{vazio}</span>
+        )}
+      </dd>
+    </div>
   );
 }
 

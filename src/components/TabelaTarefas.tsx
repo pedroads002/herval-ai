@@ -202,7 +202,29 @@ export default function TabelaTarefas() {
       {/* Tabela */}
       <div className="overflow-hidden rounded-card border border-black/10 bg-herval-branco shadow-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+          <table
+            className="tabela-empilha w-full text-sm md:min-w-[1100px]"
+            /*
+              No celular cada tarefa vira um cartão: o lead como título e os
+              outros campos embaixo, cada um com o seu rótulo. A regra está em
+              `globals.css` (`.tabela-empilha`), a mesma das tabelas de
+              Relatórios; aqui só dizemos quais são os rótulos.
+
+              A largura mínima de 1100px continua valendo de 768px para cima —
+              era ela que obrigava a arrastar a tela de lado sete vezes para
+              ler uma tarefa inteira no telefone.
+            */
+            style={
+              {
+                "--r2": '"Regra disparada"',
+                "--r3": '"Ação sugerida"',
+                "--r4": '"Responsável"',
+                "--r5": '"Score"',
+                "--r6": '"Status"',
+                "--r7": '"Ações"',
+              } as React.CSSProperties
+            }
+          >
             <thead className="border-b border-black/10 bg-black/[0.03] text-left text-xs uppercase tracking-wider text-black/50">
               <tr>
                 <th className="px-6 py-4 font-bold">Lead</th>

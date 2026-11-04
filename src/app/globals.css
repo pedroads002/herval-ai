@@ -25,3 +25,109 @@ body {
   outline: 2px solid var(--herval-verde);
   outline-offset: 2px;
 }
+
+/*
+  Tabela de relatório no celular.
+
+  As tabelas de Relatórios e da Fila de Atendimento são matrizes: clínica por
+  linha, uma métrica por coluna — a de funil tem onze. Numa tela de 390px isso
+  só cabia com rolagem lateral, e ler uma linha inteira virava arrastar de lado
+  oito vezes. Abaixo de `md` (768px, o mesmo corte do menu em gaveta) cada
+  linha passa a ser um cartão, com uma métrica por linha do cartão.
+
+  O rótulo de cada métrica não é escrito aqui: quem monta a tabela já passa a
+  lista `cabecalhos`, e o componente `Tabela` (`PecasDeRelatorio.tsx`) a
+  devolve como as variáveis `--r1`, `--r2`, ... no `style` da própria tabela.
+  Cada célula pega a variável da sua posição pelo `nth-child`. É por isso que
+  nenhuma das quatro telas que usam esse molde precisou ser alterada, e é por
+  isso que uma coluna nova no futuro já nasce com rótulo no celular.
+
+  Nada disto vale de 768px para cima: lá a tabela continua exatamente a tabela
+  de antes.
+*/
+@media (max-width: 767px) {
+  .tabela-empilha,
+  .tabela-empilha tbody,
+  .tabela-empilha tr,
+  .tabela-empilha th,
+  .tabela-empilha td {
+    display: block;
+  }
+
+  /* O cabeçalho vira o rótulo de cada célula; a faixa de cima não serve mais. */
+  .tabela-empilha thead {
+    display: none;
+  }
+
+  .tabela-empilha tr {
+    border-top: 1px solid rgb(0 0 0 / 0.07);
+    padding: 0.75rem 0;
+  }
+
+  /* `sticky` só faz sentido quando existe rolagem lateral. */
+  .tabela-empilha th,
+  .tabela-empilha td {
+    position: static;
+    padding: 0.3rem 1rem;
+    text-align: left;
+    white-space: normal;
+  }
+
+  /* A primeira célula é o nome da clínica: fica como título do cartão. */
+  .tabela-empilha tr > *:first-child {
+    padding-bottom: 0.5rem;
+  }
+
+  .tabela-empilha tr > *:not(:first-child) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    /* Célula com botões ou com mensagem de erro passa do que cabe na largura
+       do telefone; sem isto, o conteúdo ficaria apertado numa só linha. */
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .tabela-empilha tr > *:not(:first-child)::before {
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: rgb(0 0 0 / 0.45);
+  }
+
+  .tabela-empilha tr > *:nth-child(2)::before {
+    content: var(--r2);
+  }
+  .tabela-empilha tr > *:nth-child(3)::before {
+    content: var(--r3);
+  }
+  .tabela-empilha tr > *:nth-child(4)::before {
+    content: var(--r4);
+  }
+  .tabela-empilha tr > *:nth-child(5)::before {
+    content: var(--r5);
+  }
+  .tabela-empilha tr > *:nth-child(6)::before {
+    content: var(--r6);
+  }
+  .tabela-empilha tr > *:nth-child(7)::before {
+    content: var(--r7);
+  }
+  .tabela-empilha tr > *:nth-child(8)::before {
+    content: var(--r8);
+  }
+  .tabela-empilha tr > *:nth-child(9)::before {
+    content: var(--r9);
+  }
+  .tabela-empilha tr > *:nth-child(10)::before {
+    content: var(--r10);
+  }
+  .tabela-empilha tr > *:nth-child(11)::before {
+    content: var(--r11);
+  }
+  .tabela-empilha tr > *:nth-child(12)::before {
+    content: var(--r12);
+  }
+}
