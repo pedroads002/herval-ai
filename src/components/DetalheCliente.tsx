@@ -134,14 +134,33 @@ function FormularioIndividual({
     endereco: cliente.endereco,
     descricao: cliente.descricao,
     horario_funcionamento: cliente.horarioFuncionamento,
+    ...valoresDoHorario(pessoa?.horarios ?? []),
   });
-  const { marcados, setMarcados } = useMarcados(
-    marcarIds(
+  const { marcados, setMarcados } = useMarcados({
+    ...marcarIds(
       "especialidades",
       (pessoa?.especialidades ?? []).map((e) => e.id),
     ),
-  );
+    ...marcarIds(
+      "unidades",
+      (pessoa?.unidades ?? []).map((u) => u.id),
+    ),
+    ...marcadosDoHorario(pessoa?.horarios ?? []),
+  });
   const [ativa, setAtiva] = useState(cliente.ativa);
+
+  /**
+   * As unidades oferecidas, pela mesma regra de `FormularioDaPessoa`: inativa
+   * fica de fora, menos a inativa onde a pessoa já atende — escondê-la apagaria
+   * o vínculo no primeiro "salvar alterações", sem ninguém pedir.
+   */
+  const jaAtende = new Set((pessoa?.unidades ?? []).map((u) => u.id));
+  const unidades = cliente.unidades
+    .filter((u) => u.ativa || jaAtende.has(u.id))
+    .map((u) => ({
+      id: u.id,
+      nome: u.ativa ? u.nome : `${u.nome} (inativa)`,
+    }));
 
   return (
     <Cartao titulo="Profissional individual">
@@ -160,6 +179,36 @@ function FormularioIndividual({
           aoMarcar={setMarcados}
           especialidades={especialidades}
         />
+
+        {/* Onde a pessoa atende e em que dias, do mesmo jeito que a clínica com
+            equipe já tinha. Antes estes dois blocos só existiam no formulário
+            da equipe, e o cliente individual ficava sem tela nenhuma para
+            mudar a unidade do profissional: da segunda unidade em diante não
+            havia caminho, nem para escolher onde ele atende nem para tirá-lo de
+            um lugar — e sem tirar, a unidade errada não podia ser excluída.
+
+            Só com profissional cadastrado: sem ele não existe de quem seja o
+            vínculo, e a ação já recusa esse envio dizendo o que falta.
+
+            Quem tem uma unidade só não vê campo novo: `Unidades` vira um campo
+            escondido, e o horário aparece como "o horário dela", sem o nome do
+            lugar. */}
+        {pessoa && (
+          <>
+            <Unidades
+              unidades={unidades}
+              marcados={marcados}
+              aoMarcar={setMarcados}
+            />
+            <HorariosNasUnidades
+              unidades={unidades}
+              marcados={marcados}
+              aoMarcar={setMarcados}
+              valores={valores}
+              aoMudar={mudar}
+            />
+          </>
+        )}
 
         <div className="flex flex-wrap items-center gap-4 border-t border-black/10 pt-7">
           <button type="submit" disabled={enviando} className={botaoPrincipal}>

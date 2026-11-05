@@ -281,11 +281,7 @@ function lerCliente(
     longoDemais(cidade, LIMITE_CURTO, "Cidade") ??
     longoDemais(endereco, LIMITE_NOME * 2, "Endereço") ??
     longoDemais(descricao, LIMITE_DESCRICAO, "Descrição curta") ??
-    longoDemais(
-      horarioFuncionamento,
-      LIMITE_CURTO,
-      "Horário de funcionamento",
-    );
+    longoDemais(horarioFuncionamento, LIMITE_CURTO, "Horário de funcionamento");
 
   if (excedeu) return { erro: excedeu };
 
@@ -563,6 +559,10 @@ export async function editarCliente(
  * Existe separada da edição de clínica porque, aqui, o cliente e a pessoa são
  * a mesma. Dois formulários lado a lado pedindo o mesmo nome deixariam os dois
  * cadastros discordarem no dia em que alguém corrigisse só um.
+ *
+ * Onde a pessoa atende entra aqui pelas mesmas funções da edição de equipe
+ * (`unidadesEscolhidas`, `lerHorarios`, `trocarUnidades`) — ver o porquê no
+ * meio do corpo.
  */
 export async function editarIndividual(
   _anterior: ResultadoDoCadastro,
@@ -580,6 +580,39 @@ export async function editarIndividual(
 
   const pessoa = lerPessoa(formData);
   if ("erro" in pessoa) return recusar(pessoa.erro);
+
+  /*
+    Onde a pessoa atende e em que dias — conferido antes de gravar qualquer
+    coisa, para unidade de outro cliente ou hora invertida recusarem o envio
+    inteiro em vez de salvar os dados do cliente e falhar na metade de baixo.
+
+    Isto não existia aqui: a edição do cliente individual salvava a pessoa e
+    nunca tocava em `profissional_unidades`, então a tela não tinha como mudar
+    o lugar de quem atende sozinho. Da segunda unidade em diante o cliente
+    ficava preso no vínculo criado no cadastro — e, preso nele, a unidade errada
+    também não podia ser excluída. Mesmas funções da edição de equipe, nenhuma
+    regra nova.
+
+    Sem profissional não há vínculo de quem seja, e a recusa logo abaixo já diz
+    o que falta.
+  */
+  let escolhidas: { ids: number[]; nomes: Map<number, string> } | null = null;
+  let horarios: Map<number, HorarioGravavel> | null = null;
+
+  if (pessoaId !== null) {
+    const quais = await unidadesEscolhidas(
+      sessao.supabase,
+      id,
+      numeros(formData, "unidades"),
+    );
+    if ("erro" in quais) return recusar(quais.erro);
+
+    const quando = lerHorarios(formData, quais.ids, quais.nomes);
+    if ("erro" in quando) return recusar(quando.erro);
+
+    escolhidas = quais;
+    horarios = quando;
+  }
 
   const { error } = await sessao.supabase
     .from("clinicas")
@@ -606,6 +639,16 @@ export async function editarIndividual(
     dados.area_atuacao,
   );
   if (erro) return recusar(erro);
+
+  if (escolhidas !== null && horarios !== null) {
+    const erroDosLugares = await trocarUnidades(
+      sessao.supabase,
+      pessoaId,
+      escolhidas.ids,
+      horarios,
+    );
+    if (erroDosLugares) return recusar(erroDosLugares);
+  }
 
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${id}`);
