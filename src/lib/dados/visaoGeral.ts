@@ -581,9 +581,24 @@ export async function carregarVisaoGeral(
   // atual + anterior). A dos agendamentos não pode vir cortada: a regra de
   // remarcação precisa da fila inteira de consultas de cada lead, e um corte por
   // data quebraria a sequência.
+  /*
+    Lead sem cliente fica fora das três leituras de lead, pelo `.not` repetido
+    abaixo.
+
+    Em "Todas as clínicas" não havia filtro nenhum, então o lead órfão (o que
+    está gravado com `clinica_id` vazio) entrava no total desta tela e não
+    entrava no dos Relatórios, que confere cliente por cliente e não acha dono
+    para ele. As duas telas mostravam números diferentes para o mesmo período,
+    sem nada explicando a diferença. Fora da conta nas duas, o total voltou a
+    ser a soma dos clientes — e o órfão passa a aparecer no aviso, que é o lugar
+    certo de um dado quebrado: visível, em vez de somado em silêncio.
+
+    Com um cliente escolhido o `.eq` já descartava o órfão, então ali nada muda.
+  */
   let leadsDaJanela = supabase
     .from("leads")
     .select("id, etapa, criado_em")
+    .not("clinica_id", "is", null)
     .gte("criado_em", primeiroInstante(janela))
     .lte("criado_em", ultimoInstante(janela))
     .limit(TETO_DE_LINHAS);
@@ -593,6 +608,7 @@ export async function carregarVisaoGeral(
   let perdidos = supabase
     .from("leads")
     .select("id, motivo_perda")
+    .not("clinica_id", "is", null)
     .eq("etapa", ETAPA_PERDIDA)
     .limit(TETO_DE_LINHAS);
 
@@ -600,6 +616,7 @@ export async function carregarVisaoGeral(
   let motivosDaJanela = supabase
     .from("leads")
     .select("id, motivo_perda")
+    .not("clinica_id", "is", null)
     .gte("criado_em", primeiroInstante(janela))
     .lte("criado_em", ultimoInstante(janela))
     .limit(TETO_DE_LINHAS);
@@ -617,6 +634,7 @@ export async function carregarVisaoGeral(
     respostaDosAgendamentos,
     respostaDasUnidades,
     respostaDasClinicas,
+    respostaDosOrfaos,
   ] = await Promise.all([
     leadsDaJanela,
     motivosDaJanela,
@@ -642,6 +660,14 @@ export async function carregarVisaoGeral(
       .select("id, nome, ativa")
       .order("nome")
       .limit(TETO_DE_LINHAS),
+    // Quantos leads estão sem cliente, para o aviso. Contagem no banco, sem
+    // trazer linha nenhuma (`head`), porque aqui só o número interessa — e ela
+    // não tem corte de período de propósito: lead órfão é defeito de cadastro,
+    // não movimento do mês.
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .is("clinica_id", null),
   ]);
 
   const erro =
@@ -650,7 +676,8 @@ export async function carregarVisaoGeral(
     respostaDosPerdidos.error ??
     respostaDosAgendamentos.error ??
     respostaDasUnidades.error ??
-    respostaDasClinicas.error;
+    respostaDasClinicas.error ??
+    respostaDosOrfaos.error;
 
   if (erro) {
     return {
@@ -747,11 +774,19 @@ export async function carregarVisaoGeral(
       ativa: ((clinica.ativa as boolean | null) ?? true) === true,
     })),
     falha: null,
-    aviso: montarAviso(leads.length, todosOsAgendamentos.length),
+    aviso: montarAviso(
+      leads.length,
+      todosOsAgendamentos.length,
+      respostaDosOrfaos.count ?? 0,
+    ),
   };
 }
 
-function montarAviso(leadsLidos: number, agendamentosLidos: number) {
+function montarAviso(
+  leadsLidos: number,
+  agendamentosLidos: number,
+  semCliente: number,
+) {
   const avisos: string[] = [];
 
   if (leadsLidos >= TETO_DE_LINHAS) {
@@ -763,6 +798,16 @@ function montarAviso(leadsLidos: number, agendamentosLidos: number) {
   if (agendamentosLidos >= TETO_DE_LINHAS) {
     avisos.push(
       `O histórico de consultas também está limitado a ${TETO_DE_LINHAS} linhas, as mais recentes. Remarcação de consulta mais antiga que isso pode não estar contada.`,
+    );
+  }
+
+  // O mesmo texto dos Relatórios, palavra por palavra: é o mesmo defeito, e
+  // duas redações diferentes para ele fariam parecer que são dois problemas.
+  if (semCliente > 0) {
+    avisos.push(
+      semCliente === 1
+        ? 'Existe 1 lead gravado sem cliente. Ele fica fora de todas as contas desta tela, porque não há a qual operação somá-lo — e continua no banco, esperando conserto no Funil, no filtro "Sem cliente".'
+        : `Existem ${semCliente} leads gravados sem cliente. Eles ficam fora de todas as contas desta tela, porque não há a qual operação somá-los — e continuam no banco, esperando conserto no Funil, no filtro "Sem cliente".`,
     );
   }
 

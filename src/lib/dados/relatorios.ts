@@ -96,6 +96,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     respostaDosEventos,
     respostaDasUnidades,
     respostaDasClinicas,
+    respostaDosOrfaos,
   ] = await Promise.all([
     supabase
       .from("leads")
@@ -125,6 +126,15 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
       .select("id, nome, ativa")
       .order("nome", { ascending: true })
       .limit(TETO_DE_LINHAS),
+    // Quantos leads estão sem cliente, só para o aviso. A tela já os deixava de
+    // fora das contas — ela confere cliente por cliente e não acha dono para
+    // eles —, mas os deixava de fora em silêncio: ninguém tinha como saber que
+    // existiam. Contagem no banco, sem trazer linha (`head`), igual à Visão
+    // Geral, para as duas telas dizerem o mesmo número.
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .is("clinica_id", null),
   ]);
 
   const erro =
@@ -132,7 +142,8 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     respostaDosAgendamentos.error ??
     respostaDosEventos.error ??
     respostaDasUnidades.error ??
-    respostaDasClinicas.error;
+    respostaDasClinicas.error ??
+    respostaDosOrfaos.error;
 
   if (erro) {
     return {
@@ -175,11 +186,21 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     clinicaPorUnidade: unidades.map((u) => [u.id, u.clinica_id]),
     clinicas,
     falha: null,
-    aviso: montarAviso(leads.length, agendamentos.length, eventos.length),
+    aviso: montarAviso(
+      leads.length,
+      agendamentos.length,
+      eventos.length,
+      respostaDosOrfaos.count ?? 0,
+    ),
   };
 }
 
-function montarAviso(leads: number, agendamentos: number, eventos: number) {
+function montarAviso(
+  leads: number,
+  agendamentos: number,
+  eventos: number,
+  semCliente: number,
+) {
   const avisos: string[] = [];
 
   if (leads >= TETO_DE_LINHAS) {
@@ -197,6 +218,16 @@ function montarAviso(leads: number, agendamentos: number, eventos: number) {
   if (eventos >= TETO_DE_LINHAS) {
     avisos.push(
       `A Fila de Atendimento está lendo no máximo ${TETO_DE_LINHAS} mudanças de etapa, as mais recentes. Lead cuja entrada em "Em Contato" ficou fora desse corte aparece como ainda não contatado.`,
+    );
+  }
+
+  // O mesmo texto da Visão Geral, palavra por palavra: é o mesmo defeito, e
+  // duas redações diferentes para ele fariam parecer que são dois problemas.
+  if (semCliente > 0) {
+    avisos.push(
+      semCliente === 1
+        ? 'Existe 1 lead gravado sem cliente. Ele fica fora de todas as contas desta tela, porque não há a qual operação somá-lo — e continua no banco, esperando conserto no Funil, no filtro "Sem cliente".'
+        : `Existem ${semCliente} leads gravados sem cliente. Eles ficam fora de todas as contas desta tela, porque não há a qual operação somá-los — e continuam no banco, esperando conserto no Funil, no filtro "Sem cliente".`,
     );
   }
 
