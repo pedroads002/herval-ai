@@ -10,14 +10,15 @@
  *   ativarTemplate      põe este no ar e desliga o irmão da mesma
  *                       clínica+categoria. Exige ao menos uma mensagem.
  *   excluirTemplate     tira do banco, com as mensagens dele (a chave
- *                       estrangeira é `on delete cascade`). Só o que está
- *                       desligado: excluir o ativo deixaria a categoria muda
- *                       sem ninguém pedir isso.
+ *                       estrangeira é `on delete cascade`) e com os arquivos
+ *                       dele no Storage. Só o que está desligado: excluir o
+ *                       ativo deixaria a categoria muda sem ninguém pedir isso.
  *   adicionarMensagem   entra uma bolha ao final do template. `ordem` é
  *                       calculada aqui, nunca recebida da tela — igual a
  *                       `acoes/followUp.ts`.
  *   editarMensagem      formato, texto/legenda, mídia e espera de uma bolha.
- *   removerMensagem     tira a bolha. Os números das irmãs não são
+ *   removerMensagem     tira a bolha, e com ela o arquivo de mídia que era só
+ *                       dela. Os números das irmãs não são
  *                       recalculados: `ordem` só precisa ser única e crescente
  *                       dentro do template, e a tela numera pela posição na
  *                       lista, então um buraco em `ordem` não aparece.
@@ -36,6 +37,7 @@
 
 import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/servidor";
+import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { supabaseConfigurado, supabaseUrl } from "@/lib/supabase/config";
 import { carregarAutorizacao, ehHervalAdmin } from "@/lib/autorizacao";
 import { FORMATOS_DE_MENSAGEM, type FormatoDeMensagem } from "@/data/templates";
@@ -47,7 +49,8 @@ const ESPERA_MINIMA = 0;
 const ESPERA_MAXIMA = 60;
 
 /** O mesmo bucket das outras mídias do cliente — ver a rota do upload. */
-const PREFIXO_DA_MIDIA = `${supabaseUrl}/storage/v1/object/public/clinicas-midia/`;
+const BUCKET = "clinicas-midia";
+const PREFIXO_DA_MIDIA = `${supabaseUrl}/storage/v1/object/public/${BUCKET}/`;
 
 type ClienteDoServidor = Awaited<ReturnType<typeof criarClienteServidor>>;
 
@@ -75,6 +78,85 @@ async function exigirAdmin(): Promise<
   }
 
   return { supabase: await criarClienteServidor() };
+}
+
+/**
+ * O caminho do arquivo dentro do bucket, a partir do endereço público.
+ *
+ * Devolve `null` para endereço que não é do nosso bucket: o campo
+ * `midia_url` é texto, e apagar caminho vindo de endereço estranho seria
+ * apagar arquivo que não é desta mensagem.
+ */
+function caminhoDaMidia(url: string | null): string | null {
+  if (!url || !url.startsWith(PREFIXO_DA_MIDIA)) return null;
+
+  const caminho = url.slice(PREFIXO_DA_MIDIA.length);
+  return caminho.startsWith("templates/") ? caminho : null;
+}
+
+/**
+ * Apaga no Storage arquivos que acabaram de perder o dono.
+ *
+ * Passa pela `service_role` (`criarClienteAdmin`) pelo mesmo motivo da rota do
+ * upload: `storage.objects` está com RLS ligada e sem política nenhuma, então
+ * a sessão de quem está logado não apaga arquivo nenhum. A decisão de
+ * 05/11/2026 foi não criar política de storage, e sim usar a chave de serviço
+ * atrás da mesma tranca de papel — e o papel já foi conferido por
+ * `exigirAdmin` antes de chegar aqui.
+ *
+ * Devolve o motivo quando não deu, em vez de lançar: a linha do banco já foi
+ * apagada quando esta função roda, e a ação precisa poder contar as duas
+ * coisas ao usuário.
+ */
+async function apagarArquivos(caminhos: string[]): Promise<string | null> {
+  if (caminhos.length === 0) return null;
+
+  const clienteAdmin = criarClienteAdmin();
+  if (!clienteAdmin) {
+    return "falta SUPABASE_SERVICE_ROLE_KEY neste ambiente";
+  }
+
+  const { error } = await clienteAdmin.storage.from(BUCKET).remove(caminhos);
+  return error ? error.message : null;
+}
+
+/**
+ * Tudo o que está na pasta de um template.
+ *
+ * A pasta é consultada em vez de montada a partir das linhas de
+ * `template_mensagens` de propósito: assim também sai o arquivo que subiu e
+ * nunca virou mensagem (o upload acontece antes de a bolha ser salva, então o
+ * usuário que desiste no meio do formulário deixa um arquivo sozinho ali).
+ *
+ * `list` devolve no máximo um lote por chamada, daí a paginação — um template
+ * com mais de cem arquivos é improvável, mas a volta é barata.
+ */
+async function arquivosDoTemplate(
+  clinicaId: number,
+  templateId: number,
+): Promise<{ erro: string } | { caminhos: string[] }> {
+  const clienteAdmin = criarClienteAdmin();
+  if (!clienteAdmin) {
+    return { erro: "falta SUPABASE_SERVICE_ROLE_KEY neste ambiente" };
+  }
+
+  const pasta = `templates/${clinicaId}/${templateId}`;
+  const porLote = 100;
+  const caminhos: string[] = [];
+
+  for (let lote = 0; ; lote += 1) {
+    const { data, error } = await clienteAdmin.storage
+      .from(BUCKET)
+      .list(pasta, { limit: porLote, offset: lote * porLote });
+
+    if (error) return { erro: error.message };
+
+    const itens = data ?? [];
+    for (const item of itens) caminhos.push(`${pasta}/${item.name}`);
+    if (itens.length < porLote) break;
+  }
+
+  return { caminhos };
 }
 
 function numero(formData: FormData, campo: string) {
@@ -283,7 +365,7 @@ export async function excluirTemplate(
 
   const { data: template, error: erroDaLeitura } = await sessao.supabase
     .from("templates")
-    .select("id, ativo")
+    .select("id, clinica_id, ativo")
     .eq("id", id)
     .maybeSingle();
 
@@ -305,12 +387,30 @@ export async function excluirTemplate(
 
   /*
     As mensagens vão com ele, pelo `on delete cascade` da chave estrangeira. Os
-    arquivos de mídia ficam no bucket: o endereço público pode estar em uma
-    conversa já enviada, e apagar o arquivo transformaria a mensagem que o
-    paciente recebeu em link quebrado. Limpar arquivo sem dono é assunto de
-    outra hora, com ele sabendo.
+    arquivos de mídia saem do bucket junto, por decisão dele em 05/11/2026:
+    template excluído deixava a pasta `templates/{clinica}/{template}` cheia de
+    arquivo sem dono, invisível no painel e sem jeito de limpar pela tela.
+
+    O banco vem primeiro porque é ele que a tela mostra: se o Storage recusar
+    depois, a exclusão não volta atrás — a recusa abaixo diz que sobrou arquivo,
+    em vez de deixar a tela quieta sobre isso.
   */
   revalidatePath("/templates-whatsapp");
+
+  const arquivos = await arquivosDoTemplate(template.clinica_id, id);
+  if ("erro" in arquivos) {
+    return recusar(
+      `O template foi excluído, mas não deu para ler os arquivos dele no Storage (${arquivos.erro}). Os arquivos podem ter ficado lá.`,
+    );
+  }
+
+  const falhaAoApagar = await apagarArquivos(arquivos.caminhos);
+  if (falhaAoApagar) {
+    return recusar(
+      `O template foi excluído, mas os arquivos dele ficaram no Storage (${falhaAoApagar}).`,
+    );
+  }
+
   return aceitar("Template excluído.");
 }
 
@@ -389,6 +489,19 @@ export async function removerMensagem(
   const id = numero(formData, "id");
   if (id === null) return recusar("Não deu para saber qual mensagem remover.");
 
+  // O endereço do arquivo é lido antes do `delete`: depois a linha não existe
+  // mais e não haveria como saber qual arquivo ficou sem dono.
+  const { data: mensagem, error: erroDaLeitura } = await sessao.supabase
+    .from("template_mensagens")
+    .select("id, midia_url")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (erroDaLeitura) {
+    return recusar(`Não deu para ler a mensagem: ${erroDaLeitura.message}`);
+  }
+  if (!mensagem) return recusar("Esta mensagem não existe mais.");
+
   const { error } = await sessao.supabase
     .from("template_mensagens")
     .delete()
@@ -397,6 +510,19 @@ export async function removerMensagem(
   if (error) return recusar(`Não deu para remover: ${error.message}`);
 
   revalidatePath("/templates-whatsapp");
+
+  // Bolha de áudio, imagem ou vídeo leva o arquivo dela embora. Mesma ordem da
+  // exclusão de template: o banco primeiro, e o que sobrar é dito ao usuário.
+  const caminho = caminhoDaMidia(mensagem.midia_url);
+  if (caminho) {
+    const falhaAoApagar = await apagarArquivos([caminho]);
+    if (falhaAoApagar) {
+      return recusar(
+        `A mensagem foi removida, mas o arquivo dela ficou no Storage (${falhaAoApagar}).`,
+      );
+    }
+  }
+
   return aceitar("Mensagem removida.");
 }
 

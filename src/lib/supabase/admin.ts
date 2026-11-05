@@ -9,7 +9,9 @@ import { supabaseUrl } from "@/lib/supabase/config";
  * `src/app/api/admin/convidar-cliente/route.ts`,
  * `src/app/api/admin/equipe/permissoes/route.ts`,
  * `src/app/api/convite/completar/route.ts`, `src/app/convite/[token]/page.tsx`,
- * `src/lib/dados/equipe.ts` e `src/app/api/admin/templates/midia/route.ts`.
+ * `src/lib/dados/equipe.ts`, `src/app/api/admin/templates/midia/route.ts` e
+ * `src/lib/acoes/templates.ts` (apaga no Storage o arquivo da mensagem ou do
+ * template excluído, pelo mesmo motivo da rota do upload).
  * Nenhum outro lugar do projeto precisa de um cliente privilegiado — a leitura
  * e a escrita de todas as telas e Server Actions continuam pela sessão do
  * próprio usuário (`criarClienteServidor`), sujeitas à RLS. Se um dia outro

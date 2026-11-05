@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowDown,
@@ -55,6 +56,18 @@ import { RESULTADO_INICIAL } from "@/lib/acoes/resultadoDoCadastro";
  * uma cópia local aqui só criaria uma segunda versão da verdade, que
  * discordaria do banco no primeiro erro. O que é estado aqui é só o que a
  * pessoa está digitando.
+ *
+ * Por isso **toda gravação chama `router.refresh()` quando a ação responde**.
+ * O `revalidatePath` da ação limpa o cache do lado do servidor, mas não é ele
+ * que garante que esta aba redesenhe: quem limpa o cache do cliente para esta
+ * rota e refaz o pedido é o `refresh`, e ele preserva o estado React (o bloco
+ * aberto, o formulário no meio, a rolagem). Sem isso, dava para salvar uma
+ * bolha e continuar vendo a lista antiga até recarregar a página na mão — foi
+ * o que apareceu no teste em produção de 05/11/2026.
+ *
+ * O refresh acontece em qualquer resultado, inclusive recusa: a ativação e a
+ * reordenação podem parar no meio do caminho, com parte do banco já mudada, e
+ * aí a tela precisa mostrar o que ficou valendo.
  */
 
 const campoBase =
@@ -189,6 +202,7 @@ function CartaoDaCategoria({
   clinicaId: number;
   templates: TemplateDoCliente[];
 }) {
+  const router = useRouter();
   const [pendente, iniciarTransicao] = useTransition();
   const [criando, setCriando] = useState(false);
   const [novoNome, setNovoNome] = useState("");
@@ -210,6 +224,7 @@ function CartaoDaCategoria({
 
     iniciarTransicao(async () => {
       const resultado = await criarTemplate(RESULTADO_INICIAL, formData);
+      router.refresh();
 
       if (!resultado.ok) {
         setErro(resultado.mensagem);
@@ -327,6 +342,7 @@ function BlocoDoTemplate({
   template: TemplateDoCliente;
   aberto?: boolean;
 }) {
+  const router = useRouter();
   const [pendente, iniciarTransicao] = useTransition();
   const [mostrando, setMostrando] = useState(aberto);
   const [adicionando, setAdicionando] = useState(false);
@@ -338,6 +354,7 @@ function BlocoDoTemplate({
 
     iniciarTransicao(async () => {
       const resultado = await ativarTemplate(RESULTADO_INICIAL, formData);
+      router.refresh();
       setErro(resultado.ok ? "" : resultado.mensagem);
     });
   }
@@ -348,6 +365,7 @@ function BlocoDoTemplate({
 
     iniciarTransicao(async () => {
       const resultado = await excluirTemplate(RESULTADO_INICIAL, formData);
+      router.refresh();
       setErro(resultado.ok ? "" : resultado.mensagem);
     });
   }
@@ -461,6 +479,7 @@ function LinhaDaMensagem({
   primeira: boolean;
   ultima: boolean;
 }) {
+  const router = useRouter();
   const [pendente, iniciarTransicao] = useTransition();
   const [editando, setEditando] = useState(false);
   const [erro, setErro] = useState("");
@@ -472,6 +491,7 @@ function LinhaDaMensagem({
 
     iniciarTransicao(async () => {
       const resultado = await moverMensagem(RESULTADO_INICIAL, formData);
+      router.refresh();
       setErro(resultado.ok ? "" : resultado.mensagem);
     });
   }
@@ -482,6 +502,7 @@ function LinhaDaMensagem({
 
     iniciarTransicao(async () => {
       const resultado = await removerMensagem(RESULTADO_INICIAL, formData);
+      router.refresh();
       setErro(resultado.ok ? "" : resultado.mensagem);
     });
   }
@@ -600,6 +621,7 @@ function FormularioDeMensagem({
   mensagem?: MensagemDoTemplate;
   aoFechar: () => void;
 }) {
+  const router = useRouter();
   const [pendente, iniciarTransicao] = useTransition();
   const [formato, setFormato] = useState<FormatoDeMensagem>(
     mensagem?.formato ?? "texto",
@@ -661,6 +683,7 @@ function FormularioDeMensagem({
       const resultado = mensagem
         ? await editarMensagem(RESULTADO_INICIAL, formData)
         : await adicionarMensagem(RESULTADO_INICIAL, formData);
+      router.refresh();
 
       if (!resultado.ok) {
         setErro(resultado.mensagem);
