@@ -601,6 +601,16 @@ export async function carregarVisaoGeral(
     .not("clinica_id", "is", null)
     .gte("criado_em", primeiroInstante(janela))
     .lte("criado_em", ultimoInstante(janela))
+    /*
+      A ordem existe por causa do teto. Sem `order`, o banco devolve as linhas
+      na ordem que quiser: passando de TETO_DE_LINHAS, nem se sabia quais mil
+      vinham, e duas aberturas da mesma tela podiam dar números diferentes sem
+      nada ter mudado no banco. Com as mais recentes primeiro, o corte passa a
+      ser sempre o mesmo e sempre o menos pior — e o aviso de corte, que a tela
+      já mostra, diz que ele aconteceu. A leitura de consultas, logo abaixo, já
+      fazia isso; as de lead tinham ficado para trás.
+    */
+    .order("criado_em", { ascending: false })
     .limit(TETO_DE_LINHAS);
 
   // Os motivos de perda não têm filtro de período, igual ao comportamento de
@@ -610,6 +620,7 @@ export async function carregarVisaoGeral(
     .select("id, motivo_perda")
     .not("clinica_id", "is", null)
     .eq("etapa", ETAPA_PERDIDA)
+    .order("criado_em", { ascending: false })
     .limit(TETO_DE_LINHAS);
 
   // Os leads da janela também precisam do motivo, para o cálculo de qualificado.
@@ -619,6 +630,7 @@ export async function carregarVisaoGeral(
     .not("clinica_id", "is", null)
     .gte("criado_em", primeiroInstante(janela))
     .lte("criado_em", ultimoInstante(janela))
+    .order("criado_em", { ascending: false })
     .limit(TETO_DE_LINHAS);
 
   if (clinicaId !== null) {
@@ -648,7 +660,13 @@ export async function carregarVisaoGeral(
       .limit(TETO_DE_LINHAS),
     // `agendamentos` guarda a unidade, não a clínica. O recorte por cliente
     // passa por aqui — sem isso não há como filtrar consulta por clínica.
-    supabase.from("unidades").select("id, clinica_id").limit(TETO_DE_LINHAS),
+    // `order` aqui pelo mesmo motivo das leituras de lead: o teto precisa cortar
+    // sempre no mesmo lugar. Por id, que é a ordem em que as unidades nasceram.
+    supabase
+      .from("unidades")
+      .select("id, clinica_id")
+      .order("id", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     // Todos os clientes, inclusive os pausados, e pelo mesmo motivo de
     // `dados/relatorios.ts`: o seletor escreve "(pausada)" ao lado do nome, e
     // esconder o pausado tornava o histórico dele inalcançável — não havia

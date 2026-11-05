@@ -118,7 +118,11 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
       .limit(TETO_DE_LINHAS),
     // `agendamentos` guarda a unidade, não a clínica. O relatório é por
     // cliente, então o caminho passa por aqui — igual à Visão Geral.
-    supabase.from("unidades").select("id, clinica_id").limit(TETO_DE_LINHAS),
+    supabase
+      .from("unidades")
+      .select("id, clinica_id")
+      .order("id", { ascending: true })
+      .limit(TETO_DE_LINHAS),
     // Todos os clientes, inclusive os pausados: a tela já mostra "(pausada)"
     // no filtro e na tabela, e esconder cliente pausado mudaria o relatório.
     supabase
