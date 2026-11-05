@@ -17,6 +17,8 @@
  *                       calculada aqui, nunca recebida da tela — igual a
  *                       `acoes/followUp.ts`.
  *   editarMensagem      formato, texto/legenda, mídia e espera de uma bolha.
+ *                       Trocar o arquivo, ou voltar a bolha para texto, apaga
+ *                       no Storage o arquivo que saiu.
  *   removerMensagem     tira a bolha, e com ela o arquivo de mídia que era só
  *                       dela. Os números das irmãs não são
  *                       recalculados: `ordem` só precisa ser única e crescente
@@ -468,6 +470,20 @@ export async function editarMensagem(
   const dados = lerMensagem(formData);
   if ("erro" in dados) return recusar(dados.erro);
 
+  // O endereço atual é lido antes de ser sobrescrito: trocar o arquivo da
+  // bolha, ou voltar ela para "texto", deixava o arquivo anterior no bucket
+  // sem ninguém apontando para ele.
+  const { data: antes, error: erroDaLeitura } = await sessao.supabase
+    .from("template_mensagens")
+    .select("id, midia_url")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (erroDaLeitura) {
+    return recusar(`Não deu para ler a mensagem: ${erroDaLeitura.message}`);
+  }
+  if (!antes) return recusar("Esta mensagem não existe mais.");
+
   const { error } = await sessao.supabase
     .from("template_mensagens")
     .update(dados)
@@ -476,6 +492,23 @@ export async function editarMensagem(
   if (error) return recusar(`Não deu para salvar: ${error.message}`);
 
   revalidatePath("/templates-whatsapp");
+
+  // Só o arquivo que saiu da mensagem. Salvar sem mexer na mídia mantém o
+  // mesmo endereço, e aí não há nada a apagar.
+  const antigo =
+    antes.midia_url === dados.midia_url
+      ? null
+      : caminhoDaMidia(antes.midia_url);
+
+  if (antigo) {
+    const falhaAoApagar = await apagarArquivos([antigo]);
+    if (falhaAoApagar) {
+      return recusar(
+        `As alterações foram salvas, mas o arquivo antigo ficou no Storage (${falhaAoApagar}).`,
+      );
+    }
+  }
+
   return aceitar("Alterações salvas.");
 }
 
