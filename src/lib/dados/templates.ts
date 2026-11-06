@@ -22,10 +22,12 @@ import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 import {
   FORMATOS_DE_MENSAGEM,
+  UNIDADES_DE_ESPERA,
   type CategoriaDeTemplate,
   type FormatoDeMensagem,
   type MensagemDoTemplate,
   type TemplateDoCliente,
+  type UnidadeDeEspera,
 } from "@/data/templates";
 import type { ClinicaDaLista } from "@/lib/dados/visaoGeral";
 
@@ -53,7 +55,8 @@ type LinhaDeMensagem = {
   formato: string;
   texto: string | null;
   midia_url: string | null;
-  delay_segundos: number;
+  delay_valor: number;
+  delay_unidade: string;
 };
 
 export type DadosDosTemplates = {
@@ -86,6 +89,19 @@ const SEM_DADOS: DadosDosTemplates = {
 function formatoValido(valor: string): FormatoDeMensagem | null {
   return (FORMATOS_DE_MENSAGEM as readonly string[]).includes(valor)
     ? (valor as FormatoDeMensagem)
+    : null;
+}
+
+/**
+ * A unidade da espera, conferida contra a lista que o CHECK do banco aceita.
+ *
+ * Diferente do formato, unidade fora da lista não esconde a mensagem: o texto
+ * que a Helô envia continua na tela, e só a espera aparece como se fosse em
+ * segundos — contado no aviso, para ninguém ler uma espera errada sem saber.
+ */
+function unidadeValida(valor: string): UnidadeDeEspera | null {
+  return (UNIDADES_DE_ESPERA as readonly string[]).includes(valor)
+    ? (valor as UnidadeDeEspera)
     : null;
 }
 
@@ -174,7 +190,9 @@ export async function carregarTemplates(
   // leitura por template: são poucas linhas e uma consulta só.
   const { data: linhasDeMensagem, error: erroDasMensagens } = await supabase
     .from("template_mensagens")
-    .select("id, template_id, ordem, formato, texto, midia_url, delay_segundos")
+    .select(
+      "id, template_id, ordem, formato, texto, midia_url, delay_valor, delay_unidade",
+    )
     .in(
       "template_id",
       templates.map((t) => t.id),
@@ -196,6 +214,7 @@ export async function carregarTemplates(
 
   const porTemplate = new Map<number, MensagemDoTemplate[]>();
   let formatoDesconhecido = 0;
+  let unidadeDesconhecida = 0;
 
   for (const linha of mensagens) {
     const formato = formatoValido(linha.formato);
@@ -204,6 +223,9 @@ export async function carregarTemplates(
       continue;
     }
 
+    const unidade = unidadeValida(linha.delay_unidade);
+    if (unidade === null) unidadeDesconhecida += 1;
+
     const lista = porTemplate.get(linha.template_id) ?? [];
     lista.push({
       id: linha.id,
@@ -211,7 +233,8 @@ export async function carregarTemplates(
       formato,
       texto: linha.texto,
       midiaUrl: linha.midia_url,
-      delaySegundos: linha.delay_segundos,
+      delayValor: linha.delay_valor,
+      delayUnidade: unidade ?? "segundos",
     });
     porTemplate.set(linha.template_id, lista);
   }
@@ -227,7 +250,12 @@ export async function carregarTemplates(
       mensagens: porTemplate.get(linha.id) ?? [],
     })),
     falha: null,
-    aviso: montarAviso(templates.length, mensagens.length, formatoDesconhecido),
+    aviso: montarAviso(
+      templates.length,
+      mensagens.length,
+      formatoDesconhecido,
+      unidadeDesconhecida,
+    ),
   };
 }
 
@@ -235,6 +263,7 @@ function montarAviso(
   templates: number,
   mensagens: number,
   formatoDesconhecido: number,
+  unidadeDesconhecida: number,
 ) {
   const avisos: string[] = [];
 
@@ -255,6 +284,14 @@ function montarAviso(
       formatoDesconhecido === 1
         ? "Uma mensagem está gravada com um formato que esta tela não conhece e ficou de fora da lista. Ela continua no banco."
         : `${formatoDesconhecido} mensagens estão gravadas com um formato que esta tela não conhece e ficaram de fora da lista. Elas continuam no banco.`,
+    );
+  }
+
+  if (unidadeDesconhecida > 0) {
+    avisos.push(
+      unidadeDesconhecida === 1
+        ? "Uma mensagem está gravada com uma unidade de espera que esta tela não conhece, e a espera dela está sendo mostrada como se fosse em segundos. Confira no banco."
+        : `${unidadeDesconhecida} mensagens estão gravadas com uma unidade de espera que esta tela não conhece, e a espera delas está sendo mostrada como se fosse em segundos. Confira no banco.`,
     );
   }
 

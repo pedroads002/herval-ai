@@ -20,6 +20,16 @@ export const FORMATOS_DE_MENSAGEM = [
 
 export type FormatoDeMensagem = (typeof FORMATOS_DE_MENSAGEM)[number];
 
+/** As quatro unidades que o CHECK de `template_mensagens.delay_unidade` aceita. */
+export const UNIDADES_DE_ESPERA = [
+  "segundos",
+  "minutos",
+  "horas",
+  "dias",
+] as const;
+
+export type UnidadeDeEspera = (typeof UNIDADES_DE_ESPERA)[number];
+
 /** Como cada formato se chama na tela. */
 export const NOME_DO_FORMATO: Record<FormatoDeMensagem, string> = {
   texto: "Texto",
@@ -28,12 +38,41 @@ export const NOME_DO_FORMATO: Record<FormatoDeMensagem, string> = {
   video: "Vídeo",
 };
 
+/** Como cada unidade de espera se chama na tela, no singular e no plural. */
+export const NOME_DA_UNIDADE: Record<
+  UnidadeDeEspera,
+  { singular: string; plural: string }
+> = {
+  segundos: { singular: "segundo", plural: "segundos" },
+  minutos: { singular: "minuto", plural: "minutos" },
+  horas: { singular: "hora", plural: "horas" },
+  dias: { singular: "dia", plural: "dias" },
+};
+
+/**
+ * A espera escrita como se fala: "sem espera", "1 minuto", "3 segundos".
+ *
+ * Mora aqui, e não dentro de uma das telas, porque as duas telas de templates
+ * mostram a mesma frase — a da agência, que grava, e a do cliente, que só
+ * mostra.
+ */
+export function textoDaEspera(valor: number, unidade: UnidadeDeEspera): string {
+  if (valor === 0) return "sem espera";
+
+  const nome = NOME_DA_UNIDADE[unidade];
+  return `${valor} ${valor === 1 ? nome.singular : nome.plural}`;
+}
+
 /**
  * Uma "bolha" do template, na ordem em que é enviada.
  *
  * `texto` é a mensagem quando o formato é texto, e a legenda quando é mídia —
  * é a mesma coluna no banco, e o CHECK exige que ao menos um dos dois exista.
- * `delaySegundos` é a espera antes de mandar esta bolha, não depois.
+ *
+ * `delayValor` com `delayUnidade` é a espera antes de mandar esta bolha, não
+ * depois. São duas colunas separadas no banco (`delay_valor` e
+ * `delay_unidade`), e não um total em segundos, porque o cérebro da Helô lê as
+ * duas direto no SQL — ver `textoDaEspera` para a frase que a tela mostra.
  */
 export type MensagemDoTemplate = {
   id: number;
@@ -41,7 +80,8 @@ export type MensagemDoTemplate = {
   formato: FormatoDeMensagem;
   texto: string | null;
   midiaUrl: string | null;
-  delaySegundos: number;
+  delayValor: number;
+  delayUnidade: UnidadeDeEspera;
 };
 
 /**

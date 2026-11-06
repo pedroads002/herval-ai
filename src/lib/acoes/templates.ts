@@ -16,7 +16,8 @@
  *   adicionarMensagem   entra uma bolha ao final do template. `ordem` é
  *                       calculada aqui, nunca recebida da tela — igual a
  *                       `acoes/followUp.ts`.
- *   editarMensagem      formato, texto/legenda, mídia e espera de uma bolha.
+ *   editarMensagem      formato, texto/legenda, mídia e espera (valor e
+ *                       unidade) de uma bolha.
  *                       Trocar o arquivo, ou voltar a bolha para texto, apaga
  *                       no Storage o arquivo que saiu.
  *   removerMensagem     tira a bolha, e com ela o arquivo de mídia que era só
@@ -42,13 +43,32 @@ import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { supabaseConfigurado, supabaseUrl } from "@/lib/supabase/config";
 import { carregarAutorizacao, ehHervalAdmin } from "@/lib/autorizacao";
-import { FORMATOS_DE_MENSAGEM, type FormatoDeMensagem } from "@/data/templates";
+import {
+  FORMATOS_DE_MENSAGEM,
+  UNIDADES_DE_ESPERA,
+  type FormatoDeMensagem,
+  type UnidadeDeEspera,
+} from "@/data/templates";
 import type { ResultadoDoCadastro } from "@/lib/acoes/resultadoDoCadastro";
 
 const LIMITE_NOME = 120;
 const LIMITE_TEXTO = 1200;
+/**
+ * O teto da espera, por unidade.
+ *
+ * Segundos continua em 60, que era o limite do campo antes de a unidade
+ * existir — a unidade entrou para dizer esperas mais longas, não para alargar
+ * a antiga. Os outros tetos são o que faz sentido numa régua de mensagem:
+ * duas horas em minutos, dois dias em horas, um mês em dias. O banco não tem
+ * CHECK no valor (só na unidade), então este limite é aqui mesmo.
+ */
 const ESPERA_MINIMA = 0;
-const ESPERA_MAXIMA = 60;
+const ESPERA_MAXIMA: Record<UnidadeDeEspera, number> = {
+  segundos: 60,
+  minutos: 120,
+  horas: 48,
+  dias: 30,
+};
 
 /** O mesmo bucket das outras mídias do cliente — ver a rota do upload. */
 const BUCKET = "clinicas-midia";
@@ -177,7 +197,8 @@ type DadosDaMensagem = {
   formato: FormatoDeMensagem;
   texto: string | null;
   midia_url: string | null;
-  delay_segundos: number;
+  delay_valor: number;
+  delay_unidade: UnidadeDeEspera;
 };
 
 /**
@@ -195,7 +216,8 @@ function lerMensagem(formData: FormData): { erro: string } | DadosDaMensagem {
 
   const texto = String(formData.get("texto") ?? "").trim();
   const midia = String(formData.get("midia_url") ?? "").trim();
-  const espera = Number(String(formData.get("delay_segundos") ?? "").trim());
+  const espera = Number(String(formData.get("delay_valor") ?? "").trim());
+  const unidadeEnviada = String(formData.get("delay_unidade") ?? "").trim();
 
   if (texto.length > LIMITE_TEXTO) {
     return { erro: `O texto passou de ${LIMITE_TEXTO} caracteres.` };
@@ -217,13 +239,21 @@ function lerMensagem(formData: FormData): { erro: string } | DadosDaMensagem {
     return { erro: "O arquivo desta mensagem não é um arquivo nosso." };
   }
 
-  if (
-    !Number.isInteger(espera) ||
-    espera < ESPERA_MINIMA ||
-    espera > ESPERA_MAXIMA
-  ) {
+  /*
+    A unidade é conferida aqui antes de ir ao banco pelo mesmo motivo do
+    formato: o CHECK `template_mensagens_delay_unidade_valida` também cobre
+    isso, mas o erro chegaria à tela como texto técnico em inglês.
+  */
+  if (!(UNIDADES_DE_ESPERA as readonly string[]).includes(unidadeEnviada)) {
+    return { erro: "Escolha a unidade de tempo da espera." };
+  }
+
+  const unidade = unidadeEnviada as UnidadeDeEspera;
+  const teto = ESPERA_MAXIMA[unidade];
+
+  if (!Number.isInteger(espera) || espera < ESPERA_MINIMA || espera > teto) {
     return {
-      erro: `A espera precisa ser um número inteiro entre ${ESPERA_MINIMA} e ${ESPERA_MAXIMA} segundos.`,
+      erro: `A espera precisa ser um número inteiro entre ${ESPERA_MINIMA} e ${teto} ${unidade}.`,
     };
   }
 
@@ -233,7 +263,8 @@ function lerMensagem(formData: FormData): { erro: string } | DadosDaMensagem {
     // legenda" para quem lê a tabela, aqui e no n8n.
     texto: texto === "" ? null : texto,
     midia_url: formato === "texto" || midia === "" ? null : midia,
-    delay_segundos: espera,
+    delay_valor: espera,
+    delay_unidade: unidade,
   };
 }
 

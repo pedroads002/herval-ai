@@ -21,13 +21,17 @@ import {
 } from "lucide-react";
 import {
   FORMATOS_DE_MENSAGEM,
+  NOME_DA_UNIDADE,
   NOME_DO_FORMATO,
+  UNIDADES_DE_ESPERA,
   ehDeAgendamento,
   nomeCurtoDaCategoria,
+  textoDaEspera,
   type CategoriaDeTemplate,
   type FormatoDeMensagem,
   type MensagemDoTemplate,
   type TemplateDoCliente,
+  type UnidadeDeEspera,
 } from "@/data/templates";
 import {
   adicionarMensagem,
@@ -554,7 +558,9 @@ function LinhaDaMensagem({
 
           <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-black/45">
             <Clock className="h-3.5 w-3.5" />
-            Espera de {mensagem.delaySegundos}s antes de enviar
+            Espera de{" "}
+            {textoDaEspera(mensagem.delayValor, mensagem.delayUnidade)} antes de
+            enviar
           </p>
 
           <Erro texto={erro} />
@@ -627,7 +633,10 @@ function FormularioDeMensagem({
     mensagem?.formato ?? "texto",
   );
   const [texto, setTexto] = useState(mensagem?.texto ?? "");
-  const [espera, setEspera] = useState(String(mensagem?.delaySegundos ?? 3));
+  const [espera, setEspera] = useState(String(mensagem?.delayValor ?? 3));
+  const [unidade, setUnidade] = useState<UnidadeDeEspera>(
+    mensagem?.delayUnidade ?? "segundos",
+  );
   const [midiaUrl, setMidiaUrl] = useState(mensagem?.midiaUrl ?? "");
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [erro, setErro] = useState("");
@@ -674,7 +683,8 @@ function FormularioDeMensagem({
 
     formData.set("formato", formato);
     formData.set("texto", texto.trim());
-    formData.set("delay_segundos", espera);
+    formData.set("delay_valor", espera);
+    formData.set("delay_unidade", unidade);
     // Formato texto não leva arquivo: manda vazio para a gravação limpar o
     // endereço de uma mídia que a mensagem tinha antes de virar texto.
     formData.set("midia_url", levaArquivo ? midiaUrl : "");
@@ -774,15 +784,32 @@ function FormularioDeMensagem({
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2 text-xs font-bold text-black/60">
           <Clock className="h-3.5 w-3.5" />
-          Espera (segundos)
+          Espera antes desta mensagem
           <input
             type="number"
             min={0}
-            max={60}
             value={espera}
             onChange={(e) => setEspera(e.target.value)}
             className="w-20 rounded-controle border border-black/15 bg-herval-branco px-3 py-1.5 text-sm text-herval-preto outline-none focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
           />
+          {/*
+            O teto de cada unidade fica na gravação (`ESPERA_MAXIMA`, em
+            `lib/acoes/templates.ts`), e não num `max` que muda sozinho ao
+            trocar a unidade: o campo não deve apagar o que a pessoa digitou,
+            e quem recusa com texto em português é a gravação.
+          */}
+          <select
+            value={unidade}
+            onChange={(e) => setUnidade(e.target.value as UnidadeDeEspera)}
+            aria-label="Unidade de tempo da espera"
+            className="rounded-controle border border-black/15 bg-herval-branco px-3 py-1.5 text-sm font-medium text-herval-preto outline-none focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20"
+          >
+            {UNIDADES_DE_ESPERA.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {NOME_DA_UNIDADE[opcao].plural}
+              </option>
+            ))}
+          </select>
         </label>
 
         <button
