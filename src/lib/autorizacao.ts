@@ -44,9 +44,8 @@ export const TELAS_CONTROLAVEIS = {
 export type TelaControlavel =
   (typeof TELAS_CONTROLAVEIS)[keyof typeof TELAS_CONTROLAVEIS];
 
-const TODAS_AS_TELAS_CONTROLAVEIS: readonly TelaControlavel[] = Object.values(
-  TELAS_CONTROLAVEIS,
-);
+const TODAS_AS_TELAS_CONTROLAVEIS: readonly TelaControlavel[] =
+  Object.values(TELAS_CONTROLAVEIS);
 
 function ehTelaConhecida(valor: unknown): valor is TelaControlavel {
   return (TODAS_AS_TELAS_CONTROLAVEIS as readonly unknown[]).includes(valor);
@@ -279,7 +278,12 @@ export async function exigirTela(
 /**
  * A tranca das telas exclusivas da Herval (Fila de Tarefas, Clientes,
  * Procedimentos, Estratégia do Cliente, Quebra de Objeções, Régua de
- * Automação, Templates de WhatsApp, Integrações, Teste da IA).
+ * Automação, Integrações, Teste da IA).
+ *
+ * Templates de WhatsApp saiu desta lista: aquele endereço passou a mostrar
+ * duas telas, a da agência (que grava) e a do cliente (que só mostra), e por
+ * isso decide o papel por conta própria, com `ehHervalAdmin` e `ehCliente`,
+ * em vez de chamar esta função. Ver a página de `/templates-whatsapp`.
  *
  * Chamada na primeira linha de cada uma dessas páginas — o menu já escondia o
  * link para quem é cliente, mas o menu não impede ninguém de digitar o

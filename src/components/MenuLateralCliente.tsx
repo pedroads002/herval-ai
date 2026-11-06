@@ -9,6 +9,7 @@ import {
   MessagesSquare,
   LayoutDashboard,
   Users,
+  FileText,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 import MenuGaveta from "@/components/MenuGaveta";
@@ -20,9 +21,17 @@ import MenuGaveta from "@/components/MenuGaveta";
  * autocadastro prometeu: visão geral, leads (Funil), conversas (Atendimento,
  * de onde também sai a mensagem manual), relatórios e agenda. Fora daqui:
  * Fila de Tarefas, Teste da IA, Régua de Automação, Clientes, Procedimentos,
- * Estratégia do Cliente, Quebra de Objeções, Templates de WhatsApp e
- * Integrações — tudo isso é operação da Herval sobre VÁRIOS clientes, não
- * ferramenta de um cliente sobre a própria conta.
+ * Estratégia do Cliente, Quebra de Objeções e Integrações — tudo isso é
+ * operação da Herval sobre VÁRIOS clientes, não ferramenta de um cliente
+ * sobre a própria conta.
+ *
+ * Templates de WhatsApp é a exceção, e entrou depois: o mesmo endereço mostra
+ * duas telas diferentes, e o cliente cai na versão que só mostra (ver
+ * `VisaoDeTemplates` e a página de `/templates-whatsapp`). Ele não escreve
+ * nem reordena nada ali — nem pela tela, nem pelo banco, que dá ao papel de
+ * cliente apenas o SELECT da própria clínica. Vale para os dois papéis de
+ * cliente e não entra na permissão por tela do colaborador: é texto que a
+ * clínica mandou enviar em nome dela, não dado de lead.
  *
  * Equipe é a sexta, e só aparece para `cliente_admin` — é de lá que ela
  * convida colaborador para a própria clínica. `cliente_operacional` não vê o
@@ -79,6 +88,12 @@ const itensFixos = [
     rotulo: "Agenda",
     Icone: CalendarDays,
     tela: "agenda" as const,
+  },
+  {
+    href: "/templates-whatsapp",
+    rotulo: "Templates de WhatsApp",
+    Icone: FileText,
+    tela: null,
   },
 ];
 
