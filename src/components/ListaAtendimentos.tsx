@@ -178,9 +178,20 @@ export default function ListaAtendimentos({
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return conversas.filter(({ lead }) => {
+    return conversas.filter((conversa) => {
+      const { lead } = conversa;
       if (soPausadas && !lead.iaPausada) return false;
       if (clinicaId !== "todas" && lead.clinicaId !== clinicaId) return false;
+      // "Em Atendimento" e "Aguardando Resposta" nascem da etapa do Funil
+      // (em `situacaoDaEtapa`), que não sabe quem falou por último agora.
+      // Sem este reforço, um lead parado na etapa "Em Contato" que acabou
+      // de escrever de novo aparecia em "Em Atendimento" mesmo esperando
+      // resposta — e o oposto também acontecia com quem já foi respondido
+      // numa etapa do follow-up. Aqui a tela usa o mesmo `aguardando` que
+      // já decide a seção de cima, então os dois sempre combinam.
+      if (filtro === "Em Atendimento" && conversa.aguardando) return false;
+      if (filtro === "Aguardando Resposta" && !conversa.aguardando)
+        return false;
       const filtravel = { ...lead, clinica: lead.nomeDaClinica };
       return (
         combinaComBusca(filtravel, termo) && combinaComFiltro(filtravel, filtro)
