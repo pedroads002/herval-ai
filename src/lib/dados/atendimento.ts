@@ -99,10 +99,20 @@ export type NotaEmAtendimento = {
   texto: string;
 };
 
+/** Um cliente cadastrado, do jeito que o filtro da tela precisa dele. */
+export type ClinicaDoAtendimento = { id: number; nome: string };
+
 export type DadosDoAtendimento = {
   leads: LeadEmAtendimento[];
   mensagens: MensagemEmAtendimento[];
   notas: NotaEmAtendimento[];
+  /**
+   * Todos os clientes cadastrados, e não só os que aparecem nos leads: o
+   * filtro da tela se comporta como o do Funil, onde cliente recém-cadastrado
+   * e ainda sem lead nenhum também é uma opção — escolher um deles mostra a
+   * lista vazia, que é a resposta certa para "quantas conversas ele tem".
+   */
+  clinicas: ClinicaDoAtendimento[];
   /**
    * Por que a tela pode estar vazia, quando estiver. Distingue "não há
    * conversa nenhuma" de "não consegui ler o banco" — sem isso as duas
@@ -115,6 +125,7 @@ const SEM_DADOS: DadosDoAtendimento = {
   leads: [],
   mensagens: [],
   notas: [],
+  clinicas: [],
   falha: null,
 };
 
@@ -377,7 +388,14 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
     texto: linha.texto,
   }));
 
-  return { leads, mensagens, notas, falha: null };
+  // Ordem de nome, e não de id: o filtro é uma lista para ler — mesma regra
+  // que o funil usa na lista de clientes dele.
+  const clinicas = Array.from(nomesDeClinica, ([id, nome]) => ({
+    id,
+    nome,
+  })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+  return { leads, mensagens, notas, clinicas, falha: null };
 }
 
 /**
@@ -599,9 +617,8 @@ export async function carregarConversa(
   }
 
   const agora = Date.now();
-  const linhaDaClinica = respostaClinica.data as unknown as
-    | LinhaDaClinica
-    | null;
+  const linhaDaClinica =
+    respostaClinica.data as unknown as LinhaDaClinica | null;
   const clinica = linhaDaClinica
     ? montarFichaDaEstrategia(linhaDaClinica, respostaFaixas.data ?? [])
     : null;

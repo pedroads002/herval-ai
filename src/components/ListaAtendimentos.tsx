@@ -20,6 +20,7 @@ import {
   type FiltroDeSituacao,
 } from "@/lib/filtros";
 import type {
+  ClinicaDoAtendimento,
   LeadEmAtendimento,
   MensagemEmAtendimento,
 } from "@/lib/dados/atendimento";
@@ -61,10 +62,12 @@ type Conversa = {
 export default function ListaAtendimentos({
   leads,
   mensagens,
+  clinicas,
   falha,
 }: {
   leads: LeadEmAtendimento[];
   mensagens: MensagemEmAtendimento[];
+  clinicas: ClinicaDoAtendimento[];
   falha: string | null;
 }) {
   const [busca, setBusca] = useState("");
@@ -93,21 +96,6 @@ export default function ListaAtendimentos({
    * atendimento inteiro, e recortar por cliente é uma pergunta a mais.
    */
   const [clinicaId, setClinicaId] = useState<number | "todas">("todas");
-
-  /**
-   * Só os clientes que aparecem nestes leads, e não a lista inteira de
-   * clínicas: oferecer um cliente sem lead nenhum aqui daria uma opção que só
-   * esvazia a tela.
-   */
-  const clinicasPresentes = useMemo(() => {
-    const mapa = new Map<number, string>();
-    for (const lead of leads) {
-      if (lead.clinicaId !== null) mapa.set(lead.clinicaId, lead.nomeDaClinica);
-    }
-    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
-      a.nome.localeCompare(b.nome),
-    );
-  }, [leads]);
 
   // A conversa inteira é varrida uma vez, e não uma vez por linha da lista.
   const porLead = useMemo(() => indexarMensagens(mensagens), [mensagens]);
@@ -286,7 +274,7 @@ export default function ListaAtendimentos({
             className="w-full rounded-full border border-black/15 bg-herval-branco py-3 pl-5 pr-5 text-sm font-bold text-herval-preto outline-none transition-colors focus:border-herval-verde focus:ring-4 focus:ring-herval-verde/20 sm:w-auto"
           >
             <option value="todas">Todas as clínicas</option>
-            {clinicasPresentes.map((c) => (
+            {clinicas.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nome}
               </option>

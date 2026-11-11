@@ -2,7 +2,11 @@ import Cabecalho from "@/components/Cabecalho";
 import ListaAtendimentos from "@/components/ListaAtendimentos";
 import AtualizacaoAutomatica from "@/components/AtualizacaoAutomatica";
 import { carregarAtendimento } from "@/lib/dados/atendimento";
-import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autorizacao";
+import {
+  carregarAutorizacao,
+  exigirTela,
+  TELAS_CONTROLAVEIS,
+} from "@/lib/autorizacao";
 
 /**
  * A porta de entrada do atendimento. Antes só se chegava aqui pelo card do
@@ -37,10 +41,8 @@ import { carregarAutorizacao, exigirTela, TELAS_CONTROLAVEIS } from "@/lib/autor
  * é ligado), então depender dela seria dívida na certa.
  */
 export default async function PaginaAtendimento() {
-  const [{ leads, mensagens, falha }, autorizacao] = await Promise.all([
-    carregarAtendimento(),
-    carregarAutorizacao(),
-  ]);
+  const [{ leads, mensagens, clinicas, falha }, autorizacao] =
+    await Promise.all([carregarAtendimento(), carregarAutorizacao()]);
 
   await exigirTela(TELAS_CONTROLAVEIS.ATENDIMENTO, autorizacao);
 
@@ -52,7 +54,12 @@ export default async function PaginaAtendimento() {
       />
 
       <AtualizacaoAutomatica />
-      <ListaAtendimentos leads={leads} mensagens={mensagens} falha={falha} />
+      <ListaAtendimentos
+        leads={leads}
+        mensagens={mensagens}
+        clinicas={clinicas}
+        falha={falha}
+      />
     </>
   );
 }
