@@ -455,30 +455,61 @@ export default function TabelaTarefas() {
                                   : "Marcar como feita"}
                               </button>
                             ) : alerta ? (
-                              // Alerta humano: não há o que aprovar, só registrar
-                              // que o CRC foi avisado.
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  decidir(
-                                    tarefa.id,
+                              /*
+                                Alerta humano não se aprova nem se rejeita, mas
+                                precisa de um fim: "Avisar CRC" registra que o
+                                recado foi passado, e "Marcar como feita" encerra
+                                a tarefa. Sem o segundo botão a fila não esvazia —
+                                quem abre a tela costuma ser a própria CRC, que
+                                não tem a quem avisar, e o item fica Pendente para
+                                sempre.
+                              */
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    decidir(
+                                      tarefa.id,
+                                      tarefa.status === "Avisado"
+                                        ? "Pendente"
+                                        : "Avisado",
+                                    )
+                                  }
+                                  className={[
+                                    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
                                     tarefa.status === "Avisado"
-                                      ? "Pendente"
-                                      : "Avisado",
-                                  )
-                                }
-                                className={[
-                                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
-                                  tarefa.status === "Avisado"
-                                    ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
-                                    : "bg-herval-preto text-herval-branco hover:bg-black/85",
-                                ].join(" ")}
-                              >
-                                <PhoneCall className="h-3.5 w-3.5" />
-                                {tarefa.status === "Avisado"
-                                  ? "CRC avisado"
-                                  : "Avisar CRC"}
-                              </button>
+                                      ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                                      : "bg-herval-preto text-herval-branco hover:bg-black/85",
+                                  ].join(" ")}
+                                >
+                                  <PhoneCall className="h-3.5 w-3.5" />
+                                  {tarefa.status === "Avisado"
+                                    ? "CRC avisado"
+                                    : "Avisar CRC"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    decidir(
+                                      tarefa.id,
+                                      tarefa.status === "Concluída"
+                                        ? "Pendente"
+                                        : "Concluída",
+                                    )
+                                  }
+                                  className={[
+                                    "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors",
+                                    tarefa.status === "Concluída"
+                                      ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                                      : "bg-herval-preto text-herval-branco hover:bg-black/85",
+                                  ].join(" ")}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  {tarefa.status === "Concluída"
+                                    ? "Feita"
+                                    : "Marcar como feita"}
+                                </button>
+                              </div>
                             ) : (
                               <div className="flex gap-2">
                                 <button
