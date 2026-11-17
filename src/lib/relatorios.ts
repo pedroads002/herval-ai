@@ -154,9 +154,9 @@ export type LinhaFunil = {
   consultaFutura: number;
   compareceram: number;
   /**
-   * Consultas que já aconteceram e têm desfecho registrado (compareceu ou
-   * faltou). É o denominador de "% compar.": consulta sem baixa não tem como
-   * entrar numa taxa de presença.
+   * Consultas com desfecho registrado: compareceu, faltou ou foi cancelada. É o
+   * denominador de "% compar.", e consulta sem baixa não entra — ela não tem
+   * desfecho para somar a uma taxa de presença.
    */
   comDesfecho: number;
   /** Já aconteceram e ninguém registrou o desfecho. Trabalho pendente, não falta. */
@@ -196,7 +196,12 @@ export type LinhaProducao = {
   compareceram: number;
   /** Só quem está marcado "Faltou". Consulta sem baixa não é falta. */
   faltaram: number;
-  /** Compareceu + faltou: o denominador honesto do show-rate. */
+  /** Falta + cancelamento: quem marcou e não foi atendido. */
+  naoCompareceram: number;
+  /**
+   * Compareceu + faltou + cancelado: o denominador honesto do show-rate, e o
+   * mesmo do no-show. Ver `naoCompareceram` em `lib/dados/visaoGeral.ts`.
+   */
   comDesfecho: number;
   /** Já aconteceram e continuam sem baixa. Ficam fora de toda taxa. */
   aguardandoBaixa: number;
@@ -254,10 +259,21 @@ export function montarFunil({
         dentroDaFaixa(a.consultaEmDias, faixa),
     );
 
+    // As canceladas ficam fora de `consultas` (elas não ocupam mais a agenda),
+    // mas entram na base de comparecimento: desde 17/11/2026 cancelamento é
+    // no-show, e precisa ser a mesma base nas duas telas. Ver `naoCompareceram`
+    // em `lib/dados/visaoGeral.ts`.
+    const canceladas = agendamentos.filter(
+      (a) =>
+        a.clinicaId === clinica.id &&
+        a.status === "Cancelada" &&
+        dentroDaFaixa(a.consultaEmDias, faixa),
+    ).length;
+
     const jaAconteceram = consultas.filter((a) => jaAconteceu(a, agora));
     const futuras = consultas.filter((a) => !jaAconteceu(a, agora));
     const compareceram = jaAconteceram.filter((a) => a.status === "Compareceu");
-    const comDesfecho = jaAconteceram.filter(temDesfecho).length;
+    const comDesfecho = jaAconteceram.filter(temDesfecho).length + canceladas;
 
     const comConsulta = new Set(
       agendamentos.filter((a) => a.status !== "Cancelada").map((a) => a.leadId),
@@ -277,7 +293,9 @@ export function montarFunil({
       consultaFutura: futuras.length,
       compareceram: compareceram.length,
       comDesfecho,
-      aguardandoBaixa: jaAconteceram.length - comDesfecho,
+      // Sem as canceladas: cancelamento não espera baixa nenhuma.
+      aguardandoBaixa:
+        jaAconteceram.length - jaAconteceram.filter(temDesfecho).length,
       taxaComparecimento: taxa(compareceram.length, comDesfecho),
       agendadosDaSafra,
       taxaAgendamento: taxa(agendadosDaSafra, qualificados),
@@ -343,7 +361,11 @@ export function montarProducao({
     const futuras = vivos.filter((a) => !jaAconteceu(a, agora));
     const compareceram = ateAData.filter((a) => a.status === "Compareceu");
     const faltaram = ateAData.filter((a) => a.status === "Faltou");
-    const comDesfecho = compareceram.length + faltaram.length;
+    // Falta + cancelamento, a definição de no-show desde 17/11/2026. O
+    // cancelamento já tem desfecho no dia em que foi cancelado, por isso não
+    // espera a data da consulta chegar.
+    const naoCompareceram = faltaram.length + cancelados.length;
+    const comDesfecho = compareceram.length + naoCompareceram;
 
     return {
       clinica,
@@ -354,8 +376,10 @@ export function montarProducao({
       consultaFutura: futuras.length,
       compareceram: compareceram.length,
       faltaram: faltaram.length,
+      naoCompareceram,
       comDesfecho,
-      aguardandoBaixa: ateAData.length - comDesfecho,
+      // Sem os cancelados: cancelamento não espera baixa nenhuma.
+      aguardandoBaixa: ateAData.length - compareceram.length - faltaram.length,
       showRate: taxa(compareceram.length, comDesfecho),
     };
   });
@@ -387,6 +411,10 @@ export type ResumoGeral = {
   taxaReagendamento: number | null;
   /** Consultas dessa produção que já passaram e o paciente não apareceu. */
   faltas: number;
+  /** Consultas dessa produção que foram canceladas. */
+  cancelados: number;
+  /** Falta + cancelamento, que é o numerador do no-show. */
+  naoCompareceram: number;
   taxaNoShow: number | null;
   fechadosPelaIa: number;
   fechadosPeloCrc: number;
@@ -433,6 +461,8 @@ export function montarResumo(
   // menos quem compareceu", e aí toda consulta que ninguém deu baixa virava
   // falta: o no-show subia sozinho por trabalho pendente, não por ausência.
   const faltas = soma(producao, (l) => l.faltaram);
+  const cancelados = soma(producao, (l) => l.cancelados);
+  const naoCompareceram = soma(producao, (l) => l.naoCompareceram);
 
   return {
     leads: soma(funil, (l) => l.leads),
@@ -451,7 +481,9 @@ export function montarResumo(
     remarcacoes,
     taxaReagendamento: taxa(remarcacoes, totalProducao),
     faltas,
-    taxaNoShow: taxa(faltas, producaoComDesfecho),
+    cancelados,
+    naoCompareceram,
+    taxaNoShow: taxa(naoCompareceram, producaoComDesfecho),
     fechadosPelaIa: pelaIa,
     fechadosPeloCrc: doPeriodo.length - pelaIa,
     percentualIa: taxa(pelaIa, doPeriodo.length),
@@ -491,20 +523,9 @@ export function montarAlertas(
     const prod = porClinicaId.get(linha.clinica.id);
     const nome = linha.clinica.nome;
 
-    if (prod && prod.agendamentos >= metas.amostraMinima) {
-      const cancelamento = percentualCru(prod.cancelados, prod.agendamentos);
-
-      if (cancelamento > metas.tetoCancelamento) {
-        const critico = cancelamento > metas.cancelamentoCritico;
-        alertas.push({
-          id: `cancelamento-${linha.clinica.id}`,
-          clinica: nome,
-          severidade: critico ? "critico" : "atencao",
-          problema: `${Math.round(cancelamento)}% dos agendamentos do período foram cancelados (meta: até ${metas.tetoCancelamento}%).`,
-          acao: "Investigar causa do cancelamento e rodar confirmação ativa D-1.",
-        });
-      }
-    }
+    // Não existe mais alerta só de cancelamento: desde 17/11/2026 o
+    // cancelamento entra no no-show, e o alerta de show-rate abaixo é o mesmo
+    // fato pelo outro lado. Mesma decisão de `dados/visaoGeral.ts`.
 
     if (
       prod &&
@@ -520,7 +541,7 @@ export function montarAlertas(
         clinica: nome,
         severidade: critico ? "critico" : "atencao",
         problema: `Show-rate de ${prod.showRate}% na produção do período (piso: ${metas.pisoShowRate}%).`,
-        acao: "Reforçar lembrete D-1 e D-0 e revisar o intervalo entre marcar e atender.",
+        acao: `${prod.faltaram} faltas e ${prod.cancelados} cancelamentos em ${prod.comDesfecho} consultas com desfecho. Reforçar lembrete D-1 e D-0 e revisar o intervalo entre marcar e atender.`,
       });
     }
 

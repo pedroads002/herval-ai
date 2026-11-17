@@ -87,10 +87,10 @@ export default function PainelVisaoGeral({
             rotulo="Taxa de no-show"
             valor={comPercentual(atual.taxaNoShow)}
             variacao={pontos(atual.taxaNoShow, anterior.taxaNoShow)}
-            // Aqui subir é ruim: é paciente que marcou e não apareceu.
+            // Aqui subir é ruim: é paciente que marcou e não foi atendido.
             quantoMaiorPior
             detalhe={
-              `${formatarNumero(atual.faltas)} faltas em ${formatarNumero(atual.comDesfecho)} consultas com desfecho registrado` +
+              `${formatarNumero(atual.faltas)} faltas e ${formatarNumero(atual.cancelamentos)} cancelamentos em ${formatarNumero(atual.comDesfecho)} consultas com desfecho registrado` +
               (atual.aguardandoBaixa > 0
                 ? ` · ${formatarNumero(atual.aguardandoBaixa)} ${atual.aguardandoBaixa === 1 ? "consulta já aconteceu e está sem baixa, fora da conta" : "consultas já aconteceram e estão sem baixa, fora da conta"}`
                 : "")
