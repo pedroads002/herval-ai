@@ -43,7 +43,16 @@ const abas = [
   { id: "fila", rotulo: "Fila de Atendimento" },
 ] as const;
 
-const presets = ["Hoje", "Últimos 7 dias", "Este mês", "Mês passado"] as const;
+// A mesma lista, na mesma ordem, dos períodos da Visão Geral
+// (`periodosDaVisao`): o "Personalizado" de lá é, aqui, o par de campos de data
+// que fica sempre visível ao lado. Ver o porquê em `lib/visaoGeral/periodo.ts`.
+const presets = [
+  "Hoje",
+  "Últimos 7 dias",
+  "Últimos 30 dias",
+  "Este mês",
+  "Mês passado",
+] as const;
 type Preset = (typeof presets)[number];
 
 /** Meia-noite de hoje, para as contas de dia não escorregarem por hora. */
@@ -67,6 +76,7 @@ function diasAtrasDe(data: Date, hoje: Date) {
 function faixaDoPreset(preset: Preset, hoje: Date): Faixa {
   if (preset === "Hoje") return { de: 0, ate: 0 };
   if (preset === "Últimos 7 dias") return { de: 6, ate: 0 };
+  if (preset === "Últimos 30 dias") return { de: 29, ate: 0 };
 
   if (preset === "Este mês") {
     const primeiro = new Date(hoje.getFullYear(), hoje.getMonth(), 1);

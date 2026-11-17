@@ -15,12 +15,31 @@
 /** Datas no formato YYYY-MM-DD, as duas pontas inclusas. */
 export type IntervaloDeDatas = { de: string; ate: string };
 
-export type NomeDoPeriodo = "hoje" | "7d" | "30d" | "personalizado";
+export type NomeDoPeriodo =
+  | "hoje"
+  | "7d"
+  | "30d"
+  | "este-mes"
+  | "mes-passado"
+  | "personalizado";
 
+/**
+ * A mesma lista, na mesma ordem, dos presets de Relatórios — e o período
+ * inicial das duas telas é o mesmo ("Este mês").
+ *
+ * Até 17/11/2026 cada tela tinha a sua lista: a Visão Geral abria em "Hoje" com
+ * Hoje / 7 dias / 30 dias / Personalizado, e Relatórios abria em "Este mês" com
+ * Hoje / 7 dias / Este mês / Mês passado. Abertas lado a lado, a mesma base dava
+ * 36 leads numa tela e 265 na outra, e não havia como igualar as duas: faltava
+ * "Este mês" aqui e "Últimos 30 dias" lá. Nenhum dos números estava errado, mas
+ * a tela fazia parecer que estavam.
+ */
 export const periodosDaVisao: { nome: NomeDoPeriodo; rotulo: string }[] = [
   { nome: "hoje", rotulo: "Hoje" },
   { nome: "7d", rotulo: "Últimos 7 dias" },
   { nome: "30d", rotulo: "Últimos 30 dias" },
+  { nome: "este-mes", rotulo: "Este mês" },
+  { nome: "mes-passado", rotulo: "Mês passado" },
   { nome: "personalizado", rotulo: "Personalizado" },
 ];
 
@@ -118,7 +137,35 @@ export function resolverPeriodo(
     return { nome: "30d", intervalo: { de: somarDias(hoje, -29), ate: hoje } };
   }
 
-  return { nome: "hoje", intervalo: { de: hoje, ate: hoje } };
+  if (nome === "hoje") {
+    return { nome: "hoje", intervalo: { de: hoje, ate: hoje } };
+  }
+
+  if (nome === "mes-passado") {
+    return { nome: "mes-passado", intervalo: mesRelativo(hoje, -1) };
+  }
+
+  // O padrão é "Este mês", igual a Relatórios: é o recorte em que as duas telas
+  // abrem, e por isso o que elas mostram uma ao lado da outra.
+  return { nome: "este-mes", intervalo: mesRelativo(hoje, 0) };
+}
+
+/**
+ * O mês inteiro, do dia 1 ao último dia — e não até hoje.
+ *
+ * Vai até o fim do mês pelo mesmo motivo do preset de Relatórios: consulta já
+ * marcada para os próximos dias ocupa este mês, e parar em hoje a deixaria de
+ * fora do mês que ela ocupa. Lead não existe no futuro, então nada é inventado
+ * na conta de lead.
+ */
+function mesRelativo(hoje: string, deslocamento: number): IntervaloDeDatas {
+  const [ano, mes] = hoje.split("-").map(Number);
+  const primeiro = new Date(Date.UTC(ano, mes - 1 + deslocamento, 1));
+  const ultimo = new Date(Date.UTC(ano, mes + deslocamento, 0));
+  return {
+    de: primeiro.toISOString().slice(0, 10),
+    ate: ultimo.toISOString().slice(0, 10),
+  };
 }
 
 function emDiaEMes(dia: string) {
@@ -131,6 +178,8 @@ export function descricaoDoIntervalo(periodo: PeriodoEscolhido): string {
   if (periodo.nome === "hoje") return "hoje";
   if (periodo.nome === "7d") return "nos últimos 7 dias";
   if (periodo.nome === "30d") return "nos últimos 30 dias";
+  if (periodo.nome === "este-mes") return "neste mês";
+  if (periodo.nome === "mes-passado") return "no mês passado";
 
   const { de, ate } = periodo.intervalo;
   if (de === ate) return `em ${emDiaEMes(de)}`;
@@ -146,6 +195,6 @@ export function rotuloDoIntervalo(periodo: PeriodoEscolhido): string {
 
   return (
     periodosDaVisao.find((opcao) => opcao.nome === periodo.nome)?.rotulo ??
-    "Hoje"
+    "Este mês"
   );
 }
