@@ -53,7 +53,7 @@ const TETO_DE_LINHAS = 1000;
  * `ehQualificado` em `src/data/leads.ts`, refeito aqui porque lá a constante não
  * é exportada e a função pede um `Lead` inteiro, que o banco não devolve.
  */
-const PRIMEIRA_ETAPA_QUALIFICADA = etapasFunil.indexOf("Outros Contatos");
+const PRIMEIRA_ETAPA_QUALIFICADA = etapasFunil.indexOf("F1");
 
 const STATUS_CANCELADA = "Cancelada";
 const STATUS_FALTOU = "Faltou";
