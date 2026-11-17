@@ -234,7 +234,10 @@ export default function PainelRelatorios({
       producao,
       follow,
       resumo: montarResumo(funil, producao, doPeriodo, faixa),
-      alertas: montarAlertas(funil, producao, metasPadrao),
+      alertas: montarAlertas(funil, producao, metasPadrao, {
+        leads,
+        agendamentos,
+      }),
     };
   }, [faixa, doBanco, clinicasFiltradas, atualizadoEm, hoje]);
 
@@ -480,7 +483,7 @@ export default function PainelRelatorios({
             <Kpi
               rotulo="Taxa de agendamento"
               valor={comPercentual(resumo.taxaAgendamento)}
-              detalhe={`sobre ${formatarNumero(resumo.qualificados)} qualificados · meta ${metasPadrao.taxaAgendamento}%${
+              detalhe={`${formatarNumero(resumo.agendadosDaSafra)} de ${formatarNumero(resumo.qualificados)} qualificados · meta ${metasPadrao.taxaAgendamento}%${
                 resumo.inalcancaveis > 0
                   ? ` · ${formatarNumero(resumo.inalcancaveis)} deles longe demais`
                   : ""
@@ -616,6 +619,9 @@ export default function PainelRelatorios({
               "Consulta futura",
               "Compareceram",
               "Sem baixa",
+              // A base da taxa ao lado dela: 88% sobre 8 consultas não é a
+              // mesma informação que 88% sobre 34.
+              "Desfecho",
               "% compar.",
               "% agend./qualif.",
             ]}
@@ -641,6 +647,7 @@ export default function PainelRelatorios({
                 <Num alerta={linha.aguardandoBaixa > 0}>
                   {linha.aguardandoBaixa}
                 </Num>
+                <Num>{linha.comDesfecho}</Num>
                 <Num>{comPercentual(linha.taxaComparecimento)}</Num>
                 <Num
                   alerta={
@@ -697,6 +704,7 @@ export default function PainelRelatorios({
               "Compareceram",
               "Faltaram",
               "Sem baixa",
+              "Desfecho",
               "Show-rate",
             ]}
             vazio={producaoVisivel.length === 0}
@@ -719,6 +727,7 @@ export default function PainelRelatorios({
                 <Num alerta={linha.aguardandoBaixa > 0}>
                   {linha.aguardandoBaixa}
                 </Num>
+                <Num>{linha.comDesfecho}</Num>
                 <Num
                   alerta={
                     linha.showRate !== null &&
@@ -792,6 +801,7 @@ const colunasFunil: Coluna<LinhaFunil>[] = [
   { tipo: "soma", valor: (l) => l.consultaFutura },
   { tipo: "soma", valor: (l) => l.compareceram },
   { tipo: "soma", valor: (l) => l.aguardandoBaixa },
+  { tipo: "soma", valor: (l) => l.comDesfecho },
   { tipo: "taxa", parte: (l) => l.compareceram, total: (l) => l.comDesfecho },
   {
     tipo: "taxa",
@@ -813,6 +823,7 @@ const colunasProducao: Coluna<LinhaProducao>[] = [
   { tipo: "soma", valor: (l) => l.compareceram },
   { tipo: "soma", valor: (l) => l.faltaram },
   { tipo: "soma", valor: (l) => l.aguardandoBaixa },
+  { tipo: "soma", valor: (l) => l.comDesfecho },
   {
     tipo: "taxa",
     parte: (l) => l.compareceram,

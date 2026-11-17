@@ -3,6 +3,7 @@ import type { Clinica } from "@/data/clinicas";
 import {
   ehLeadDeMarketing,
   ehQualificado,
+  ETAPA_REMARCAR,
   MOTIVO_DISTANCIA,
   type Lead,
 } from "@/data/leads";
@@ -396,6 +397,8 @@ export type ResumoGeral = {
   agendadosFunil: number;
   consultaFutura: number;
   taxaAgendamento: number | null;
+  /** O numerador da taxa acima: qualificados da safra que marcaram consulta. */
+  agendadosDaSafra: number;
   /** Qualificados do período perdidos por distância. Contexto da taxa acima. */
   inalcancaveis: number;
   producao: number;
@@ -471,6 +474,7 @@ export function montarResumo(
     agendadosFunil,
     consultaFutura: soma(funil, (l) => l.consultaFutura),
     taxaAgendamento: taxa(agendadosDaSafra, qualificados),
+    agendadosDaSafra,
     inalcancaveis: soma(funil, (l) => l.inalcancaveis),
     producao: totalProducao,
     producaoCompareceu,
@@ -515,9 +519,22 @@ export function montarAlertas(
   funil: LinhaFunil[],
   producao: LinhaProducao[],
   metas: Metas,
+  /**
+   * A base inteira, sem corte de período: o alerta de contradição entre etapa e
+   * status olha lead parado, que não pertence a mês nenhum.
+   */
+  base: { leads: Lead[]; agendamentos: Agendamento[] },
 ): Alerta[] {
   const alertas: Alerta[] = [];
   const porClinicaId = new Map(producao.map((l) => [l.clinica.id, l]));
+
+  // Leads que já têm a baixa registrada em alguma consulta. Quem está em
+  // "Reagendamento" e não está aqui é a contradição que o alerta aponta.
+  const comBaixa = new Set(
+    base.agendamentos
+      .filter((a) => a.status === "Faltou" || a.status === "Cancelada")
+      .map((a) => a.leadId),
+  );
 
   for (const linha of funil) {
     const prod = porClinicaId.get(linha.clinica.id);
@@ -526,6 +543,31 @@ export function montarAlertas(
     // Não existe mais alerta só de cancelamento: desde 17/11/2026 o
     // cancelamento entra no no-show, e o alerta de show-rate abaixo é o mesmo
     // fato pelo outro lado. Mesma decisão de `dados/visaoGeral.ts`.
+
+    /*
+      A etapa diz uma coisa e o status da consulta diz outra.
+
+      Não é taxa, é contradição entre dois campos do banco — por isso não passa
+      pela amostra mínima. Enquanto ela existe, o no-show desta clínica está
+      menor do que a realidade. Mesmo alerta da Visão Geral.
+    */
+    const semBaixa = base.leads.filter(
+      (l) =>
+        l.clinicaId === linha.clinica.id &&
+        l.etapa === ETAPA_REMARCAR &&
+        !comBaixa.has(l.id),
+    ).length;
+
+    if (semBaixa > 0) {
+      const um = semBaixa === 1;
+      alertas.push({
+        id: `reagendamento-sem-baixa-${linha.clinica.id}`,
+        clinica: nome,
+        severidade: "atencao",
+        problema: `${semBaixa} ${um ? "lead está" : "leads estão"} em "Reagendamento" sem nenhuma consulta marcada como falta ou cancelamento.`,
+        acao: `Dar a baixa na consulta que não aconteceu. Sem isso ${um ? "esse lead não entra" : "esses leads não entram"} no no-show, e a taxa fica menor do que a realidade.`,
+      });
+    }
 
     if (
       prod &&
