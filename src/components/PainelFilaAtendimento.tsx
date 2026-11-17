@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { Info } from "lucide-react";
-import type { Ligacao } from "@/data/ligacoes";
 import { metasPadrao } from "@/data/metas";
 import type { Clinica } from "@/data/clinicas";
 import type { Agendamento } from "@/data/agendamentos";
@@ -34,18 +33,6 @@ import {
   Total,
   type Coluna,
 } from "@/components/PecasDeRelatorio";
-
-/**
- * Não existe registro de ligação no banco, e é por isso que esta constante é
- * vazia em vez de ser uma leitura.
- *
- * Com ela vazia, tudo que se mede da primeira tentativa de ligação sai `null`:
- * mediana, média, cauda, e os alertas que dependem delas. `null` é o que a tela
- * desenha como "não medido" — e é de propósito que não seja zero, porque zero
- * ali seria lido como "ninguém esperou", que é afirmação sobre dado que não
- * existe. Ver o mapeamento inteiro em `dados/relatorios.ts`.
- */
-const SEM_REGISTRO_DE_LIGACAO = new Map<number, Ligacao[]>();
 
 /**
  * A régua de recuperação (`lib/regua.ts`) conta tentativa por tentativa, com
@@ -89,18 +76,11 @@ export default function PainelFilaAtendimento({
     const linhas = montarFila({
       leads: base,
       historico: indice,
-      ligacoes: SEM_REGISTRO_DE_LIGACAO,
       agendamentos,
       faixa,
       clinicas,
     });
-    const resumo = montarResumoDaFila(
-      linhas,
-      base,
-      indice,
-      SEM_REGISTRO_DE_LIGACAO,
-      faixa,
-    );
+    const resumo = montarResumoDaFila(linhas, base, indice, faixa);
 
     // Ao vivo: não olha o período nem a clínica escolhida, de propósito.
     const esperando = aguardandoContato(
@@ -179,10 +159,10 @@ export default function PainelFilaAtendimento({
           valor={mediana === null ? "não medido" : duracao(mediana)}
           detalhe={
             mediana === null
-              ? "mede da chegada do lead até a primeira tentativa de ligação, e o sistema ainda não registra ligação — o campo fica vazio em vez de mostrar zero, que seria lido como atendimento imediato"
-              : `mediana até a primeira tentativa de ligação, sobre ${formatarNumero(
+              ? "mede da chegada do lead até o primeiro contato; nenhum lead do período foi contatado ainda, e o campo fica vazio em vez de mostrar zero, que seria lido como atendimento imediato"
+              : `mediana da chegada até o primeiro contato, sobre ${formatarNumero(
                   resumo.resposta.atendidos,
-                )} ${resumo.resposta.atendidos === 1 ? "lead" : "leads"} com ligação registrada`
+                )} ${resumo.resposta.atendidos === 1 ? "lead contatado" : "leads contatados"}`
           }
           alerta={mediana !== null && mediana >= 120}
         />
@@ -202,13 +182,14 @@ export default function PainelFilaAtendimento({
             <span className="font-bold text-herval-preto">
               Tempo de resposta
             </span>{" "}
-            conta da chegada do lead até a primeira tentativa de ligação, que é
-            a definição do sistema desde que a régua de ligação existe. Metade
-            deles esperou até {duracao(mediana)}. A média é de {duracao(media)},
+            conta da chegada do lead até o primeiro contato — a entrada dele na
+            etapa “Em Contato”, que é o que o sistema registra. Metade deles
+            esperou até {duracao(mediana)}. A média é de {duracao(media)},
             puxada pelos {comPercentual(resumo.percentualNaCauda)} que esperaram
-            mais de um dia. Só entram aqui os leads com ligação registrada:
-            volume e tempo de resposta não saem da mesma base, porque o
-            histórico antigo não tem registro de ligação.
+            mais de um dia. É a mesma base do volume: quem ainda não foi
+            contatado conta como esperando, não como atendido na hora. O limite
+            desta medida: ela depende de o card ser movido, então lead atendido
+            por telefone e com card parado aparece como demora.
           </span>
         </p>
       )}
@@ -270,14 +251,14 @@ export default function PainelFilaAtendimento({
       <PontosDeAtencao
         alertas={alertas}
         visiveis={metasPadrao.alertasVisiveis}
-        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento. Dos três, só o primeiro está medido hoje: os outros dois dependem de registro de ligação, que o sistema ainda não tem — então não há como dizer que eles estão em ordem, apenas que não foram verificados.`}
-        vazio="Nenhum lead parado há mais de um dia sem contato. Recuperação vencida e cauda fora do padrão não foram verificadas: dependem de registro de ligação, que o sistema ainda não tem."
+        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento. Dois dos três estão medidos. O de recuperação vencida depende de registro de ligação, que o sistema ainda não tem — não há como dizer que ele está em ordem, apenas que não foi verificado.`}
+        vazio="Nenhuma clínica fora do padrão e nenhum lead parado há mais de um dia sem contato. A recuperação vencida não foi verificada: depende de registro de ligação, que o sistema ainda não tem."
       />
 
       {/* Tabela por clínica */}
       <Tabela
         titulo="Atendimento por clínica (leads do período)"
-        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos, contatados e agendados contam a base inteira, e são os mesmos números dos Relatórios. Já a mediana e a média contam só os leads com ligação registrada, porque o tempo de resposta é medido da chegada até a primeira tentativa de ligação — e o sistema ainda não registra ligação, então essas duas colunas aparecem vazias mesmo onde há volume. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
+        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos, contatados e agendados contam a base inteira, e são os mesmos números dos Relatórios. A mediana e a média saem da mesma base: medem da chegada do lead até o primeiro contato, e quem ainda não foi contatado conta como esperando. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
         cabecalhos={[
           "Clínica",
           "Recebidos",
@@ -329,15 +310,15 @@ export default function PainelFilaAtendimento({
         </h2>
         <p className="mt-2 text-xs font-medium leading-relaxed text-black/50">
           As mesmas faixas que os alertas usam. A primeira é a promessa da régua
-          de automação: primeiro contato em até cinco minutos.
+          de atendimento: primeiro contato em até dez minutos.
         </p>
 
         {semMedidaDeTempo ? (
           <p className="mt-6 text-sm font-medium leading-relaxed text-black/60">
-            Não medido. Esta distribuição conta quanto cada lead esperou até a
-            primeira tentativa de ligação, e o sistema ainda não registra
-            ligação. As faixas ficam em branco em vez de aparecerem zeradas,
-            porque zero aqui seria lido como “ninguém esperou”.
+            Não medido. Esta distribuição conta quanto cada lead esperou até o
+            primeiro contato, e nenhum lead do período foi contatado ainda. As
+            faixas ficam em branco em vez de aparecerem zeradas, porque zero
+            aqui seria lido como “ninguém esperou”.
           </p>
         ) : (
           <ul className="mt-7 space-y-4">

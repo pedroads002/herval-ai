@@ -64,6 +64,16 @@ export function primeiroContato(
  * Quantos minutos o lead esperou até alguém falar com ele. Nulo quando ainda
  * não houve contato — e nulo não é zero: quem ainda espera não pode entrar
  * numa média como se tivesse sido atendido na hora.
+ *
+ * **É a definição de tempo de resposta do sistema desde 17/11/2026.** Mede a
+ * chegada do lead até a entrada dele em "Em Contato", que é o que o banco
+ * registra de fato, nos `lead_etapa_eventos`.
+ *
+ * Limite conhecido, assumido: depende de alguém mover o card, e quem é
+ * atendido direto por telefone pode pular para `Agendamento` sem passar por
+ * "Em Contato" — esse lead entra na conta como ainda não contatado. Enquanto
+ * não houver registro de ligação, essa é a medida honesta disponível, e um
+ * número com esse limite declarado vale mais do que "não medido" para sempre.
  */
 export function minutosAteOPrimeiroContato(
   historico: HistoricoDeEtapas,
@@ -76,16 +86,22 @@ export function minutosAteOPrimeiroContato(
 }
 
 /**
- * Quanto o lead esperou até o CRC pegar o telefone. **Esta é a definição
- * oficial de tempo de resposta.**
+ * Quanto o lead esperou até o CRC pegar o telefone.
  *
- * A anterior media a entrada em "Em Contato", e quebrava com a régua de
- * ligação: quem atende a ligação vai direto para `Agendamento` ou
- * `Venda Perdida` e nunca passa por "Em Contato" — ou seja, justamente os
- * leads bem atendidos sairiam da conta, e o número passaria a medir o tempo
- * até a operação desistir do telefone.
+ * **Não está em uso, e é de propósito.** Esta era a definição oficial de tempo
+ * de resposta até 17/11/2026, e ela media um dado que o sistema não grava: não
+ * existe registro de ligação no banco, nem tabela, nem canal, nem tentativa.
+ * Com isso mediana, média, cauda e dois alertas da Fila de Atendimento ficavam
+ * permanentemente em "não medido" — a tela que deveria cobrar o tempo de
+ * atendimento não cobrava nada. O tempo de resposta voltou a ser
+ * `minutosAteOPrimeiroContato`, que mede o que existe.
  *
- * Só existe para quem tem ligação registrada, que hoje são os leads da fila.
+ * A função fica aqui, guardada, porque a definição continua certa para o dia
+ * em que a operação registrar ligação: aí é só voltar a ligar os dois pontos.
+ * O limite conhecido dela: quem é atendido por telefone pode ir direto para
+ * `Agendamento` sem passar por "Em Contato" — ver o limite espelhado em
+ * `minutosAteOPrimeiroContato`.
+ *
  * Nunca dá negativo: nenhuma ligação acontece antes de o lead chegar, e isso
  * é invariante checada na base.
  */
@@ -149,7 +165,10 @@ export function tempoDeResposta(medidos: (number | null)[]): TempoDeResposta {
  * precisam usar exatamente os mesmos cortes — dois lugares medindo "demorou"
  * com réguas diferentes é como as divergências deste projeto começaram.
  *
- * O primeiro corte é a promessa da régua de automação: ligar em até 5 minutos.
+ * O primeiro corte é a promessa do atendimento: primeiro contato em até 10
+ * minutos. Era 5 minutos, da régua de ligação antiga; virou 10 em 17/11/2026,
+ * que é o prazo combinado com a clínica e o mesmo valor de
+ * `clinicas.atendimento_delay_minutos`.
  */
 export type FaixaDeResposta = {
   id: string;
@@ -159,8 +178,8 @@ export type FaixaDeResposta = {
 };
 
 export const faixasDeResposta: FaixaDeResposta[] = [
-  { id: "ate5", rotulo: "até 5 min", ate: 5 },
-  { id: "ate30", rotulo: "5 a 30 min", ate: 30 },
+  { id: "ate10", rotulo: "até 10 min", ate: 10 },
+  { id: "ate30", rotulo: "10 a 30 min", ate: 30 },
   { id: "ate2h", rotulo: "30 min a 2h", ate: 120 },
   { id: "ate12h", rotulo: "2h a 12h", ate: 720 },
   { id: "ate1dia", rotulo: "12h a 1 dia", ate: 1440 },
@@ -212,8 +231,6 @@ type EntradaDaFila = {
   /** Base inteira: é dela que saem os números de volume. */
   leads: Lead[];
   historico: HistoricoDeEtapas;
-  /** Registro de ligação. Só existe para os leads da fila. */
-  ligacoes: Ligacoes;
   agendamentos: Agendamento[];
   faixa: Faixa;
   clinicas: Clinica[];
@@ -227,19 +244,14 @@ type EntradaDaFila = {
  * Até 17/11/2026 a aba filtrava `ehLeadDeMarketing`, e como a base inteira
  * nasce com `origem = 'WhatsApp'` ela ficava zerada para todas as clínicas.
  *
- * Dentro da linha convivem duas bases, de propósito:
- *
- * - **Volume** (recebidos, contatados, agendados) conta a base inteira. São os
- *   mesmos números dos Relatórios, e precisam continuar batendo com eles.
- * - **Tempo de resposta** (mediana, média, cauda) conta só quem tem ligação
- *   registrada. A definição nova mede da primeira tentativa de ligação, e esse
- *   dado não existe no histórico — misturar as duas bases num agregado só
- *   inventaria um número que não corresponde a nenhuma das duas.
+ * Volume (recebidos, contatados, agendados) e tempo de resposta (mediana,
+ * média, cauda) saem da mesma base e do mesmo evento: a entrada do lead em
+ * "Em Contato". Antes o tempo vinha da primeira tentativa de ligação, que o
+ * banco não registra, e por isso vinha sempre vazio.
  */
 export function montarFila({
   leads,
   historico,
-  ligacoes,
   agendamentos,
   faixa,
   clinicas,
@@ -256,16 +268,13 @@ export function montarFila({
         l.clinicaId === clinica.id && dentroDaFaixa(l.diasAtras, faixa),
     );
 
-    // Volume: quem chegou a "Em Contato" ou além, na base inteira.
-    const contatados = daClinica.filter(
-      (l) => minutosAteOPrimeiroContato(indice, l.id) !== null,
-    ).length;
-
-    // Tempo de resposta: só quem tem ligação registrada.
-    const medidos = daClinica
-      .filter((l) => primeiraTentativa(ligacoes, l.id) !== null)
-      .map((l) => minutosAteAPrimeiraTentativa(indice, ligacoes, l.id));
+    // Uma medida só para os dois: quem tem espera medida é quem foi contatado,
+    // e `null` em `tempoDeResposta` é exatamente quem ainda aguarda.
+    const medidos = daClinica.map((l) =>
+      minutosAteOPrimeiroContato(indice, l.id),
+    );
     const resposta = tempoDeResposta(medidos);
+    const contatados = resposta.atendidos;
 
     const tempos = medidos.filter((t): t is number => t !== null);
     const naCauda = tempos.filter(estaNaCauda).length;
@@ -296,15 +305,14 @@ export type ResumoDaFila = {
 };
 
 /**
- * O total da tela, com o mesmo split das linhas: volume somado das clínicas
- * visíveis, tempo de resposta refeito sobre os leads que têm ligação — porque
- * mediana de medianas não é mediana.
+ * O total da tela: volume somado das clínicas visíveis, e o tempo de resposta
+ * refeito sobre todos os leads juntos — porque mediana de medianas não é
+ * mediana.
  */
 export function montarResumoDaFila(
   linhas: LinhaFila[],
   leads: Lead[],
   historico: HistoricoDeEtapas,
-  ligacoes: Ligacoes,
   faixa: Faixa,
 ): ResumoDaFila {
   const indice =
@@ -318,12 +326,8 @@ export function montarResumoDaFila(
   // refazendo a conta sobre todos os tempos juntos.
   const idsVisiveis = new Set(linhas.map((l) => l.clinica.id));
   const medidos = doPeriodo
-    .filter(
-      (l) =>
-        idsVisiveis.has(l.clinicaId) &&
-        primeiraTentativa(ligacoes, l.id) !== null,
-    )
-    .map((l) => minutosAteAPrimeiraTentativa(indice, ligacoes, l.id));
+    .filter((l) => idsVisiveis.has(l.clinicaId))
+    .map((l) => minutosAteOPrimeiroContato(indice, l.id));
 
   const resposta = tempoDeResposta(medidos);
   const tempos = medidos.filter((t): t is number => t !== null);
