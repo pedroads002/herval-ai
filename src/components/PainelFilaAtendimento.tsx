@@ -310,7 +310,7 @@ export default function PainelFilaAtendimento({
         </h2>
         <p className="mt-2 text-xs font-medium leading-relaxed text-black/50">
           As mesmas faixas que os alertas usam. A primeira é a promessa da régua
-          de automação: primeiro contato em até cinco minutos.
+          de atendimento: primeiro contato em até dez minutos.
         </p>
 
         {semMedidaDeTempo ? (

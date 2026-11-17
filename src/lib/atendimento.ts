@@ -165,7 +165,10 @@ export function tempoDeResposta(medidos: (number | null)[]): TempoDeResposta {
  * precisam usar exatamente os mesmos cortes — dois lugares medindo "demorou"
  * com réguas diferentes é como as divergências deste projeto começaram.
  *
- * O primeiro corte é a promessa da régua de automação: ligar em até 5 minutos.
+ * O primeiro corte é a promessa do atendimento: primeiro contato em até 10
+ * minutos. Era 5 minutos, da régua de ligação antiga; virou 10 em 17/11/2026,
+ * que é o prazo combinado com a clínica e o mesmo valor de
+ * `clinicas.atendimento_delay_minutos`.
  */
 export type FaixaDeResposta = {
   id: string;
@@ -175,8 +178,8 @@ export type FaixaDeResposta = {
 };
 
 export const faixasDeResposta: FaixaDeResposta[] = [
-  { id: "ate5", rotulo: "até 5 min", ate: 5 },
-  { id: "ate30", rotulo: "5 a 30 min", ate: 30 },
+  { id: "ate10", rotulo: "até 10 min", ate: 10 },
+  { id: "ate30", rotulo: "10 a 30 min", ate: 30 },
   { id: "ate2h", rotulo: "30 min a 2h", ate: 120 },
   { id: "ate12h", rotulo: "2h a 12h", ate: 720 },
   { id: "ate1dia", rotulo: "12h a 1 dia", ate: 1440 },
