@@ -113,10 +113,13 @@ export type ResumoDoPeriodo = {
   cancelamentos: number;
   /** Agendamentos do período cuja consulta já passou. */
   consultasAteAData: number;
+  /** Falta + cancelamento: quem marcou e não foi atendido. */
+  naoCompareceram: number;
   /**
-   * Dessas, quantas têm desfecho registrado (Compareceu ou Faltou). É o
-   * denominador do show-rate e do no-show — e não `consultasAteAData`, que
-   * inclui a consulta que passou e continua em "Agendada".
+   * Quantas consultas têm desfecho registrado — compareceu, faltou ou foi
+   * cancelada. É o denominador do show-rate e do no-show, o mesmo para os dois,
+   * e não `consultasAteAData`, que inclui a consulta que passou e continua em
+   * "Agendada".
    */
   comDesfecho: number;
   /** Já aconteceram e ninguém deu baixa. Não é falta nem presença. */
@@ -135,7 +138,6 @@ export type ResumoDoPeriodo = {
   taxaReagendamento: number | null;
   percentualIa: number | null;
   percentualLigacao: number | null;
-  taxaCancelamento: number | null;
   showRate: number | null;
   taxaAgendamento: number | null;
 };
@@ -160,6 +162,7 @@ const RESUMO_VAZIO: ResumoDoPeriodo = {
   faltas: 0,
   cancelamentos: 0,
   consultasAteAData: 0,
+  naoCompareceram: 0,
   comDesfecho: 0,
   aguardandoBaixa: 0,
   remarcacoes: 0,
@@ -174,7 +177,6 @@ const RESUMO_VAZIO: ResumoDoPeriodo = {
   taxaReagendamento: null,
   percentualIa: null,
   percentualLigacao: null,
-  taxaCancelamento: null,
   showRate: null,
   taxaAgendamento: null,
 };
@@ -334,17 +336,33 @@ function montarResumo(
   const comparecimentos = jaAconteceram.filter(
     (consulta) => consulta.status === STATUS_COMPARECEU,
   ).length;
-  // A base das duas taxas de presença. Antes elas dividiam por tudo que já
-  // tinha acontecido, e aí a consulta que passou sem ninguém dar baixa entrava
-  // no denominador: o show-rate caía e o no-show caía junto, os dois por
-  // trabalho pendente e não por ausência. Uma consulta sem baixa não tem
-  // desfecho para ser contado — ela sai da conta e vira o alerta "sem
-  // desfecho", que é o fato que existe de verdade. Mesma regra de
-  // `montarProducao`, em `lib/relatorios.ts`.
-  const comDesfecho = comparecimentos + faltas;
   const cancelamentos = producao.filter(
     (consulta) => consulta.status === STATUS_CANCELADA,
   ).length;
+
+  /*
+    Quem marcou e não foi atendido: falta + cancelamento.
+
+    Decisão dele, em 17/11/2026: para a clínica, cadeira vazia é cadeira vazia,
+    e o lead vai para "Reagendamento" nos dois casos. Até aqui o no-show contava
+    só "Faltou" e o cancelamento era uma taxa separada — duas taxas para a mesma
+    pergunta, e a de no-show vivia zerada porque ninguém marca "Faltou".
+
+    Cancelamento não precisa esperar a data chegar: ele já tem desfecho no dia
+    em que foi cancelado, por isso conta sobre toda a produção e não só sobre o
+    que já passou.
+  */
+  const naoCompareceram = faltas + cancelamentos;
+
+  // A base das duas taxas de presença, e a mesma para as duas: assim no-show e
+  // show-rate somam 100% e param de contar histórias diferentes. Antes elas
+  // dividiam por tudo que já tinha acontecido, e aí a consulta que passou sem
+  // ninguém dar baixa entrava no denominador: o show-rate caía e o no-show caía
+  // junto, os dois por trabalho pendente e não por ausência. Uma consulta sem
+  // baixa não tem desfecho para ser contado — ela sai da conta e vira o alerta
+  // "sem desfecho", que é o fato que existe de verdade. Mesma regra de
+  // `montarProducao`, em `lib/relatorios.ts`.
+  const comDesfecho = comparecimentos + naoCompareceram;
   const remarcacoes = producao.filter((consulta) =>
     contexto.remarcacoes.has(consulta.id),
   ).length;
@@ -398,7 +416,9 @@ function montarResumo(
     cancelamentos,
     consultasAteAData: jaAconteceram.length,
     comDesfecho,
-    aguardandoBaixa: jaAconteceram.length - comDesfecho,
+    naoCompareceram,
+    // Sem os cancelados: cancelamento não espera baixa nenhuma.
+    aguardandoBaixa: jaAconteceram.length - comparecimentos - faltas,
     remarcacoes,
     fechadosPelaIa,
     fechadosPeloCrc,
@@ -407,11 +427,10 @@ function montarResumo(
     fechadosPorWhatsapp,
     qualificados,
     leadsComAgendamento: comAgendamento.size,
-    taxaNoShow: taxa(faltas, comDesfecho),
+    taxaNoShow: taxa(naoCompareceram, comDesfecho),
     taxaReagendamento: taxa(remarcacoes, producao.length),
     percentualIa: taxa(fechadosPelaIa, producao.length),
     percentualLigacao: taxa(fechadosPorLigacao, comCanal.length),
-    taxaCancelamento: taxa(cancelamentos, producao.length),
     showRate: taxa(comparecimentos, comDesfecho),
     taxaAgendamento: taxa(comAgendamento.size, qualificados),
   };
@@ -472,21 +491,9 @@ function montarAlertas(
   const alertas: AlertaDaVisao[] = [];
   const metas = metasPadrao;
 
-  if (
-    resumo.taxaCancelamento !== null &&
-    resumo.agendamentos >= metas.amostraMinima &&
-    resumo.taxaCancelamento > metas.tetoCancelamento
-  ) {
-    alertas.push({
-      id: "cancelamento",
-      severidade:
-        resumo.taxaCancelamento > metas.cancelamentoCritico
-          ? "critico"
-          : "atencao",
-      problema: `${resumo.taxaCancelamento}% dos agendamentos do período foram cancelados, acima do teto de ${metas.tetoCancelamento}%.`,
-      acao: `${resumo.cancelamentos} de ${resumo.agendamentos} agendamentos. Vale ouvir as ligações de confirmação antes de culpar a agenda.`,
-    });
-  }
+  // Não existe mais alerta só de cancelamento: desde 17/11/2026 o cancelamento
+  // entra no no-show, e o alerta de show-rate abaixo é o mesmo fato pelo outro
+  // lado — dois alertas para a mesma cadeira vazia era o que confundia.
 
   if (
     resumo.showRate !== null &&
@@ -501,7 +508,7 @@ function montarAlertas(
       severidade:
         resumo.showRate < metas.showRateCritico ? "critico" : "atencao",
       problema: `Comparecimento em ${resumo.showRate}% das consultas com desfecho registrado, abaixo do piso de ${metas.pisoShowRate}%.`,
-      acao: `${resumo.faltas} faltas em ${resumo.comDesfecho} consultas com desfecho registrado.`,
+      acao: `${resumo.faltas} faltas e ${resumo.cancelamentos} cancelamentos em ${resumo.comDesfecho} consultas com desfecho registrado.`,
     });
   }
 

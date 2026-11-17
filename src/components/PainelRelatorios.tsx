@@ -499,7 +499,7 @@ export default function PainelRelatorios({
               rotulo="Show-rate da produção"
               valor={comPercentual(resumo.showRateProducao)}
               detalhe={
-                `${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoComDesfecho)} consultas com desfecho registrado` +
+                `${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoComDesfecho)} consultas com desfecho (compareceu, faltou ou cancelou) · no-show de ${comPercentual(resumo.taxaNoShow)}, que é ${formatarNumero(resumo.faltas)} ${resumo.faltas === 1 ? "falta" : "faltas"} e ${formatarNumero(resumo.cancelados)} ${resumo.cancelados === 1 ? "cancelamento" : "cancelamentos"}` +
                 (resumo.aguardandoBaixa > 0
                   ? ` · ${formatarNumero(resumo.aguardandoBaixa)} ${resumo.aguardandoBaixa === 1 ? "consulta já aconteceu e está sem baixa, fora da conta" : "consultas já aconteceram e estão sem baixa, fora da conta"}`
                   : "")
@@ -600,7 +600,7 @@ export default function PainelRelatorios({
           <Tabela
             titulo="Funil de leads (consultas do período)"
             legenda={
-              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem; a coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho registrado: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
+              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem; a coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
               (resumo.inalcancaveis > 0
                 ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
                 : "")
@@ -687,7 +687,7 @@ export default function PainelRelatorios({
           <Tabela
             titulo="Produção de agendamentos (pelo ato de agendar)"
             selo="Métrica oficial de comparecimento"
-            legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas que já aconteceram e têm desfecho registrado: as futuras e as que estão sem baixa ficam de fora do cálculo. Consulta sem baixa não é falta — é consulta esperando alguém marcar se o paciente veio."
+            legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas com desfecho: compareceu, faltou ou cancelou. No-show é o resto dessa mesma conta — falta e cancelamento juntos, porque nos dois a cadeira ficou vazia —, então as duas taxas são as duas faces do mesmo número (somadas podem dar 99% ou 101%, que é só o arredondamento de cada uma). As consultas futuras e as que já passaram sem baixa ficam fora do cálculo: consulta sem baixa não é falta, é consulta esperando alguém marcar se o paciente veio."
             cabecalhos={[
               "Clínica",
               "Agendamentos",
