@@ -165,7 +165,7 @@ export default function PainelFilaAtendimento({
         <Kpi
           rotulo="Recebidos"
           valor={formatarNumero(resumo.recebidos)}
-          detalhe="leads de campanha paga que chegaram no período"
+          detalhe="leads que chegaram no período, de qualquer origem"
         />
         <Kpi
           rotulo="Contatados"

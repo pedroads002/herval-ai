@@ -1,4 +1,4 @@
-import { ehLeadDeMarketing, type EtapaFunil, type Lead } from "@/data/leads";
+import { type EtapaFunil, type Lead } from "@/data/leads";
 import type { Clinica } from "@/data/clinicas";
 import {
   indexarPorLead,
@@ -220,9 +220,12 @@ type EntradaDaFila = {
 };
 
 /**
- * Uma linha por clínica, sempre sobre o mesmo grupo: os leads de campanha que
- * chegaram no período. Recebidos, contatados e agendados são degraus do mesmo
- * funil, e não três recortes diferentes que não fecham entre si.
+ * Uma linha por clínica, sempre sobre o mesmo grupo: os leads que chegaram no
+ * período, de qualquer origem. Recebidos, contatados e agendados são degraus do
+ * mesmo funil, e não três recortes diferentes que não fecham entre si.
+ *
+ * Até 17/11/2026 a aba filtrava `ehLeadDeMarketing`, e como a base inteira
+ * nasce com `origem = 'WhatsApp'` ela ficava zerada para todas as clínicas.
  *
  * Dentro da linha convivem duas bases, de propósito:
  *
@@ -250,9 +253,7 @@ export function montarFila({
   return clinicas.map((clinica) => {
     const daClinica = leads.filter(
       (l) =>
-        l.clinicaId === clinica.id &&
-        ehLeadDeMarketing(l) &&
-        dentroDaFaixa(l.diasAtras, faixa),
+        l.clinicaId === clinica.id && dentroDaFaixa(l.diasAtras, faixa),
     );
 
     // Volume: quem chegou a "Em Contato" ou além, na base inteira.
@@ -309,9 +310,7 @@ export function montarResumoDaFila(
   const indice =
     historico instanceof Map ? historico : indexarPorLead(historico);
 
-  const doPeriodo = leads.filter(
-    (l) => ehLeadDeMarketing(l) && dentroDaFaixa(l.diasAtras, faixa),
-  );
+  const doPeriodo = leads.filter((l) => dentroDaFaixa(l.diasAtras, faixa));
   const soma = (campo: (l: LinhaFila) => number) =>
     linhas.reduce((total, l) => total + campo(l), 0);
 
