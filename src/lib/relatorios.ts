@@ -131,10 +131,21 @@ export function taxa(parte: number, total: number): number | null {
 
 // --- Linhas por clínica ----------------------------------------------------
 
-/** Uma linha da tabela "Funil de marketing", pela data da consulta. */
+/** Uma linha da tabela "Funil de leads", pela data da consulta. */
 export type LinhaFunil = {
   clinica: Clinica;
   leads: number;
+  /**
+   * Quantos desses leads chegaram por campanha paga (`origensPagas`).
+   *
+   * Até 17/11/2026 esta tabela **só** contava esses leads, e a base inteira
+   * grava `origem = 'WhatsApp'` na criação do lead: as colunas de lead ficavam
+   * zeradas para todas as clínicas e a taxa de agendamento nunca tinha base.
+   * Agora o funil conta todo lead, e a origem paga virou este recorte — o dia
+   * em que a entrada passar a registrar a campanha, a coluna começa a encher
+   * sozinha, sem mexer no resto da conta.
+   */
+  leadsPagos: number;
   desqualificados: number;
   qualificados: number;
   /** Consultas marcadas para o período, de qualquer safra. */
@@ -213,8 +224,9 @@ function porClinica<T>(
 }
 
 /**
- * Funil de marketing: conta os leads pela safra (quando chegaram) e as consultas
- * que caem no período, venham de qual safra vierem.
+ * Funil de leads: conta os leads pela safra (quando chegaram) e as consultas
+ * que caem no período, venham de qual safra vierem. Todo lead entra, de
+ * qualquer origem — a campanha paga aparece na coluna `leadsPagos`.
  */
 export function montarFunil({
   leads,
@@ -226,12 +238,11 @@ export function montarFunil({
   return porClinica(clinicas, (clinica) => {
     const daClinica = leads.filter(
       (l) =>
-        l.clinicaId === clinica.id &&
-        ehLeadDeMarketing(l) &&
-        dentroDaFaixa(l.diasAtras, faixa),
+        l.clinicaId === clinica.id && dentroDaFaixa(l.diasAtras, faixa),
     );
 
     const qualificados = daClinica.filter(ehQualificado).length;
+    const leadsPagos = daClinica.filter(ehLeadDeMarketing).length;
 
     // Consultas marcadas PARA o período, de qualquer safra de lead. Quando o
     // período alcança dias que ainda não chegaram, as consultas já marcadas
@@ -258,6 +269,7 @@ export function montarFunil({
     return {
       clinica,
       leads: daClinica.length,
+      leadsPagos,
       desqualificados: daClinica.length - qualificados,
       qualificados,
       agendados: consultas.length,
@@ -352,7 +364,10 @@ export function montarProducao({
 // --- Indicadores do topo ---------------------------------------------------
 
 export type ResumoGeral = {
-  leadsMarketing: number;
+  /** Leads que chegaram no período, de qualquer origem. */
+  leads: number;
+  /** Desses, quantos vieram de campanha paga. Ver `LinhaFunil.leadsPagos`. */
+  leadsPagos: number;
   qualificados: number;
   agendadosFunil: number;
   consultaFutura: number;
@@ -420,7 +435,8 @@ export function montarResumo(
   const faltas = soma(producao, (l) => l.faltaram);
 
   return {
-    leadsMarketing: soma(funil, (l) => l.leads),
+    leads: soma(funil, (l) => l.leads),
+    leadsPagos: soma(funil, (l) => l.leadsPagos),
     qualificados,
     agendadosFunil,
     consultaFutura: soma(funil, (l) => l.consultaFutura),

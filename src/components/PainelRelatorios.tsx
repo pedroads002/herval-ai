@@ -454,9 +454,13 @@ export default function PainelRelatorios({
           {/* KPIs */}
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
             <Kpi
-              rotulo="Leads de marketing"
-              valor={formatarNumero(resumo.leadsMarketing)}
-              detalhe={`só Meta Ads e Google Ads · ${formatarNumero(resumo.qualificados)} qualificados`}
+              rotulo="Leads"
+              valor={formatarNumero(resumo.leads)}
+              detalhe={`de qualquer origem · ${formatarNumero(resumo.qualificados)} qualificados${
+                resumo.leadsPagos > 0
+                  ? ` · ${formatarNumero(resumo.leadsPagos)} de campanha paga`
+                  : ""
+              }`}
             />
             <Kpi
               rotulo="Agendados (funil)"
@@ -524,23 +528,26 @@ export default function PainelRelatorios({
           </div>
 
           {/* Fica fora do card para não esticar a linha inteira de
-              indicadores, igual às duas notas abaixo. Esta existe porque o
-              mesmo lead era contado de dois jeitos em duas telas, sem nada
-              dizer isso: a Visão Geral mostra todo lead que entrou, aqui só
-              entra campanha paga. Quem comparasse os dois números concluiria
-              que um deles está errado. */}
+              indicadores, igual às duas notas abaixo. Antes esta nota
+              explicava por que o mesmo lead era contado de dois jeitos em duas
+              telas: aqui só entrava campanha paga. Só que a entrada do lead
+              grava "WhatsApp" em toda a base, então o recorte deixava a tela
+              inteira zerada — as duas telas passaram a contar o mesmo lead, e
+              a campanha paga virou coluna. */}
           <p className="-mt-4 flex items-start gap-2 text-xs font-medium leading-relaxed text-black/50">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              <span className="font-bold text-herval-preto">
-                Leads de marketing
+              <span className="font-bold text-herval-preto">Leads</span> conta
+              todo lead que entrou no período, de qualquer origem — o mesmo
+              número do card <span className="font-bold text-herval-preto">
+                Leads
               </span>{" "}
-              conta só quem chegou por Meta Ads ou Google Ads, porque estas
-              tabelas medem retorno de campanha. Quem chegou por Instagram,
-              indicação, site ou WhatsApp não aparece aqui — aparece no card{" "}
-              <span className="font-bold text-herval-preto">Leads</span> da
-              Visão Geral, que conta todas as origens. Os dois números serem
-              diferentes é esperado.
+              da Visão Geral. A coluna{" "}
+              <span className="font-bold text-herval-preto">Campanha</span> na
+              tabela abaixo mostra quantos desses vieram de Meta Ads ou Google
+              Ads. Hoje ela fica em zero porque a entrada do lead pelo WhatsApp
+              não registra de qual anúncio a pessoa veio; quando passar a
+              registrar, a coluna enche sozinha e o resto da conta não muda.
             </span>
           </p>
 
@@ -581,9 +588,9 @@ export default function PainelRelatorios({
 
           {/* Tabela A */}
           <Tabela
-            titulo="Funil de marketing (consultas do período)"
+            titulo="Funil de leads (consultas do período)"
             legenda={
-              'Conta os leads pela safra — o mês em que chegaram. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho registrado: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
+              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem; a coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho registrado: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
               (resumo.inalcancaveis > 0
                 ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
                 : "")
@@ -591,6 +598,7 @@ export default function PainelRelatorios({
             cabecalhos={[
               "Clínica",
               "Leads",
+              "Campanha",
               "Desqual.",
               "Qualif.",
               "Agendados",
@@ -613,6 +621,7 @@ export default function PainelRelatorios({
                   ativa={linha.clinica.ativa}
                 />
                 <Num>{linha.leads}</Num>
+                <Num>{linha.leadsPagos}</Num>
                 <Num>{linha.desqualificados}</Num>
                 <Num>{linha.qualificados}</Num>
                 <Num>{linha.agendados}</Num>
@@ -723,10 +732,10 @@ export default function PainelRelatorios({
             <dl className="mt-5 grid gap-5 lg:grid-cols-3">
               {[
                 {
-                  titulo: "Funil de marketing",
-                  quando: "Para fechar o mês e avaliar campanha.",
+                  titulo: "Funil de leads",
+                  quando: "Para fechar o mês e avaliar a entrada de leads.",
                   texto:
-                    "Responde se o investimento em anúncio virou consulta. Como conta pela data da consulta, o número muda quando um paciente antecipa ou adia.",
+                    "Responde se o lead que entrou virou consulta. Conta todo lead, de qualquer origem, e a coluna Campanha separa o que veio de anúncio pago. Como as consultas contam pela data em que o paciente é atendido, o número muda quando alguém antecipa ou adia.",
                 },
                 {
                   titulo: "Produção de agendamentos",
@@ -765,6 +774,7 @@ export default function PainelRelatorios({
 
 const colunasFunil: Coluna<LinhaFunil>[] = [
   { tipo: "soma", valor: (l) => l.leads },
+  { tipo: "soma", valor: (l) => l.leadsPagos },
   { tipo: "soma", valor: (l) => l.desqualificados },
   { tipo: "soma", valor: (l) => l.qualificados },
   { tipo: "soma", valor: (l) => l.agendados },
