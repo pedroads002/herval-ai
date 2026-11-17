@@ -88,7 +88,8 @@ export default function FiltrosDaVisaoGeral({
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <div className="inline-flex rounded-full border border-black/15 bg-herval-branco p-1">
+      {/* `flex-wrap`: com seis períodos a fila não cabe mais em tela estreita. */}
+      <div className="inline-flex flex-wrap rounded-full border border-black/15 bg-herval-branco p-1">
         {periodosDaVisao.map((opcao) => {
           const ativo = opcao.nome === periodo.nome;
           return (
