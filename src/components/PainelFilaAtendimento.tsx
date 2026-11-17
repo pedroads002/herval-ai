@@ -145,14 +145,20 @@ export default function PainelFilaAtendimento({
         <Kpi
           rotulo="Recebidos"
           valor={formatarNumero(resumo.recebidos)}
-          detalhe="leads que chegaram no período, de qualquer origem"
+          detalhe={
+            resumo.foraDaConta === 0
+              ? "leads que chegaram no período, de qualquer origem"
+              : `leads que chegaram no período, de qualquer origem · ${formatarNumero(
+                  resumo.foraDaConta,
+                )} de “Outros Contatos” fora da conta, porque ali não é paciente (é por isso que este número fica abaixo do total de leads da aba Funil)`
+          }
         />
         <Kpi
           rotulo="Contatados"
           valor={formatarNumero(resumo.contatados)}
           detalhe={`${comPercentual(resumo.taxaDeContato)} dos recebidos · ${formatarNumero(
             resumo.recebidos - resumo.contatados,
-          )} ainda sem contato`}
+          )} ainda sem contato · conta quem entrou em “Em Contato” e também quem já está numa etapa depois do contato`}
         />
         <Kpi
           rotulo="Tempo de resposta"
@@ -162,7 +168,7 @@ export default function PainelFilaAtendimento({
               ? "mede da chegada do lead até o primeiro contato; nenhum lead do período foi contatado ainda, e o campo fica vazio em vez de mostrar zero, que seria lido como atendimento imediato"
               : `mediana da chegada até o primeiro contato, sobre ${formatarNumero(
                   resumo.resposta.atendidos,
-                )} ${resumo.resposta.atendidos === 1 ? "lead contatado" : "leads contatados"}`
+                )} ${resumo.resposta.atendidos === 1 ? "lead com espera medida" : "leads com espera medida"}`
           }
           alerta={mediana !== null && mediana >= 120}
         />
@@ -186,10 +192,13 @@ export default function PainelFilaAtendimento({
             etapa “Em Contato”, que é o que o sistema registra. Metade deles
             esperou até {duracao(mediana)}. A média é de {duracao(media)},
             puxada pelos {comPercentual(resumo.percentualNaCauda)} que esperaram
-            mais de um dia. É a mesma base do volume: quem ainda não foi
-            contatado conta como esperando, não como atendido na hora. O limite
-            desta medida: ela depende de o card ser movido, então lead atendido
-            por telefone e com card parado aparece como demora.
+            mais de um dia. Quem ainda não foi contatado conta como esperando,
+            não como atendido na hora. O limite desta medida: ela depende de o
+            card passar por “Em Contato”. Lead atendido por telefone e com card
+            parado aparece como demora; lead que a equipe puxou direto para
+            Agendamento conta como contatado no volume, mas fica sem tempo
+            medido aqui — por isso a mediana pode sair de menos gente do que o
+            número de contatados.
           </span>
         </p>
       )}
@@ -251,14 +260,14 @@ export default function PainelFilaAtendimento({
       <PontosDeAtencao
         alertas={alertas}
         visiveis={metasPadrao.alertasVisiveis}
-        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads contatados ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento. Dois dos três estão medidos. O de recuperação vencida depende de registro de ligação, que o sistema ainda não tem — não há como dizer que ele está em ordem, apenas que não foi verificado.`}
+        legenda={`Lead parado há mais de um dia sem contato, lead com a tentativa de recuperação da régua vencida, e clínica cuja fatia de leads que esperaram 12h ou mais é ao menos ${metasPadrao.multiplicadorDaCauda} vezes a fatia da base no mesmo período. A comparação é com a base, e não com um número fixo: mês ruim para todo mundo é assunto de meta. Ficam de fora clínicas com menos de ${metasPadrao.amostraMinima} leads com espera medida ou menos de ${metasPadrao.minimoNaCauda} leads na cauda — um caso isolado não é padrão de atendimento. Dois dos três estão medidos. O de recuperação vencida depende de registro de ligação, que o sistema ainda não tem — não há como dizer que ele está em ordem, apenas que não foi verificado.`}
         vazio="Nenhuma clínica fora do padrão e nenhum lead parado há mais de um dia sem contato. A recuperação vencida não foi verificada: depende de registro de ligação, que o sistema ainda não tem."
       />
 
       {/* Tabela por clínica */}
       <Tabela
         titulo="Atendimento por clínica (leads do período)"
-        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos, contatados e agendados contam a base inteira, e são os mesmos números dos Relatórios. A mediana e a média saem da mesma base: medem da chegada do lead até o primeiro contato, e quem ainda não foi contatado conta como esperando. A mediana resiste a um caso perdido; a média mostra quando existe cauda. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
+        legenda="Conta os leads pela safra: os que chegaram dentro do período escolhido, acompanhados até onde foram. Recebidos e agendados contam toda origem de lead, e só deixam de fora a etapa “Outros Contatos”, que é onde a clínica guarda quem não é paciente — por isso “Recebidos” fica abaixo do total de leads da aba Funil, que mostra a base inteira. Contatado é quem entrou na etapa “Em Contato” ou já está numa etapa depois do contato: quem a equipe atendeu por telefone e puxou direto para Agendamento também foi atendido. A mediana e a média contam só quem tem espera medida, ou seja quem passou pelo card “Em Contato” — para os outros o tempo fica não medido, e não zero, porque zero seria lido como atendimento imediato. Por isso a mediana pode sair de menos gente do que a coluna “Contatados”. Não há total de mediana porque mediana de medianas não é mediana — o número do topo é calculado sobre todos os leads juntos."
         cabecalhos={[
           "Clínica",
           "Recebidos",
