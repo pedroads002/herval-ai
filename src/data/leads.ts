@@ -203,6 +203,31 @@ export function ehQualificado(lead: Lead): boolean {
   return etapasFunil.indexOf(lead.etapa) >= PRIMEIRA_ETAPA_QUALIFICADA;
 }
 
+/**
+ * A etapa em que a clínica guarda quem **não** é paciente: o próprio número da
+ * clínica, fornecedor, a agência. Ver o comentário de
+ * `PRIMEIRA_ETAPA_QUALIFICADA` — ali não há lead, e por isso ela fica fora das
+ * contas de oportunidade e de atendimento.
+ */
+export const ETAPA_SEM_LEAD: EtapaFunil = "Outros Contatos";
+
+/**
+ * Se o lead já está numa etapa que só se alcança depois de alguém ter falado
+ * com ele.
+ *
+ * O corte é o mesmo de `ehQualificado`, e de propósito não é a posição de "Em
+ * Contato" na lista: "Outros Contatos" vem depois dela na ordem do funil e não
+ * é contato nenhum.
+ *
+ * Existe para a Fila de Atendimento. Lead que a equipe atendeu por telefone e
+ * puxou direto para Agendamento não tem o evento de entrada em "Em Contato", e
+ * sem isso ele aparecia como alguém que ninguém atendeu — inclusive quem já
+ * compareceu à consulta.
+ */
+export function passouDoContato(etapa: EtapaFunil): boolean {
+  return etapasFunil.indexOf(etapa) >= PRIMEIRA_ETAPA_QUALIFICADA;
+}
+
 /** Etapas que o sistema controla sozinho a partir dos agendamentos. */
 export const ETAPA_AGENDADO: EtapaFunil = "Agendamento";
 export const ETAPA_REMARCAR: EtapaFunil = "Reagendamento";

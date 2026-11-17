@@ -1,4 +1,9 @@
-import { type EtapaFunil, type Lead } from "@/data/leads";
+import {
+  ETAPA_SEM_LEAD,
+  passouDoContato,
+  type EtapaFunil,
+  type Lead,
+} from "@/data/leads";
 import type { Clinica } from "@/data/clinicas";
 import {
   indexarPorLead,
@@ -209,6 +214,17 @@ export function estaNaCauda(minutos: number) {
 export type LinhaFila = {
   clinica: Clinica;
   recebidos: number;
+  /**
+   * Quantos contatos de "Outros Contatos" chegaram no período e ficaram fora
+   * de `recebidos`. Fica guardado para a tela poder dizer o número, em vez de
+   * a conta simplesmente não fechar com a aba de Funil.
+   */
+  foraDaConta: number;
+  /**
+   * Quem já foi atendido: tem o evento de entrada em "Em Contato" **ou** já
+   * está numa etapa depois do contato. Não é o mesmo que `resposta.atendidos`,
+   * que é só quem tem espera medida — ver `montarFila`.
+   */
   contatados: number;
   taxaDeContato: number | null;
   resposta: TempoDeResposta;
@@ -245,9 +261,27 @@ type EntradaDaFila = {
  * nasce com `origem = 'WhatsApp'` ela ficava zerada para todas as clínicas.
  *
  * Volume (recebidos, contatados, agendados) e tempo de resposta (mediana,
- * média, cauda) saem da mesma base e do mesmo evento: a entrada do lead em
- * "Em Contato". Antes o tempo vinha da primeira tentativa de ligação, que o
- * banco não registra, e por isso vinha sempre vazio.
+ * média, cauda) saem da mesma base. Antes o tempo vinha da primeira tentativa
+ * de ligação, que o banco não registra, e por isso vinha sempre vazio.
+ *
+ * Duas correções de 17/11/2026, e as duas pelo mesmo motivo — a tela dizia "16
+ * leads ainda sem contato" com o cartão ao lado dizendo "0 aguardando contato":
+ *
+ * 1. **Contatado não é mais só quem tem o evento de "Em Contato".** Quem já
+ *    está numa etapa depois do contato também conta: a equipe atende por
+ *    telefone e puxa o card direto para Agendamento, sem passar pelo card do
+ *    meio. Eram 10 leads assim, três deles já com consulta comparecida,
+ *    contados como gente que ninguém tinha atendido.
+ *
+ *    O tempo de espera desses 10 continua **não medido**, e não zero: zero
+ *    entraria na faixa "até 10 min" e seria lido como atendimento imediato.
+ *    Por isso `contatados` (volume) e `resposta.atendidos` (quem tem espera
+ *    medida) são dois números diferentes de propósito.
+ *
+ * 2. **"Outros Contatos" sai de `recebidos`.** É a etapa de quem não é
+ *    paciente, o mesmo corte já aplicado na taxa de agendamento. Eram 6
+ *    contatos entrando como lead que ninguém atendeu, sem nunca haver alguém
+ *    para atender. O número deles fica em `foraDaConta`.
  */
 export function montarFila({
   leads,
@@ -263,18 +297,22 @@ export function montarFila({
   );
 
   return clinicas.map((clinica) => {
-    const daClinica = leads.filter(
+    const chegaram = leads.filter(
       (l) =>
         l.clinicaId === clinica.id && dentroDaFaixa(l.diasAtras, faixa),
     );
+    const daClinica = chegaram.filter((l) => l.etapa !== ETAPA_SEM_LEAD);
 
-    // Uma medida só para os dois: quem tem espera medida é quem foi contatado,
-    // e `null` em `tempoDeResposta` é exatamente quem ainda aguarda.
+    // `null` em `tempoDeResposta` é quem não tem espera medida — e isso inclui
+    // quem foi atendido por telefone sem passar pelo card "Em Contato". Por
+    // isso a conta de volume é separada, logo abaixo.
     const medidos = daClinica.map((l) =>
       minutosAteOPrimeiroContato(indice, l.id),
     );
     const resposta = tempoDeResposta(medidos);
-    const contatados = resposta.atendidos;
+    const contatados = daClinica.filter(
+      (l, i) => medidos[i] !== null || passouDoContato(l.etapa),
+    ).length;
 
     const tempos = medidos.filter((t): t is number => t !== null);
     const naCauda = tempos.filter(estaNaCauda).length;
@@ -282,6 +320,7 @@ export function montarFila({
     return {
       clinica,
       recebidos: daClinica.length,
+      foraDaConta: chegaram.length - daClinica.length,
       contatados,
       taxaDeContato: taxa(contatados, daClinica.length),
       resposta,
@@ -294,6 +333,8 @@ export function montarFila({
 
 export type ResumoDaFila = {
   recebidos: number;
+  /** A soma de `foraDaConta` das clínicas visíveis. */
+  foraDaConta: number;
   contatados: number;
   taxaDeContato: number | null;
   resposta: TempoDeResposta;
@@ -318,7 +359,11 @@ export function montarResumoDaFila(
   const indice =
     historico instanceof Map ? historico : indexarPorLead(historico);
 
-  const doPeriodo = leads.filter((l) => dentroDaFaixa(l.diasAtras, faixa));
+  // O mesmo recorte de `montarFila`, "Outros Contatos" fora: a mediana da tela
+  // tem de sair da mesma base das linhas.
+  const doPeriodo = leads.filter(
+    (l) => dentroDaFaixa(l.diasAtras, faixa) && l.etapa !== ETAPA_SEM_LEAD,
+  );
   const soma = (campo: (l: LinhaFila) => number) =>
     linhas.reduce((total, l) => total + campo(l), 0);
 
@@ -335,6 +380,7 @@ export function montarResumoDaFila(
 
   return {
     recebidos: soma((l) => l.recebidos),
+    foraDaConta: soma((l) => l.foraDaConta),
     contatados: soma((l) => l.contatados),
     taxaDeContato: taxa(
       soma((l) => l.contatados),
@@ -446,8 +492,10 @@ export function montarAlertasDaFila(
       const cauda = linha.percentualNaCauda;
       if (cauda === null) continue;
       // Os dois pisos: volume da clínica, como nos outros alertas, e volume da
-      // própria cauda, senão um único lead perdido vira alarme.
-      if (linha.contatados < metas.amostraMinima) continue;
+      // própria cauda, senão um único lead perdido vira alarme. O piso é sobre
+      // quem tem espera medida, que é a base da cauda — e não sobre
+      // `contatados`, que inclui quem foi atendido sem o card e não entra nela.
+      if (linha.resposta.atendidos < metas.amostraMinima) continue;
       if (linha.naCauda < metas.minimoNaCauda) continue;
 
       const vezes = cauda / caudaDaBase;
@@ -457,7 +505,7 @@ export function montarAlertasDaFila(
         id: `cauda-${linha.clinica.id}`,
         clinica: linha.clinica.nome,
         severidade: vezes >= metas.caudaCritica ? "critico" : "atencao",
-        problema: `${cauda}% dos leads esperaram 12h ou mais pelo primeiro contato (${linha.naCauda} de ${linha.contatados}) — ${vezes.toFixed(1).replace(".", ",")} vezes a fatia da base, que é de ${caudaDaBase}%.`,
+        problema: `${cauda}% dos leads esperaram 12h ou mais pelo primeiro contato (${linha.naCauda} de ${linha.resposta.atendidos} com espera medida) — ${vezes.toFixed(1).replace(".", ",")} vezes a fatia da base, que é de ${caudaDaBase}%.`,
         acao: "Revisar quem recebe o lead novo nesta clínica e o horário de cobertura.",
       });
     }
