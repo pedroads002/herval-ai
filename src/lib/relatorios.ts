@@ -130,6 +130,20 @@ export function taxa(parte: number, total: number): number | null {
   return total === 0 ? null : Math.round(percentualCru(parte, total));
 }
 
+/**
+ * O que falta para 100% da outra taxa. Para o par show-rate / no-show, que
+ * divide pela mesma base e por isso tem de somar 100% exatos.
+ *
+ * Arredondar as duas em separado não garante isso: com 7 presenças em 8
+ * consultas, 87,5% e 12,5% sobem as duas e a tela mostrava 88% + 13% = 101%.
+ * Base pequena e divisão caindo no meio é a regra nessas clínicas, não a
+ * exceção. Derivando uma da outra, os dois números continuam certos e a soma
+ * fecha. Mesma regra em `lib/dados/visaoGeral.ts`.
+ */
+export function complementoDa(outra: number | null): number | null {
+  return outra === null ? null : 100 - outra;
+}
+
 // --- Linhas por clínica ----------------------------------------------------
 
 /** Uma linha da tabela "Funil de leads", pela data da consulta. */
@@ -466,6 +480,8 @@ export function montarResumo(
   const faltas = soma(producao, (l) => l.faltaram);
   const cancelados = soma(producao, (l) => l.cancelados);
   const naoCompareceram = soma(producao, (l) => l.naoCompareceram);
+  // O no-show sai daqui por complemento, nunca de um arredondamento próprio.
+  const showRateProducao = taxa(producaoCompareceu, producaoComDesfecho);
 
   return {
     leads: soma(funil, (l) => l.leads),
@@ -481,13 +497,13 @@ export function montarResumo(
     producaoAteAData,
     producaoComDesfecho,
     aguardandoBaixa: soma(producao, (l) => l.aguardandoBaixa),
-    showRateProducao: taxa(producaoCompareceu, producaoComDesfecho),
+    showRateProducao,
     remarcacoes,
     taxaReagendamento: taxa(remarcacoes, totalProducao),
     faltas,
     cancelados,
     naoCompareceram,
-    taxaNoShow: taxa(naoCompareceram, producaoComDesfecho),
+    taxaNoShow: complementoDa(showRateProducao),
     fechadosPelaIa: pelaIa,
     fechadosPeloCrc: doPeriodo.length - pelaIa,
     percentualIa: taxa(pelaIa, doPeriodo.length),
