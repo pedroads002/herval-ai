@@ -169,10 +169,20 @@ export type Lead = {
 };
 
 /**
- * A partir de "Outros Contatos" o lead já passou da triagem: alguém falou com
- * ele e ele seguiu no funil. Antes disso é contato cru.
+ * A partir de "F1" o lead já passou da triagem: alguém falou com ele e ele
+ * seguiu no funil. Antes disso é contato cru.
+ *
+ * Até 17/11/2026 o corte era "Outros Contatos", e isso estava errado: aquela
+ * etapa é onde a clínica guarda quem **não** é paciente — o número da própria
+ * clínica, fornecedor, a própria agência. É a etapa em que a Helô tem proibição
+ * de falar, justamente porque ali não há lead. Com o corte antigo, 21 contatos
+ * desses entravam no denominador da taxa de agendamento sem nenhuma chance de
+ * virar consulta, e a taxa aparecia 3 pontos pior do que é.
+ *
+ * O lead continua na etapa onde está e aparecendo na tela; só para de contar
+ * como oportunidade de venda.
  */
-const PRIMEIRA_ETAPA_QUALIFICADA = etapasFunil.indexOf("Outros Contatos");
+const PRIMEIRA_ETAPA_QUALIFICADA = etapasFunil.indexOf("F1");
 
 /**
  * Qualificado é leitura da etapa, nunca um campo gravado à parte — era assim
