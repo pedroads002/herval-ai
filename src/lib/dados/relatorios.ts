@@ -10,19 +10,23 @@
  * mesmas tabelas e com os mesmos campos: nenhum segundo jeito de buscar lead,
  * consulta ou cliente.
  *
- * A aba "Fila de Atendimento" vem daqui pela metade, e a metade importa:
+ * A aba "Fila de Atendimento" sai quase inteira daqui:
  *
- * - **Vem:** recebidos, contatados, % de contato, agendados, quem está
- *   aguardando contato e o alerta de lead parado. Tudo isso sai de
- *   `lead_etapa_eventos`, que guarda a entrada do lead em "Em Contato" — a
- *   definição oficial de primeiro contato, intocada.
- * - **Não vem:** tempo de resposta (mediana, média), a cauda, o alerta de cauda
- *   desproporcional e o alerta de recuperação vencida. Esses quatro medem da
- *   chegada até a *primeira tentativa de ligação*, e não existe registro de
- *   ligação no banco: `mensagens` guarda conversa, não telefone, e não tem
- *   canal, número de tentativa nem desfecho. Na tela eles aparecem como não
- *   medidos, nunca como zero — número de ligação saído de tabela que não
- *   registra ligação seria invenção com cara de medição.
+ * - **Vem:** recebidos, contatados, % de contato, agendados, o tempo de
+ *   resposta (mediana, média, faixas), a cauda, o alerta de cauda
+ *   desproporcional, quem está aguardando contato e o alerta de lead parado.
+ *   Tudo isso sai de `lead_etapa_eventos`, que guarda a entrada do lead em
+ *   "Em Contato" — a definição oficial de primeiro contato.
+ *
+ *   Até 17/11/2026 o tempo de resposta media da chegada até a *primeira
+ *   tentativa de ligação*, e com isso mediana, média, cauda e dois alertas
+ *   ficavam permanentemente em "não medido": não existe registro de ligação no
+ *   banco. `mensagens` guarda conversa, não telefone, e não tem canal, número
+ *   de tentativa nem desfecho.
+ * - **Não vem:** o alerta de recuperação vencida, que conta tentativa por
+ *   tentativa de ligação. Na tela ele aparece como não verificado, nunca como
+ *   em ordem — número de ligação saído de tabela que não registra ligação
+ *   seria invenção com cara de medição.
  *
  * Roda apenas no servidor.
  */
