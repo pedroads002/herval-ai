@@ -200,6 +200,20 @@ function taxa(parte: number, total: number): number | null {
   return Math.round((parte / total) * 100);
 }
 
+/**
+ * O que falta para 100% da outra taxa. Para o par show-rate / no-show, que
+ * divide pela mesma base e por isso tem de somar 100% exatos.
+ *
+ * Arredondar as duas em separado não garante isso: com 7 presenças em 8
+ * consultas, 87,5% e 12,5% sobem as duas e a tela mostrava 88% + 13% = 101%.
+ * Base pequena e divisão caindo no meio é a regra nessas clínicas, não a
+ * exceção. Derivando uma da outra, os dois números continuam certos e a soma
+ * fecha.
+ */
+function complementoDa(outra: number | null): number | null {
+  return outra === null ? null : 100 - outra;
+}
+
 function ehQualificado(etapa: string, motivo: string | null): boolean {
   // Lead perdido continua qualificado, menos quando o motivo da perda diz que
   // ele nunca foi lead de verdade (clicou errado, spam, procedimento que a
@@ -390,6 +404,9 @@ function montarResumo(
 
   const qualificados = idsQualificados.size;
 
+  // O no-show sai daqui por complemento, nunca de um arredondamento próprio.
+  const showRate = taxa(comparecimentos, comDesfecho);
+
   // Quantos leads QUALIFICADOS do período chegaram a ter consulta marcada —
   // qualquer uma, em qualquer data, porque o lead é acompanhado até onde
   // chegou. Restrito a qualificados porque é o numerador de `taxaAgendamento`
@@ -428,11 +445,11 @@ function montarResumo(
     fechadosPorWhatsapp,
     qualificados,
     leadsComAgendamento: comAgendamento.size,
-    taxaNoShow: taxa(naoCompareceram, comDesfecho),
+    taxaNoShow: complementoDa(showRate),
     taxaReagendamento: taxa(remarcacoes, producao.length),
     percentualIa: taxa(fechadosPelaIa, producao.length),
     percentualLigacao: taxa(fechadosPorLigacao, comCanal.length),
-    showRate: taxa(comparecimentos, comDesfecho),
+    showRate,
     taxaAgendamento: taxa(comAgendamento.size, qualificados),
   };
 }
