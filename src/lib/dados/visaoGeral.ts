@@ -26,6 +26,7 @@ import { supabaseConfigurado } from "@/lib/supabase/config";
 import {
   ETAPA_GANHA,
   ETAPA_PERDIDA,
+  ETAPA_REMARCAR,
   etapasFunil,
   motivosDePerda,
   motivosQueDesqualificam,
@@ -486,7 +487,11 @@ function montarConversao(
  */
 function montarAlertas(
   resumo: ResumoDoPeriodo,
-  fatos: { aguardandoConfirmacao: number; semDesfecho: number },
+  fatos: {
+    aguardandoConfirmacao: number;
+    semDesfecho: number;
+    reagendamentoSemBaixa: number;
+  },
 ): AlertaDaVisao[] {
   const alertas: AlertaDaVisao[] = [];
   const metas = metasPadrao;
@@ -554,6 +559,25 @@ function montarAlertas(
       problema: `${fatos.semDesfecho} ${fatos.semDesfecho === 1 ? "consulta já aconteceu e o status nunca foi atualizado" : "consultas já aconteceram e o status nunca foi atualizado"}.`,
       acao: "Enquanto o status não for Compareceu, Faltou ou Cancelada, essas consultas ficam fora do no-show e do comparecimento.",
       destino: { texto: "Ver fila →", href: "/atendimento" },
+    });
+  }
+
+  /*
+    A etapa diz uma coisa e o status da consulta diz outra.
+
+    Também não é taxa: é contradição entre dois campos do banco, e por isso não
+    passa pela amostra mínima. Enquanto ela existe, o no-show está menor do que
+    a realidade — e esta é a única forma de a tela dizer isso sem inventar
+    falta que ninguém registrou.
+  */
+  if (fatos.reagendamentoSemBaixa > 0) {
+    const um = fatos.reagendamentoSemBaixa === 1;
+    alertas.push({
+      id: "reagendamento-sem-baixa",
+      severidade: "atencao",
+      problema: `${fatos.reagendamentoSemBaixa} ${um ? "lead está" : "leads estão"} em "Reagendamento" sem nenhuma consulta marcada como falta ou cancelamento.`,
+      acao: `Enquanto a consulta não receber a baixa, ${um ? "esse lead" : "esses leads"} ${um ? "não entra" : "não entram"} no no-show: a taxa fica menor do que a realidade. A etapa do card não alimenta métrica nenhuma.`,
+      destino: { texto: "Ver funil →", href: "/funil" },
     });
   }
 
@@ -640,7 +664,25 @@ export async function carregarVisaoGeral(
     .order("criado_em", { ascending: false })
     .limit(TETO_DE_LINHAS);
 
+  /*
+    Os leads parados em "Reagendamento", sem corte de período.
+
+    Serve ao alerta de contradição: a etapa diz que a consulta não aconteceu, e
+    nenhuma consulta daquele lead está marcada como falta ou cancelamento. É o
+    buraco entre o card, que a equipe move à mão, e o status da consulta, que
+    alimenta o no-show e o show-rate. Sem corte de data porque lead parado é
+    parado — ele não pertence a mês nenhum.
+  */
+  let emReagendamento = supabase
+    .from("leads")
+    .select("id")
+    .not("clinica_id", "is", null)
+    .eq("etapa", ETAPA_REMARCAR)
+    .order("id", { ascending: true })
+    .limit(TETO_DE_LINHAS);
+
   if (clinicaId !== null) {
+    emReagendamento = emReagendamento.eq("clinica_id", clinicaId);
     leadsDaJanela = leadsDaJanela.eq("clinica_id", clinicaId);
     perdidos = perdidos.eq("clinica_id", clinicaId);
     motivosDaJanela = motivosDaJanela.eq("clinica_id", clinicaId);
@@ -654,6 +696,7 @@ export async function carregarVisaoGeral(
     respostaDasUnidades,
     respostaDasClinicas,
     respostaDosOrfaos,
+    respostaDoReagendamento,
   ] = await Promise.all([
     leadsDaJanela,
     motivosDaJanela,
@@ -693,6 +736,7 @@ export async function carregarVisaoGeral(
       .from("leads")
       .select("id", { count: "exact", head: true })
       .is("clinica_id", null),
+    emReagendamento,
   ]);
 
   const erro =
@@ -702,7 +746,8 @@ export async function carregarVisaoGeral(
     respostaDosAgendamentos.error ??
     respostaDasUnidades.error ??
     respostaDasClinicas.error ??
-    respostaDosOrfaos.error;
+    respostaDosOrfaos.error ??
+    respostaDoReagendamento.error;
 
   if (erro) {
     return {
@@ -783,6 +828,21 @@ export async function carregarVisaoGeral(
       consulta.status === STATUS_AGENDADA && consulta.data_consulta < hoje,
   ).length;
 
+  // Leads em "Reagendamento" sem nenhuma consulta marcada como falta ou
+  // cancelamento — inclusive os que não têm consulta nenhuma gravada.
+  const leadsComBaixa = new Set(
+    agendamentos
+      .filter(
+        (consulta) =>
+          consulta.status === STATUS_FALTOU ||
+          consulta.status === STATUS_CANCELADA,
+      )
+      .map((consulta) => consulta.lead_id),
+  );
+  const reagendamentoSemBaixa = (
+    (respostaDoReagendamento.data ?? []) as { id: number }[]
+  ).filter((lead) => !leadsComBaixa.has(lead.id)).length;
+
   return {
     atual: resumoAtual,
     anterior: montarResumo(anterior, contexto),
@@ -792,6 +852,7 @@ export async function carregarVisaoGeral(
     alertas: montarAlertas(resumoAtual, {
       aguardandoConfirmacao,
       semDesfecho,
+      reagendamentoSemBaixa,
     }),
     clinicas: (respostaDasClinicas.data ?? []).map((clinica) => ({
       id: clinica.id as number,
