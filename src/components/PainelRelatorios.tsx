@@ -473,6 +473,10 @@ export default function PainelRelatorios({
                 resumo.leadsPagos > 0
                   ? ` · ${formatarNumero(resumo.leadsPagos)} de campanha paga`
                   : ""
+              }${
+                resumo.foraDaConta > 0
+                  ? ` · ${formatarNumero(resumo.foraDaConta)} em "Outros Contatos" ${resumo.foraDaConta === 1 ? "ficou" : "ficaram"} fora: ali não é paciente`
+                  : ""
               }`}
             />
             <Kpi
@@ -603,7 +607,7 @@ export default function PainelRelatorios({
           <Tabela
             titulo="Funil de leads (consultas do período)"
             legenda={
-              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem; a coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
+              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem, menos quem está em "Outros Contatos": aquela etapa é onde a clínica guarda quem não é paciente, e ali não há lead para contar nem para desqualificar. A coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
               (resumo.inalcancaveis > 0
                 ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
                 : "")

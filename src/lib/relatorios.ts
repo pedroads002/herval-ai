@@ -4,6 +4,7 @@ import {
   ehLeadDeMarketing,
   ehQualificado,
   ETAPA_REMARCAR,
+  ETAPA_SEM_LEAD,
   MOTIVO_DISTANCIA,
   type Lead,
 } from "@/data/leads";
@@ -151,6 +152,12 @@ export type LinhaFunil = {
   clinica: Clinica;
   leads: number;
   /**
+   * Contatos do período que ficaram fora de `leads` por estarem em "Outros
+   * Contatos". Serve para a legenda da tabela explicar a diferença, do mesmo
+   * jeito que a Fila de Atendimento faz.
+   */
+  foraDaConta: number;
+  /**
    * Quantos desses leads chegaram por campanha paga (`origensPagas`).
    *
    * Até 17/11/2026 esta tabela **só** contava esses leads, e a base inteira
@@ -256,10 +263,15 @@ export function montarFunil({
   agora,
 }: Entrada): LinhaFunil[] {
   return porClinica(clinicas, (clinica) => {
-    const daClinica = leads.filter(
+    const chegaram = leads.filter(
       (l) =>
         l.clinicaId === clinica.id && dentroDaFaixa(l.diasAtras, faixa),
     );
+    // Sem "Outros Contatos": ali a clínica guarda quem **não** é paciente, e
+    // isso não é lead recebido nem lead desqualificado. Mesmo corte da Fila de
+    // Atendimento e da Visão Geral. Ver `ETAPA_SEM_LEAD`, em `data/leads.ts`.
+    const daClinica = chegaram.filter((l) => l.etapa !== ETAPA_SEM_LEAD);
+    const foraDaConta = chegaram.length - daClinica.length;
 
     const qualificados = daClinica.filter(ehQualificado).length;
     const leadsPagos = daClinica.filter(ehLeadDeMarketing).length;
@@ -300,6 +312,7 @@ export function montarFunil({
     return {
       clinica,
       leads: daClinica.length,
+      foraDaConta,
       leadsPagos,
       desqualificados: daClinica.length - qualificados,
       qualificados,
@@ -405,6 +418,8 @@ export function montarProducao({
 export type ResumoGeral = {
   /** Leads que chegaram no período, de qualquer origem. */
   leads: number;
+  /** Contatos do período que ficaram fora de `leads`: ver `LinhaFunil.foraDaConta`. */
+  foraDaConta: number;
   /** Desses, quantos vieram de campanha paga. Ver `LinhaFunil.leadsPagos`. */
   leadsPagos: number;
   qualificados: number;
@@ -485,6 +500,7 @@ export function montarResumo(
 
   return {
     leads: soma(funil, (l) => l.leads),
+    foraDaConta: soma(funil, (l) => l.foraDaConta),
     leadsPagos: soma(funil, (l) => l.leadsPagos),
     qualificados,
     agendadosFunil,

@@ -57,7 +57,13 @@ export default function PainelVisaoGeral({
           // chamado "Leads de marketing" que conta só Meta Ads e Google Ads,
           // e sem esta linha os dois números pareciam o mesmo medido duas
           // vezes — um deles errado.
-          detalhe={`entraram na base ${quando}, de qualquer origem`}
+          detalhe={
+            atual.foraDaConta > 0
+              ? `entraram na base ${quando}, de qualquer origem · ${formatarNumero(
+                  atual.foraDaConta,
+                )} ${atual.foraDaConta === 1 ? "contato" : "contatos"} em "Outros Contatos" ${atual.foraDaConta === 1 ? "ficou" : "ficaram"} fora: ali não é paciente`
+              : `entraram na base ${quando}, de qualquer origem`
+          }
         />
         <Kpi
           rotulo="Agendamentos"
