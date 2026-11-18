@@ -103,6 +103,16 @@ export default function PainelFilaAtendimento({
     const nomeDoCliente = (id: number) =>
       dados.clinicas.find((c) => c.id === id)?.nome ?? "Clínica removida";
 
+    // O KPI ao vivo acima é de propósito de todos os clientes, e a tela diz
+    // isso. Os "Pontos de atenção" não: eles são por lead, com o nome da
+    // clínica escrito no aviso, e o outro gatilho do bloco (a cauda) já
+    // respeita o filtro — lead de outro cliente aqui é aviso que quem está
+    // olhando esta clínica não tem como resolver.
+    const idsVisiveis = new Set(linhas.map((l) => l.clinica.id));
+    const esperandoVisiveis = esperando.filter((l) =>
+      idsVisiveis.has(l.clinicaId),
+    );
+
     return {
       linhas,
       resumo,
@@ -110,7 +120,7 @@ export default function PainelFilaAtendimento({
       aviso: avisoDoHistorico(doBanco.desconhecidos),
       alertas: montarAlertasDaFila(
         linhas,
-        esperando,
+        esperandoVisiveis,
         resumo.percentualNaCauda,
         metasPadrao,
         nomeDoCliente,
