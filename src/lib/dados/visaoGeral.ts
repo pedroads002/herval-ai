@@ -27,6 +27,7 @@ import {
   ETAPA_GANHA,
   ETAPA_PERDIDA,
   ETAPA_REMARCAR,
+  ETAPA_SEM_LEAD,
   etapasFunil,
   motivosDePerda,
   motivosQueDesqualificam,
@@ -105,6 +106,12 @@ export type AlertaDaVisao = {
 /** Os números de um intervalo. Vale para o período atual e para o anterior. */
 export type ResumoDoPeriodo = {
   leads: number;
+  /**
+   * Contatos do período que ficaram fora de `leads` por estarem em "Outros
+   * Contatos". Existe para a tela poder explicar a diferença em vez de o
+   * número simplesmente encolher sem motivo visível.
+   */
+  foraDaConta: number;
   /** Agendamentos pelo ato de agendar: `criado_em` dentro do período. */
   agendamentos: number;
   /** Desses agendamentos, os que já aconteceram e tiveram presença. */
@@ -157,6 +164,7 @@ export type DadosDaVisaoGeral = {
 
 const RESUMO_VAZIO: ResumoDoPeriodo = {
   leads: 0,
+  foraDaConta: 0,
   agendamentos: 0,
   comparecimentos: 0,
   vendas: 0,
@@ -316,9 +324,20 @@ function montarResumo(
   intervalo: IntervaloDeDatas,
   contexto: Contexto,
 ): ResumoDoPeriodo {
-  const leadsDoPeriodo = contexto.leads.filter((lead) =>
+  const chegaram = contexto.leads.filter((lead) =>
     dentroDoIntervalo(diaDoInstante(lead.criado_em), intervalo),
   );
+  // "Outros Contatos" é a etapa em que a clínica guarda quem **não** é paciente
+  // — o número dela mesma, fornecedor, a agência. Ali não há lead, e por isso
+  // esses contatos não entram em "Leads Recebidos". A Fila de Atendimento já
+  // fazia esse corte desde 17/11/2026; até aqui a Visão Geral e o Funil
+  // continuavam contando, e as três telas davam dois números diferentes para a
+  // mesma pergunta. Eles seguem aparecendo no Funil do Atendimento, onde a
+  // equipe trabalha com eles; o que muda é só a contagem.
+  const leadsDoPeriodo = chegaram.filter(
+    (lead) => lead.etapa !== ETAPA_SEM_LEAD,
+  );
+  const foraDaConta = chegaram.length - leadsDoPeriodo.length;
   // Ids dos leads qualificados do período — é o universo que `taxaAgendamento`
   // usa como denominador logo abaixo, e precisa ser o mesmo universo do
   // numerador (`comAgendamento`). Antes o numerador contava qualquer lead do
@@ -427,6 +446,7 @@ function montarResumo(
 
   return {
     leads: leadsDoPeriodo.length,
+    foraDaConta,
     agendamentos: producao.length,
     comparecimentos,
     vendas,
@@ -459,8 +479,12 @@ function montarConversao(
   intervalo: IntervaloDeDatas,
   contexto: Contexto,
 ): DegrauDaConversao[] {
-  const doPeriodo = contexto.leads.filter((lead) =>
-    dentroDoIntervalo(diaDoInstante(lead.criado_em), intervalo),
+  // Mesma base de "Leads Recebidos": sem "Outros Contatos", senão o primeiro
+  // degrau ficaria maior que o número do cartão acima dele.
+  const doPeriodo = contexto.leads.filter(
+    (lead) =>
+      lead.etapa !== ETAPA_SEM_LEAD &&
+      dentroDoIntervalo(diaDoInstante(lead.criado_em), intervalo),
   );
   const ids = new Set(doPeriodo.map((lead) => lead.id));
 
