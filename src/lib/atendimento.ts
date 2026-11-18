@@ -491,6 +491,11 @@ export type RecuperacaoVencida = {
   atraso: number;
 };
 
+/**
+ * `esperando` precisa chegar já no recorte de clínicas de `linhas`. O estado ao
+ * vivo da tela é de propósito de todos os clientes, mas aviso por lead leva o
+ * nome da clínica e é dirigido a quem olha aquele cliente.
+ */
 export function montarAlertasDaFila(
   linhas: LinhaFila[],
   esperando: LeadNaEspera[],
