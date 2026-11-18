@@ -202,20 +202,34 @@ export function tempoDeResposta(medidos: (number | null)[]): TempoDeResposta {
  * que é o prazo combinado com a clínica e o mesmo valor de
  * `clinicas.atendimento_delay_minutos`.
  */
+/**
+ * Como cada faixa é lida pela operação, decidido por ele em 18/11/2026.
+ *
+ * Mora aqui, junto do corte em minutos, e não na tela: a cor é a leitura da
+ * faixa, e faixa e leitura separadas em arquivos diferentes foi exatamente o
+ * problema que apareceu na revisão — a barra pintava "12h a 1 dia" de verde
+ * enquanto o alerta de cauda contava aquele mesmo lead como demora.
+ *
+ * `ruim` começa onde `estaNaCauda` começa, e não é coincidência: é a mesma
+ * régua, lida do mesmo lugar.
+ */
+export type GravidadeDaFaixa = "boa" | "atencao" | "ruim";
+
 export type FaixaDeResposta = {
   id: string;
   rotulo: string;
   /** Limite superior em minutos, incluído. */
   ate: number;
+  gravidade: GravidadeDaFaixa;
 };
 
 export const faixasDeResposta: FaixaDeResposta[] = [
-  { id: "ate10", rotulo: "até 10 min", ate: 10 },
-  { id: "ate30", rotulo: "10 a 30 min", ate: 30 },
-  { id: "ate2h", rotulo: "30 min a 2h", ate: 120 },
-  { id: "ate12h", rotulo: "2h a 12h", ate: 720 },
-  { id: "ate1dia", rotulo: "12h a 1 dia", ate: 1440 },
-  { id: "acima", rotulo: "mais de 1 dia", ate: Infinity },
+  { id: "ate10", rotulo: "até 10 min", ate: 10, gravidade: "boa" },
+  { id: "ate30", rotulo: "10 a 30 min", ate: 30, gravidade: "boa" },
+  { id: "ate2h", rotulo: "30 min a 2h", ate: 120, gravidade: "atencao" },
+  { id: "ate12h", rotulo: "2h a 12h", ate: 720, gravidade: "atencao" },
+  { id: "ate1dia", rotulo: "12h a 1 dia", ate: 1440, gravidade: "ruim" },
+  { id: "acima", rotulo: "mais de 1 dia", ate: Infinity, gravidade: "ruim" },
 ];
 
 export function faixaDaResposta(minutos: number): FaixaDeResposta {

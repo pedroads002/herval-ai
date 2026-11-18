@@ -17,6 +17,7 @@ import {
   montarAlertasDaFila,
   montarFila,
   montarResumoDaFila,
+  type GravidadeDaFaixa,
   type LinhaFila,
 } from "@/lib/atendimento";
 import { baseDeLeads, type Faixa } from "@/lib/relatorios";
@@ -40,6 +41,16 @@ import {
  * em vez de virar alerta calculado sobre nada.
  */
 const SEM_RECUPERACOES: never[] = [];
+
+/**
+ * A cor de cada barra da distribuição. Quem decide a leitura da faixa é
+ * `faixasDeResposta`, em `lib/atendimento.ts`; aqui só se escolhe o tom.
+ */
+const CORES_DA_FAIXA: Record<GravidadeDaFaixa, string> = {
+  boa: "bg-herval-verde",
+  atencao: "bg-herval-atencao",
+  ruim: "bg-herval-vermelho",
+};
 
 export default function PainelFilaAtendimento({
   faixa,
@@ -321,7 +332,9 @@ export default function PainelFilaAtendimento({
         </h2>
         <p className="mt-2 text-xs font-medium leading-relaxed text-black/50">
           As mesmas faixas que os alertas usam. A primeira é a promessa da régua
-          de atendimento: primeiro contato em até dez minutos.
+          de atendimento: primeiro contato em até dez minutos. Verde é dentro do
+          combinado, âmbar é atraso, e vermelho é a cauda — as mesmas 12h ou
+          mais que o alerta de cauda cobra.
         </p>
 
         {semMedidaDeTempo ? (
@@ -339,7 +352,7 @@ export default function PainelFilaAtendimento({
                 ...resumo.distribuicao.map((d) => d.quantidade),
               );
               const largura = Math.round((quantidade / maior) * 100);
-              const ruim = faixaDeEspera.ate > ESPERA_CRITICA;
+              const cor = CORES_DA_FAIXA[faixaDeEspera.gravidade];
 
               return (
                 <li key={faixaDeEspera.id}>
@@ -353,10 +366,7 @@ export default function PainelFilaAtendimento({
                   </div>
                   <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/5">
                     <div
-                      className={[
-                        "h-full rounded-full",
-                        ruim ? "bg-herval-vermelho" : "bg-herval-verde",
-                      ].join(" ")}
+                      className={["h-full rounded-full", cor].join(" ")}
                       style={{ width: `${largura}%` }}
                     />
                   </div>
