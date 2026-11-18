@@ -198,7 +198,9 @@ export default function PainelFilaAtendimento({
             parado aparece como demora; lead que a equipe puxou direto para
             Agendamento conta como contatado no volume, mas fica sem tempo
             medido aqui — por isso a mediana pode sair de menos gente do que o
-            número de contatados.
+            número de contatados. Fica fora da conta, pelo mesmo motivo, o lead
+            cuja etapa foi corrigida depois por varredura: ali o registro tem a
+            hora da correção, e não a hora do atendimento.
           </span>
         </p>
       )}

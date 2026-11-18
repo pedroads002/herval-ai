@@ -77,10 +77,12 @@ function etapaConhecida(nome: string | null): EtapaFunil | null {
  * linha com autor é "Humano" com o nome que a tabela gravou; linha sem autor
  * ficou sem quem assumir e é lida como ação do sistema.
  *
- * Nenhuma conta de `atendimento.ts` lê este campo — ele existe porque o tipo
- * `MudancaDeEtapa` pede. Ou seja: não entra em número nenhum da tela. No dia em
- * que entrar, a tabela precisa de uma coluna de tipo de agente, e não de um
- * palpite aqui.
+ * Uma conta de `atendimento.ts` lê este campo, e só uma: o nome
+ * `AUTOR_DA_CORRECAO_RETROATIVA` ("Correção manual") marca evento escrito por
+ * varredura depois do fato, e o tempo de resposta desse lead fica não medido.
+ * O `tipo` do agente continua palpite — quem move card é pessoa logada — e
+ * nenhum número depende dele. Para distinguir IA de humano de verdade, a tabela
+ * precisa de uma coluna de tipo de agente, e não de um palpite aqui.
  */
 function agenteDo(autor: string | null): Agente {
   const nome = (autor ?? "").trim();

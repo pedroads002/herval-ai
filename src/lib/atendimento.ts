@@ -53,6 +53,29 @@ export function chegadaDoLead(
   return doLead(historico, leadId)[0] ?? null;
 }
 
+/**
+ * O autor que a varredura de correção grava em `lead_etapa_eventos.autor_nome`.
+ *
+ * Evento com esse autor foi escrito depois do fato: ele carrega a hora em que a
+ * correção rodou, e não a hora em que o atendimento aconteceu. Medido em
+ * 18/11/2026, na clínica 39, eram 52 de 215 leads, e eles sozinhos levavam a
+ * mediana de 14 para 34 minutos, a média de 2h36 para 8h57 e a cauda de 10%
+ * para 22% — dois terços da cauda era correção, não demora.
+ *
+ * Por isso a espera desses leads fica **não medida**, e não zero nem o valor
+ * inflado: o lead continua contado como contatado (ver `montarFila`), ele só
+ * não entra em média, mediana, faixa de espera nem alerta de cauda.
+ */
+export const AUTOR_DA_CORRECAO_RETROATIVA = "Correção manual";
+
+/** Se a mudança de etapa foi escrita por varredura de correção, e não no ato. */
+export function ehCorrecaoRetroativa(mudanca: MudancaDeEtapa): boolean {
+  return (
+    mudanca.agente.tipo === "Humano" &&
+    mudanca.agente.nome === AUTOR_DA_CORRECAO_RETROATIVA
+  );
+}
+
 /** A mudança que marcou o primeiro contato. Nulo em quem nunca foi atendido. */
 export function primeiroContato(
   historico: HistoricoDeEtapas,
@@ -79,6 +102,9 @@ export function primeiroContato(
  * "Em Contato" — esse lead entra na conta como ainda não contatado. Enquanto
  * não houver registro de ligação, essa é a medida honesta disponível, e um
  * número com esse limite declarado vale mais do que "não medido" para sempre.
+ *
+ * Segundo limite, também assumido: contato gravado por varredura de correção
+ * fica fora da conta — ver `AUTOR_DA_CORRECAO_RETROATIVA`.
  */
 export function minutosAteOPrimeiroContato(
   historico: HistoricoDeEtapas,
@@ -87,6 +113,7 @@ export function minutosAteOPrimeiroContato(
   const chegada = chegadaDoLead(historico, leadId);
   const contato = primeiroContato(historico, leadId);
   if (!chegada || !contato) return null;
+  if (ehCorrecaoRetroativa(contato)) return null;
   return chegada.minutosAtras - contato.minutosAtras;
 }
 
@@ -310,8 +337,11 @@ export function montarFila({
       minutosAteOPrimeiroContato(indice, l.id),
     );
     const resposta = tempoDeResposta(medidos);
+    // Volume lê o evento de contato, e não a espera medida: quem foi contatado
+    // por varredura de correção tem espera não medida de propósito, mas foi
+    // atendido de verdade e continua contado aqui.
     const contatados = daClinica.filter(
-      (l, i) => medidos[i] !== null || passouDoContato(l.etapa),
+      (l) => primeiroContato(indice, l.id) !== null || passouDoContato(l.etapa),
     ).length;
 
     const tempos = medidos.filter((t): t is number => t !== null);
