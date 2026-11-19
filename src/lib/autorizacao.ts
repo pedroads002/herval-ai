@@ -276,8 +276,7 @@ export async function exigirTela(
 }
 
 /**
- * A tranca das telas exclusivas da Herval (Fila de Tarefas, Clientes,
- * Procedimentos, Estratégia do Cliente, Quebra de Objeções, Régua de
+ * A tranca das telas exclusivas da Herval (Clientes, Procedimentos, Estratégia do Cliente, Quebra de Objeções, Régua de
  * Automação, Integrações, Teste da IA).
  *
  * Templates de WhatsApp saiu desta lista: aquele endereço passou a mostrar

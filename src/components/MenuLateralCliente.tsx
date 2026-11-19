@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  ListChecks,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 import MenuGaveta from "@/components/MenuGaveta";
@@ -17,10 +18,11 @@ import MenuGaveta from "@/components/MenuGaveta";
 /**
  * O menu de quem é cliente (`cliente_admin` ou `cliente_operacional`).
  *
- * É o `MenuLateral` da Herval, só que cortado para as cinco telas que o
- * autocadastro prometeu: visão geral, leads (Funil), conversas (Atendimento,
- * de onde também sai a mensagem manual), relatórios e agenda. Fora daqui:
- * Fila de Tarefas, Teste da IA, Régua de Automação, Clientes, Procedimentos,
+ * É o `MenuLateral` da Herval, só que cortado para as telas do cliente:
+ * visão geral, leads (Funil), conversas (Atendimento, de onde também sai a
+ * mensagem manual), fila de tarefas (só as da própria clínica — quem recorta
+ * é o banco), relatórios e agenda. Fora daqui:
+ * Teste da IA, Régua de Automação, Clientes, Procedimentos,
  * Estratégia do Cliente, Quebra de Objeções e Integrações — tudo isso é
  * operação da Herval sobre VÁRIOS clientes, não ferramenta de um cliente
  * sobre a própria conta.
@@ -75,6 +77,15 @@ const itensFixos = [
     href: "/atendimento",
     rotulo: "Conversas",
     Icone: MessagesSquare,
+    tela: "atendimento" as const,
+  },
+  {
+    // Mesma tela da Herval, recortada pelo banco para a clínica de quem está
+    // logado. Segue a liberação de Conversas porque abrir a tarefa mostra a
+    // conversa do lead (ver a página de `/fila-de-tarefas`).
+    href: "/fila-de-tarefas",
+    rotulo: "Fila de Tarefas",
+    Icone: ListChecks,
     tela: "atendimento" as const,
   },
   {

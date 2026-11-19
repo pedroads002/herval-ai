@@ -113,8 +113,7 @@ export async function proxy(request: NextRequest) {
 
   if (!user && !naTelaDeLogin) return irPara(request, TELA_DE_LOGIN);
   // Quem já está logado não fica na tela de login: vai para a Visão Geral, a
-  // primeira seção do menu. Não para "/", que é a Fila de Tarefas — tela
-  // exclusiva de admin Herval, e não a página inicial do sistema. É este
+  // primeira seção do menu. Não para "/", que só redireciona para lá. É este
   // desvio, e não o `router.replace` do formulário, que decide onde o login
   // termina: o `router.refresh()` revalida `/login` com a sessão já criada e
   // esta linha responde antes da navegação do formulário chegar.
