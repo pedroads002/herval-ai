@@ -14,8 +14,10 @@ import type { DadosDaMovimentacao } from "@/components/ProvedorLeads";
  * O menu de mover o lead de etapa, com a exigência que a regra impõe: Venda
  * Perdida pede motivo da lista.
  *
- * Venda Ganha não pede nada. Ela pedia o valor da venda, e isso saiu: o
- * sistema não guarda nem exibe valor de nada nem de ninguém.
+ * Venda Ganha pede a venda (valor pago e procedimento), mas não aqui: quem
+ * escolhe "Venda Ganha" neste menu recebe o modal de `VendasDoLead`, e é a
+ * gravação da venda que move o lead (`salvarVenda`). O valor tinha saído no
+ * #45 e voltou em 24/11/2026, agora como o que o paciente pagou de fato.
  *
  * Mora num arquivo próprio porque o Funil e a tela de atendimento movem o
  * mesmo lead — se cada uma tivesse a sua cópia, a regra passaria a valer só

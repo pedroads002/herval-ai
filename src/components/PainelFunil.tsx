@@ -9,12 +9,15 @@ import {
   Move,
   RotateCcw,
   Search,
+  Trophy,
   X,
 } from "lucide-react";
 import MenuDeEtapa, { type PassoDoMenu } from "@/components/MenuDeEtapa";
+import VendasDoLead from "@/components/VendasDoLead";
 import type { DadosDaMovimentacao } from "@/components/ProvedorLeads";
 import { moverLeadDeEtapa } from "@/lib/acoes/funil";
-import { etapasFunil, type EtapaFunil } from "@/data/leads";
+import { ETAPA_GANHA, etapasFunil, type EtapaFunil } from "@/data/leads";
+import { formatarReais } from "@/lib/dados/linhaDeVenda";
 // Do módulo puro, e não de `dados/funil.ts`: aquele importa o cliente de
 // servidor do Supabase, e nada disso tem o que fazer no pacote do navegador.
 import type { ClienteDoFunil, LeadDoFunil } from "@/lib/dados/linhaDoFunil";
@@ -78,6 +81,16 @@ export default function PainelFunil({
   /** Lead cuja etapa está sendo gravada agora. */
   const [gravando, setGravando] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * O lead com o modal de vendas aberto. `registrando` é quando o modal abriu
+   * porque alguém escolheu "Venda Ganha" no menu: aí ele já começa no
+   * formulário, e é a gravação da venda que move o card.
+   */
+  const [vendendo, setVendendo] = useState<{
+    id: number;
+    nome: string;
+    registrando: boolean;
+  } | null>(null);
 
   /**
    * Há lead sem cliente na base? Só então o filtro oferece "Sem cliente". Se a
@@ -123,6 +136,15 @@ export default function PainelFunil({
     setMovendo(null);
     setPasso("etapa");
     setErro(null);
+
+    // Venda Ganha cobra a venda (valor e procedimento) antes de mover — o
+    // mesmo raciocínio do motivo em Venda Perdida. Quem move é `salvarVenda`.
+    if (etapa === ETAPA_GANHA) {
+      const lead = leads.find((l) => l.id === id);
+      setVendendo({ id, nome: lead?.nome ?? "Lead", registrando: true });
+      return;
+    }
+
     setGravando(id);
 
     try {
@@ -294,12 +316,29 @@ export default function PainelFunil({
                   aoAbrirMenu={() => abrirMenu(lead.id)}
                   aoPedirPasso={setPasso}
                   aoMover={(destino, dados) => mover(lead.id, destino, dados)}
+                  aoAbrirVendas={() =>
+                    setVendendo({
+                      id: lead.id,
+                      nome: lead.nome,
+                      registrando: false,
+                    })
+                  }
                 />
               ))}
             </div>
           </section>
         ))}
       </div>
+
+      {vendendo && (
+        <VendasDoLead
+          key={vendendo.id}
+          leadId={vendendo.id}
+          leadNome={vendendo.nome}
+          comecarRegistrando={vendendo.registrando}
+          aoFechar={() => setVendendo(null)}
+        />
+      )}
     </div>
   );
 }
@@ -312,6 +351,7 @@ function Cartao({
   aoAbrirMenu,
   aoPedirPasso,
   aoMover,
+  aoAbrirVendas,
 }: {
   lead: LeadDoFunil;
   menuAberto: boolean;
@@ -320,7 +360,11 @@ function Cartao({
   aoAbrirMenu: () => void;
   aoPedirPasso: (passo: PassoDoMenu) => void;
   aoMover: (etapa: EtapaFunil, dados?: DadosDaMovimentacao) => void;
+  aoAbrirVendas: () => void;
 }) {
+  // Quem já comprou mostra o valor; quem está em Venda Ganha sem venda
+  // registrada (movido antes de existir o campo) ganha o atalho para registrar.
+  const mostrarVendas = lead.vendas > 0 || lead.etapa === ETAPA_GANHA;
   return (
     <article
       className={[
@@ -369,6 +413,30 @@ function Cartao({
           <X className="h-3 w-3" />
           {lead.motivoPerda}
         </p>
+      )}
+
+      {mostrarVendas && (
+        <button
+          type="button"
+          onClick={aoAbrirVendas}
+          title={lead.vendas > 0 ? "Ver e corrigir as vendas" : "Registrar a venda"}
+          className={[
+            "mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold transition-colors",
+            lead.vendas > 0
+              ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+              : "border border-dashed border-black/25 text-black/60 hover:border-herval-verde hover:text-herval-preto",
+          ].join(" ")}
+        >
+          <Trophy className="h-3 w-3" />
+          {lead.vendas > 0 ? (
+            <span className="tabular-nums">
+              {formatarReais(lead.vendido)}
+              {lead.vendas > 1 && ` · ${lead.vendas} vendas`}
+            </span>
+          ) : (
+            "Registrar venda"
+          )}
+        </button>
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">

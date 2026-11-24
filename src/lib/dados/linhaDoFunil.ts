@@ -39,6 +39,10 @@ export type LeadDoFunil = {
   motivoPerda: MotivoPerda | null;
   /** Quantas vezes a consulta deste lead foi remarcada depois de uma falta. */
   remarcacoes: number;
+  /** Soma do que o lead já pagou, em reais. Zero quando não há venda. */
+  vendido: number;
+  /** Quantas vendas o lead tem registradas. */
+  vendas: number;
 };
 
 /**
@@ -69,6 +73,8 @@ export type ContextoDoFunil = {
   clientes: Map<number, string>;
   /** Quantas faltas cada lead tem em `agendamentos`. */
   faltas: Map<number, number>;
+  /** Total pago e quantidade de vendas por lead, lidos de `vendas`. */
+  vendas?: Map<number, { total: number; quantidade: number }>;
 };
 
 /**
@@ -99,6 +105,8 @@ export function montarLeadDoFunil(
     diasAtras: diasDesde(linha.criado_em, contexto.hoje),
     motivoPerda: motivoValido(linha.motivo_perda),
     remarcacoes: contexto.faltas.get(linha.id) ?? 0,
+    vendido: contexto.vendas?.get(linha.id)?.total ?? 0,
+    vendas: contexto.vendas?.get(linha.id)?.quantidade ?? 0,
   };
 }
 

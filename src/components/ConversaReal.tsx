@@ -18,6 +18,7 @@ import {
   Send,
   StickyNote,
   Stethoscope,
+  Trophy,
   UserRound,
   Users,
   Video,
@@ -33,6 +34,7 @@ import {
 } from "@/data/mensagens";
 import FormularioDeTarefa from "@/components/FormularioDeTarefa";
 import MarcarComoPerdido from "@/components/MarcarComoPerdido";
+import VendasDoLead from "@/components/VendasDoLead";
 import {
   duracaoEmMinutos,
   useGravadorDeAudio,
@@ -44,7 +46,7 @@ import {
   type AbaDoAtendimento,
 } from "@/components/AbasDoAtendimento";
 import { ligacoesDoLead, type Ligacao } from "@/data/ligacoes";
-import { ETAPA_PERDIDA } from "@/data/leads";
+import { ETAPA_GANHA, ETAPA_PERDIDA } from "@/data/leads";
 import { tempoRelativo, tempoRelativoPorExtenso } from "@/lib/tempo";
 import type {
   EspecialidadeDaClinica,
@@ -229,6 +231,7 @@ export default function ConversaReal({
   const [agendamentoAberto, setAgendamentoAberto] = useState(false);
   const [criandoTarefa, setCriandoTarefa] = useState(false);
   const [marcandoPerdido, setMarcandoPerdido] = useState(false);
+  const [vendasAbertas, setVendasAbertas] = useState(false);
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [nota, setNota] = useState("");
@@ -683,6 +686,29 @@ export default function ConversaReal({
             </button>
 
             {/*
+              As vendas do lead: registrar, corrigir e apagar, no mesmo modal
+              que o Funil usa. Registrar leva o lead para Venda Ganha.
+            */}
+            <button
+              type="button"
+              onClick={() => {
+                setVendasAbertas(true);
+                setCriandoTarefa(false);
+                setMarcandoPerdido(false);
+              }}
+              title="Vendas deste lead"
+              className={[
+                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-extrabold transition-colors",
+                etapa === ETAPA_GANHA
+                  ? "bg-herval-verde text-herval-preto hover:bg-herval-verdeEscuro"
+                  : "border border-black/15 bg-herval-branco text-herval-preto hover:border-herval-verde",
+              ].join(" ")}
+            >
+              <Trophy className="h-3.5 w-3.5" />
+              Vendas
+            </button>
+
+            {/*
               Some quando o lead já está perdido: marcar de novo não teria o
               que fazer, e manter o botão ali só convidaria a repetir uma ação
               sem efeito. Reabrir um lead perdido é decisão de negócio fora
@@ -747,6 +773,20 @@ export default function ConversaReal({
           aoMarcado={() => {
             setEtapa(ETAPA_PERDIDA);
             setMarcandoPerdido(false);
+          }}
+        />
+      )}
+
+      {vendasAbertas && (
+        <VendasDoLead
+          leadId={lead.id}
+          leadNome={lead.lead}
+          aoFechar={() => setVendasAbertas(false)}
+          // Registrar venda leva o lead para Venda Ganha no servidor; o selo
+          // acompanha assim que a gravação confirma, sem esperar a leitura
+          // automática. Corrigir ou apagar não mexe na etapa.
+          aoMudar={(_vendas, registrou) => {
+            if (registrou) setEtapa(ETAPA_GANHA);
           }}
         />
       )}
