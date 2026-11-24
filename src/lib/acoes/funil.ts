@@ -44,6 +44,8 @@ export async function moverLeadDeEtapa(
   revalidatePath("/funil");
   // A etapa do lead é o que a Agenda usa para saber quem está esperando horário.
   revalidatePath("/agenda");
+  // O Atendimento também troca a etapa, pelo selo do cabeçalho.
+  revalidatePath(`/atendimento/${leadId}`);
 
   // O aviso vem quando a gravação não passou, ou quando a etapa mudou e o
   // histórico não registrou. `moverEtapaDoLead` nunca lança: ele explica.
