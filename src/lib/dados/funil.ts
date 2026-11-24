@@ -67,9 +67,13 @@ export async function carregarFunil(): Promise<DadosDoFunil> {
 
   const supabase = await criarClienteServidor();
 
-  // As três leituras não dependem uma da outra.
-  const [respostaDosLeads, respostaDasFaltas, respostaDosClientes] =
-    await Promise.all([
+  // As quatro leituras não dependem uma da outra.
+  const [
+    respostaDosLeads,
+    respostaDasFaltas,
+    respostaDosClientes,
+    respostaDasVendas,
+  ] = await Promise.all([
       supabase
         .from("leads")
         .select(CAMPOS_DO_LEAD)
@@ -84,6 +88,9 @@ export async function carregarFunil(): Promise<DadosDoFunil> {
         .eq("status", "Faltou")
         .limit(TETO_DE_LINHAS),
       supabase.from("clinicas").select("id, nome").limit(TETO_DE_LINHAS),
+      // O valor vendido de cada card. Sem teto de 1000: uma clínica com muitas
+      // vendas não pode ter o total cortado em silêncio.
+      supabase.from("vendas").select("lead_id, valor").limit(20000),
     ]);
 
   const erro =
@@ -112,7 +119,23 @@ export async function carregarFunil(): Promise<DadosDoFunil> {
     clientes.set(cliente.id, (cliente.nome ?? "").trim() || "Sem nome");
   }
 
-  const contexto = { hoje: new Date(), clientes, faltas };
+  // Falhar aqui não derruba o quadro: os cards abrem sem o valor vendido, e o
+  // modal de vendas diz o motivo quando alguém abrir.
+  const vendas = new Map<number, { total: number; quantidade: number }>();
+  if (!respostaDasVendas.error) {
+    for (const { lead_id, valor } of (respostaDasVendas.data ?? []) as {
+      lead_id: number;
+      valor: number | string;
+    }[]) {
+      const atual = vendas.get(lead_id) ?? { total: 0, quantidade: 0 };
+      vendas.set(lead_id, {
+        total: (Math.round(atual.total * 100) + Math.round(Number(valor) * 100)) / 100,
+        quantidade: atual.quantidade + 1,
+      });
+    }
+  }
+
+  const contexto = { hoje: new Date(), clientes, faltas, vendas };
 
   const leads: LeadDoFunil[] = [];
   const foraDoQuadro = new Set<string>();

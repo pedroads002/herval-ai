@@ -458,7 +458,7 @@ export type ConversaDoLead = {
  * leituras. São duas idas ao banco porque a segunda depende da primeira: para
  * saber os procedimentos da equipe é preciso saber quem é a equipe.
  */
-async function especialidadesDaClinica(
+export async function especialidadesDaClinica(
   supabase: Awaited<ReturnType<typeof criarClienteServidor>>,
   clinicaId: number | null,
 ): Promise<{
