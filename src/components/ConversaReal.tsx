@@ -35,6 +35,7 @@ import {
 import FormularioDeTarefa from "@/components/FormularioDeTarefa";
 import MarcarComoPerdido from "@/components/MarcarComoPerdido";
 import VendasDoLead from "@/components/VendasDoLead";
+import TrocarEtapa from "@/components/TrocarEtapa";
 import {
   duracaoEmMinutos,
   useGravadorDeAudio,
@@ -232,6 +233,8 @@ export default function ConversaReal({
   const [criandoTarefa, setCriandoTarefa] = useState(false);
   const [marcandoPerdido, setMarcandoPerdido] = useState(false);
   const [vendasAbertas, setVendasAbertas] = useState(false);
+  // Vindo do selo de etapa ("Venda Ganha"), o modal já abre no formulário.
+  const [vendasRegistrando, setVendasRegistrando] = useState(false);
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [nota, setNota] = useState("");
@@ -641,9 +644,23 @@ export default function ConversaReal({
               como um grupo único, não como controles soltos uns sobre os
               outros.
             */}
-            <span className="inline-flex h-9 shrink-0 items-center rounded-full bg-herval-verde/15 px-3.5 text-xs font-bold text-herval-preto">
-              {etapa}
-            </span>
+            {/*
+              O selo da etapa também troca a etapa, com as mesmas regras do
+              Funil (motivo em Venda Perdida, venda registrada em Venda Ganha).
+            */}
+            {etapa && (
+              <TrocarEtapa
+                leadId={lead.id}
+                etapa={etapa}
+                aoMovido={setEtapa}
+                aoPedirVenda={() => {
+                  setVendasRegistrando(true);
+                  setVendasAbertas(true);
+                  setCriandoTarefa(false);
+                  setMarcandoPerdido(false);
+                }}
+              />
+            )}
 
             {/*
               Ligar e desligar a Helô neste lead.
@@ -692,6 +709,7 @@ export default function ConversaReal({
             <button
               type="button"
               onClick={() => {
+                setVendasRegistrando(false);
                 setVendasAbertas(true);
                 setCriandoTarefa(false);
                 setMarcandoPerdido(false);
@@ -781,6 +799,7 @@ export default function ConversaReal({
         <VendasDoLead
           leadId={lead.id}
           leadNome={lead.lead}
+          comecarRegistrando={vendasRegistrando}
           aoFechar={() => setVendasAbertas(false)}
           // Registrar venda leva o lead para Venda Ganha no servidor; o selo
           // acompanha assim que a gravação confirma, sem esperar a leitura
