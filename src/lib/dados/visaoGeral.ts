@@ -360,8 +360,14 @@ function montarResumo(
   // Consultas dessa produção que já aconteceram. Agendamento marcado para a
   // semana que vem — ou para mais tarde hoje — não pode entrar na conta de
   // falta nem de presença.
-  const jaAconteceram = producao.filter((consulta) =>
-    jaAconteceu(consulta, contexto),
+  //
+  // Sem as canceladas, igual a `montarProducao` em `lib/relatorios.ts`: o
+  // cancelamento tem desfecho próprio e não "acontece" na data. Antes ela
+  // entrava aqui quando a data passava e virava "consulta sem baixa" em
+  // `aguardandoBaixa`, que nunca seria resolvida porque a baixa já existia.
+  const jaAconteceram = producao.filter(
+    (consulta) =>
+      consulta.status !== STATUS_CANCELADA && jaAconteceu(consulta, contexto),
   );
 
   const faltas = jaAconteceram.filter(

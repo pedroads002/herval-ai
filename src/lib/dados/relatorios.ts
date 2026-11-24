@@ -56,6 +56,49 @@ export type DadosDosRelatorios = {
 /** Ver o mesmo raciocínio em `dados/agenda.ts`. */
 const TETO_DE_LINHAS = 1000;
 
+/**
+ * O tamanho de cada página das mudanças de etapa. É o máximo que o Supabase
+ * devolve por pedido, então pedir mais não traria mais.
+ */
+const PAGINA_DE_EVENTOS = 1000;
+
+/**
+ * Até onde a leitura em páginas vai. Existe só para uma tabela que cresça sem
+ * controle não travar a tela; se for atingido, o aviso de corte continua
+ * aparecendo, como antes.
+ */
+const TETO_DE_EVENTOS = 50_000;
+
+type Supabase = Awaited<ReturnType<typeof criarClienteServidor>>;
+
+/**
+ * Todas as mudanças de etapa, das mais recentes para as mais antigas.
+ *
+ * Mesmo formato de resposta (`data` / `error`) das outras leituras, para o
+ * resto da função não precisar saber que esta veio em partes. O desempate por
+ * `id` mantém a paginação estável quando duas linhas têm o mesmo `criado_em`.
+ */
+async function lerEventosEmPaginas(supabase: Supabase) {
+  const linhas: LinhaDeEventoDeEtapaDoBanco[] = [];
+
+  for (let inicio = 0; inicio < TETO_DE_EVENTOS; inicio += PAGINA_DE_EVENTOS) {
+    const { data, error } = await supabase
+      .from("lead_etapa_eventos")
+      .select(CAMPOS_DO_EVENTO)
+      .order("criado_em", { ascending: false })
+      .order("id", { ascending: false })
+      .range(inicio, inicio + PAGINA_DE_EVENTOS - 1);
+
+    if (error) return { data: null, error };
+
+    const pagina = (data ?? []) as LinhaDeEventoDeEtapaDoBanco[];
+    linhas.push(...pagina);
+    if (pagina.length < PAGINA_DE_EVENTOS) break;
+  }
+
+  return { data: linhas, error: null };
+}
+
 const SEM_DADOS: DadosDosRelatorios = {
   leads: [],
   agendamentos: [],
@@ -115,11 +158,13 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     // As mudanças de etapa. Sem corte por data pelo mesmo motivo dos outros: a
     // espera de um lead se mede da chegada dele, que pode ser de antes do
     // período escolhido.
-    supabase
-      .from("lead_etapa_eventos")
-      .select(CAMPOS_DO_EVENTO)
-      .order("criado_em", { ascending: false })
-      .limit(TETO_DE_LINHAS),
+    //
+    // Lidas em páginas, e não com o teto de mil linhas das outras leituras.
+    // Esta tabela cresce muito mais rápido que `leads` — cada passo do
+    // follow-up grava uma linha — e em 24/11/2026 já tinha 1.354. Com o teto,
+    // tudo antes de 15/11 ficava de fora, e 159 leads contatados apareciam como
+    // "aguardando contato", distorcendo % de contato e tempo de resposta.
+    lerEventosEmPaginas(supabase),
     // `agendamentos` guarda a unidade, não a clínica. O relatório é por
     // cliente, então o caminho passa por aqui — igual à Visão Geral.
     supabase
@@ -223,9 +268,9 @@ function montarAviso(
     );
   }
 
-  if (eventos >= TETO_DE_LINHAS) {
+  if (eventos >= TETO_DE_EVENTOS) {
     avisos.push(
-      `A Fila de Atendimento está lendo no máximo ${TETO_DE_LINHAS} mudanças de etapa, as mais recentes. Lead cuja entrada em "Em Contato" ficou fora desse corte aparece como ainda não contatado.`,
+      `A Fila de Atendimento está lendo no máximo ${TETO_DE_EVENTOS.toLocaleString("pt-BR")} mudanças de etapa, as mais recentes. Lead cuja entrada em "Em Contato" ficou fora desse corte aparece como ainda não contatado.`,
     );
   }
 
