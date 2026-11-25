@@ -28,12 +28,14 @@ import {
   ETAPA_PERDIDA,
   ETAPA_REMARCAR,
   ETAPA_SEM_LEAD,
+  ehLeadDeVerdade,
   etapasFunil,
   motivosDePerda,
   motivosQueDesqualificam,
   type MotivoPerda,
 } from "@/data/leads";
 import { metasPadrao } from "@/data/metas";
+import { lerQuemRespondeu } from "@/lib/dados/respostas";
 import {
   diaDeHoje,
   intervaloAnterior,
@@ -141,6 +143,13 @@ export type ResumoDoPeriodo = {
   fechadosPorWhatsapp: number;
   qualificados: number;
   leadsComAgendamento: number;
+  /**
+   * Leads do período que responderam depois da primeira mensagem da clínica.
+   * Ver `respondeuAClinica`, em `data/leads.ts`.
+   */
+  responderam: number;
+  /** Desses, quantos chegaram a ter consulta marcada. */
+  responderamComAgendamento: number;
   /** Percentuais; `null` quando não há base para dividir. */
   taxaNoShow: number | null;
   taxaReagendamento: number | null;
@@ -148,6 +157,8 @@ export type ResumoDoPeriodo = {
   percentualLigacao: number | null;
   showRate: number | null;
   taxaAgendamento: number | null;
+  /** Agendamento sobre quem respondeu. Não substitui a taxa da meta. */
+  taxaAgendamentoResponderam: number | null;
 };
 
 export type DadosDaVisaoGeral = {
@@ -182,12 +193,15 @@ const RESUMO_VAZIO: ResumoDoPeriodo = {
   fechadosPorWhatsapp: 0,
   qualificados: 0,
   leadsComAgendamento: 0,
+  responderam: 0,
+  responderamComAgendamento: 0,
   taxaNoShow: null,
   taxaReagendamento: null,
   percentualIa: null,
   percentualLigacao: null,
   showRate: null,
   taxaAgendamento: null,
+  taxaAgendamentoResponderam: null,
 };
 
 const SEM_DADOS: DadosDaVisaoGeral = {
@@ -299,6 +313,8 @@ type Contexto = {
   motivoDoLead: Map<number, string | null>;
   agendamentos: LinhaDeAgendamento[];
   remarcacoes: Set<number>;
+  /** Ids dos leads que responderam à clínica. Ver `lib/dados/respostas.ts`. */
+  responderam: Set<number>;
   hoje: string;
   /** A hora atual em Brasília, "HH:MM". Só decide a consulta de hoje. */
   agora: string;
@@ -466,6 +482,30 @@ function montarResumo(
     }
   }
 
+  // A mesma conta, com outra base: quem respondeu à clínica, e não quem está
+  // de F1 em diante. Ver `respondeuAClinica`, em `data/leads.ts`.
+  const idsResponderam = new Set(
+    leadsDoPeriodo
+      .filter(
+        (lead) =>
+          contexto.responderam.has(lead.id) &&
+          ehLeadDeVerdade(
+            lead.etapa,
+            contexto.motivoDoLead.get(lead.id) ?? null,
+          ),
+      )
+      .map((lead) => lead.id),
+  );
+  const responderamComAgendamento = new Set<number>();
+  for (const consulta of contexto.agendamentos) {
+    if (
+      idsResponderam.has(consulta.lead_id) &&
+      consulta.status !== STATUS_CANCELADA
+    ) {
+      responderamComAgendamento.add(consulta.lead_id);
+    }
+  }
+
   const vendas = leadsDoPeriodo.filter(
     (lead) => lead.etapa === ETAPA_GANHA,
   ).length;
@@ -491,12 +531,18 @@ function montarResumo(
     fechadosPorWhatsapp,
     qualificados,
     leadsComAgendamento: comAgendamento.size,
+    responderam: idsResponderam.size,
+    responderamComAgendamento: responderamComAgendamento.size,
     taxaNoShow: complementoDa(showRate),
     taxaReagendamento: taxa(remarcacoes, producao.length),
     percentualIa: taxa(fechadosPelaIa, producao.length),
     percentualLigacao: taxa(fechadosPorLigacao, comCanal.length),
     showRate,
     taxaAgendamento: taxa(comAgendamento.size, qualificados),
+    taxaAgendamentoResponderam: taxa(
+      responderamComAgendamento.size,
+      idsResponderam.size,
+    ),
   };
 }
 
@@ -764,6 +810,7 @@ export async function carregarVisaoGeral(
     respostaDasClinicas,
     respostaDosOrfaos,
     respostaDoReagendamento,
+    quemRespondeu,
   ] = await Promise.all([
     leadsDaJanela,
     motivosDaJanela,
@@ -804,6 +851,9 @@ export async function carregarVisaoGeral(
       .select("id", { count: "exact", head: true })
       .is("clinica_id", null),
     emReagendamento,
+    // Só as mensagens da janela: os leads que esta tela conta chegaram dentro
+    // dela, e nenhuma mensagem deles é anterior à chegada.
+    lerQuemRespondeu(supabase, primeiroInstante(janela)),
   ]);
 
   const erro =
@@ -820,6 +870,13 @@ export async function carregarVisaoGeral(
     return {
       ...SEM_DADOS,
       falha: `Não deu para ler a visão geral: ${erro.message}`,
+    };
+  }
+
+  if (quemRespondeu.erro) {
+    return {
+      ...SEM_DADOS,
+      falha: `Não deu para ler a visão geral: ${quemRespondeu.erro}`,
     };
   }
 
@@ -860,6 +917,7 @@ export async function carregarVisaoGeral(
     // A remarcação é calculada sobre a fila inteira, antes de qualquer corte de
     // período: é a consulta anterior do lead que decide, e ela pode ser de antes.
     remarcacoes: idsDeRemarcacao(agendamentos),
+    responderam: quemRespondeu.ids,
     hoje,
     agora: horaDeAgora(),
   };
@@ -931,6 +989,7 @@ export async function carregarVisaoGeral(
       leads.length,
       todosOsAgendamentos.length,
       respostaDosOrfaos.count ?? 0,
+      quemRespondeu.cortado,
     ),
   };
 }
@@ -939,8 +998,15 @@ function montarAviso(
   leadsLidos: number,
   agendamentosLidos: number,
   semCliente: number,
+  mensagensCortadas: boolean,
 ) {
   const avisos: string[] = [];
+
+  if (mensagensCortadas) {
+    avisos.push(
+      "A leitura das conversas parou no teto de linhas: o número de quem respondeu pode estar menor do que é.",
+    );
+  }
 
   if (leadsLidos >= TETO_DE_LINHAS) {
     avisos.push(

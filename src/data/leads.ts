@@ -166,6 +166,11 @@ export type Lead = {
   motivoPerda?: MotivoPerda;
   /** Quantas vezes a consulta deste lead precisou ser remarcada. */
   remarcacoes?: number;
+  /**
+   * Se o lead escreveu depois da primeira mensagem da clínica. Ver
+   * `idsQueResponderam`, em `lib/dados/respostas.ts`.
+   */
+  respondeu?: boolean;
 };
 
 /**
@@ -201,6 +206,40 @@ export function ehQualificado(lead: Lead): boolean {
     );
   }
   return etapasFunil.indexOf(lead.etapa) >= PRIMEIRA_ETAPA_QUALIFICADA;
+}
+
+/**
+ * Lead que conversou com a clínica: respondeu depois da primeira mensagem
+ * dela. É a base da taxa "agendamento sobre quem respondeu".
+ *
+ * Existe ao lado de `ehQualificado`, sem substituí-lo (decisão dele, em
+ * 25/11/2026). "Qualificado" é a etapa a partir de F1, e a escada leva para F1
+ * quem ficou 24h sem responder: em novembro, 93 dos 243 qualificados da
+ * clínica 39 nunca responderam. No sentido contrário, quem conversa e fica em
+ * "Em Contato" não entrava em base nenhuma. A taxa sobre quem respondeu mede
+ * o trabalho da conversa; a taxa sobre qualificados continua sendo a da meta.
+ *
+ * Fica de fora o que não é lead: "Outros Contatos" e a perda por clique
+ * errado, spam ou procedimento que a clínica não faz.
+ */
+export function respondeuAClinica(lead: Lead): boolean {
+  if (lead.respondeu !== true) return false;
+  return ehLeadDeVerdade(lead.etapa, lead.motivoPerda ?? null);
+}
+
+/**
+ * Se o contato é lead: não está em "Outros Contatos" nem foi perdido por um
+ * motivo que diz que nunca foi lead. Recebe os campos soltos porque a Visão
+ * Geral lê do banco e não monta um `Lead` inteiro.
+ */
+export function ehLeadDeVerdade(etapa: string, motivo: string | null): boolean {
+  if (etapa === ETAPA_SEM_LEAD) return false;
+  if (etapa === "Venda Perdida") {
+    return !(
+      motivo !== null && motivosQueDesqualificam.includes(motivo as MotivoPerda)
+    );
+  }
+  return true;
 }
 
 /**

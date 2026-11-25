@@ -3,6 +3,7 @@ import type { Clinica } from "@/data/clinicas";
 import {
   ehLeadDeMarketing,
   ehQualificado,
+  respondeuAClinica,
   ETAPA_REMARCAR,
   ETAPA_SEM_LEAD,
   MOTIVO_DISTANCIA,
@@ -201,6 +202,14 @@ export type LinhaFunil = {
    * como agendar.
    */
   inalcancaveis: number;
+  /**
+   * Leads da safra que responderam depois da primeira mensagem da clínica, e
+   * quantos deles marcaram consulta. É a taxa de agendamento com outra base:
+   * quem conversou, e não quem está de F1 em diante. Ver `respondeuAClinica`.
+   */
+  responderam: number;
+  agendadosQueResponderam: number;
+  taxaAgendamentoResponderam: number | null;
 };
 
 /** Uma linha da tabela "Follow", colheita de safras anteriores. */
@@ -314,6 +323,11 @@ export function montarFunil({
       (l) => ehQualificado(l) && comConsulta.has(l.id),
     ).length;
 
+    const responderam = daClinica.filter(respondeuAClinica);
+    const agendadosQueResponderam = responderam.filter((l) =>
+      comConsulta.has(l.id),
+    ).length;
+
     return {
       clinica,
       leads: daClinica.length,
@@ -337,6 +351,12 @@ export function montarFunil({
       inalcancaveis: daClinica.filter(
         (l) => ehQualificado(l) && l.motivoPerda === MOTIVO_DISTANCIA,
       ).length,
+      responderam: responderam.length,
+      agendadosQueResponderam,
+      taxaAgendamentoResponderam: taxa(
+        agendadosQueResponderam,
+        responderam.length,
+      ),
     };
   });
 }
@@ -437,6 +457,10 @@ export type ResumoGeral = {
   agendadosDaSafra: number;
   /** Qualificados do período perdidos por distância. Contexto da taxa acima. */
   inalcancaveis: number;
+  /** Leads que responderam à clínica, e quantos deles marcaram consulta. */
+  responderam: number;
+  agendadosQueResponderam: number;
+  taxaAgendamentoResponderam: number | null;
   producao: number;
   /*
     Comparecimento, falta, cancelamento e no-show contam pelo DIA DA CONSULTA,
@@ -523,6 +547,12 @@ export function montarResumo(
     taxaAgendamento: taxa(agendadosDaSafra, qualificados),
     agendadosDaSafra,
     inalcancaveis: soma(funil, (l) => l.inalcancaveis),
+    responderam: soma(funil, (l) => l.responderam),
+    agendadosQueResponderam: soma(funil, (l) => l.agendadosQueResponderam),
+    taxaAgendamentoResponderam: taxa(
+      soma(funil, (l) => l.agendadosQueResponderam),
+      soma(funil, (l) => l.responderam),
+    ),
     producao: totalProducao,
     compareceram,
     consultasAteAData: soma(funil, (l) => l.ateAData),

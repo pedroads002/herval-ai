@@ -176,7 +176,7 @@ export default function PainelRelatorios({
     if (!hoje) return null;
 
     const clinicaPorUnidade = new Map(dados.clinicaPorUnidade);
-    const leads = montarLeadsDoBanco(dados.leads, hoje);
+    const leads = montarLeadsDoBanco(dados.leads, hoje, new Set(dados.responderam));
     const agendamentos = montarAgendamentosDoBanco(
       dados.agendamentos,
       clinicaPorUnidade,
@@ -469,7 +469,7 @@ export default function PainelRelatorios({
             <Kpi
               rotulo="Leads"
               valor={formatarNumero(resumo.leads)}
-              detalhe={`de qualquer origem · ${formatarNumero(resumo.qualificados)} qualificados${
+              detalhe={`de qualquer origem · ${formatarNumero(resumo.qualificados)} qualificados · ${formatarNumero(resumo.responderam)} responderam${
                 resumo.leadsPagos > 0
                   ? ` · ${formatarNumero(resumo.leadsPagos)} de campanha paga`
                   : ""
@@ -491,7 +491,7 @@ export default function PainelRelatorios({
                 resumo.inalcancaveis > 0
                   ? ` · ${formatarNumero(resumo.inalcancaveis)} deles longe demais`
                   : ""
-              }`}
+              } · sobre quem respondeu: ${comPercentual(resumo.taxaAgendamentoResponderam)} (${formatarNumero(resumo.agendadosQueResponderam)} de ${formatarNumero(resumo.responderam)})`}
               alerta={
                 resumo.taxaAgendamento !== null &&
                 resumo.taxaAgendamento < metasPadrao.taxaAgendamento
