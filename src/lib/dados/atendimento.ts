@@ -17,7 +17,8 @@
  */
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
-import { etapasFunil, type EtapaFunil } from "@/data/leads";
+import { ETAPA_SEM_LEAD, etapasFunil, type EtapaFunil } from "@/data/leads";
+import { lerEmPaginas } from "@/lib/dados/pacientes";
 import {
   QUEM_PAUSOU_SEM_NOME,
   horaDaPausa,
@@ -305,13 +306,25 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
         .select(
           "id, nome, telefone, clinica_id, etapa, origem, criado_em, atendimento_ia, ia_pausada_em, ia_pausada_por",
         )
+        // "Outros Contatos" é quem não é paciente (o número da clínica,
+        // fornecedor, a agência): não é conversa da fila. Continua aberta pelo
+        // card do Funil, em `/atendimento/[id]`.
+        .neq("etapa", ETAPA_SEM_LEAD)
         .order("criado_em", { ascending: false }),
-      supabase
-        .from("mensagens")
-        .select(
-          "id, lead_id, remetente_tipo, remetente_nome, formato, texto, regra, status, criado_em",
-        )
-        .order("criado_em", { ascending: true }),
+      // Em páginas: o PostgREST devolve no máximo mil linhas por pedido, e a
+      // base já passou disso. Lida de uma vez só, a tela recebia só as mil
+      // mensagens mais antigas e as conversas recentes apareciam sem fala.
+      lerEmPaginas<LinhaMensagem>((de, ate) =>
+        supabase
+          .from("mensagens")
+          .select(
+            "id, lead_id, remetente_tipo, remetente_nome, formato, texto, regra, status, criado_em",
+          )
+          .order("criado_em", { ascending: true })
+          .order("id", { ascending: true })
+          .range(de, ate),
+        100_000,
+      ),
       supabase
         .from("notas")
         .select("id, lead_id, autor_nome, texto, criado_em")
@@ -322,11 +335,11 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
   // Leads e mensagens são a tela. Se qualquer uma das duas falhar, é melhor
   // dizer que não deu para ler do que mostrar meia conversa como se fosse a
   // conversa toda.
-  const erro = respostaLeads.error ?? respostaMensagens.error;
+  const erro = respostaLeads.error?.message ?? respostaMensagens.erro;
   if (erro) {
     return {
       ...SEM_DADOS,
-      falha: `Não deu para ler as conversas: ${erro.message}`,
+      falha: `Não deu para ler as conversas: ${erro}`,
     };
   }
 
@@ -357,7 +370,7 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
     } satisfies LeadEmAtendimento;
   });
 
-  const mensagens = ((respostaMensagens.data ?? []) as LinhaMensagem[]).map(
+  const mensagens = respostaMensagens.linhas.map(
     (linha) => {
       const nome = (linha.remetente_nome ?? "").trim();
       return {
