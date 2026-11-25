@@ -17,6 +17,7 @@ import {
   Bot,
   Stethoscope,
   ClipboardList,
+  UserRound,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
 import MenuGaveta from "@/components/MenuGaveta";
@@ -28,6 +29,7 @@ const itens = [
   { href: "/atendimento", rotulo: "Atendimento", Icone: MessagesSquare },
   { href: "/funil", rotulo: "Funil", Icone: KanbanSquare },
   { href: "/agenda", rotulo: "Agenda", Icone: CalendarDays },
+  { href: "/pacientes", rotulo: "Pacientes", Icone: UserRound },
   { href: "/teste-ia", rotulo: "Teste da IA", Icone: Bot },
   { href: "/regua-automacao", rotulo: "Régua de Automação", Icone: Workflow },
   { href: "/clientes", rotulo: "Clientes", Icone: Stethoscope },

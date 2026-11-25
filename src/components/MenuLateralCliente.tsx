@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  UserRound,
   ListChecks,
 } from "lucide-react";
 import LogoHerval from "@/components/LogoHerval";
@@ -99,6 +100,13 @@ const itensFixos = [
     rotulo: "Agenda",
     Icone: CalendarDays,
     tela: "agenda" as const,
+  },
+  {
+    // Seção própria, com liberação própria em Equipe (`pacientes`).
+    href: "/pacientes",
+    rotulo: "Pacientes",
+    Icone: UserRound,
+    tela: "pacientes" as const,
   },
   {
     href: "/templates-whatsapp",

@@ -39,6 +39,9 @@ export const TELAS_CONTROLAVEIS = {
   ATENDIMENTO: "atendimento",
   RELATORIOS: "relatorios",
   AGENDA: "agenda",
+  // Entrou depois das quatro primeiras, como seção à parte: a lista de
+  // pacientes da clínica, com edição, importação e exclusão.
+  PACIENTES: "pacientes",
 } as const;
 
 export type TelaControlavel =

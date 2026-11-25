@@ -26,6 +26,7 @@ const TELAS_DO_FORMULARIO = [
   { tela: "atendimento", rotulo: "Conversas" },
   { tela: "relatorios", rotulo: "Relatórios" },
   { tela: "agenda", rotulo: "Agenda" },
+  { tela: "pacientes", rotulo: "Pacientes" },
 ] as const;
 
 const TODAS_AS_TELAS = TELAS_DO_FORMULARIO.map((item) => item.tela);
