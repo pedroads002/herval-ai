@@ -19,7 +19,13 @@ import { criarClienteAdmin } from "@/lib/supabase/admin";
  * dia existir, já nasça liberada para quem hoje tem acesso total.
  */
 
-const TELAS_VALIDAS = new Set(["funil", "atendimento", "relatorios", "agenda"]);
+const TELAS_VALIDAS = new Set([
+  "funil",
+  "atendimento",
+  "relatorios",
+  "agenda",
+  "pacientes",
+]);
 
 type Corpo = {
   usuarioId?: unknown;
@@ -79,7 +85,7 @@ export async function POST(request: Request) {
     return recusar("Este colaborador não é da sua clínica.", 403);
   }
 
-  // Todas as quatro marcadas é o mesmo que "sem restrição" — ver o
+  // Todas marcadas (agora cinco, com Pacientes) é o mesmo que "sem restrição" — ver o
   // comentário no topo do arquivo.
   const paraGravar = telas.length === TELAS_VALIDAS.size ? null : telas;
 
