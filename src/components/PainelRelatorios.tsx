@@ -608,7 +608,7 @@ export default function PainelRelatorios({
             titulo="Funil de leads (consultas do período)"
             selo="Métrica oficial de comparecimento"
             legenda={
-              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem, menos quem está em "Outros Contatos": aquela etapa é onde a clínica guarda quem não é paciente, e ali não há lead para contar nem para desqualificar. A coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
+              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem, menos quem está em "Outros Contatos": aquela etapa é onde a clínica guarda quem não é paciente, e ali não há lead para contar nem para desqualificar. A coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. "Não qualif." é quem ainda não passou da triagem — está em "Em Contato" — ou foi perdido por clique errado, spam ou procedimento que a clínica não faz; não quer dizer que o lead foi descartado. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
               (resumo.inalcancaveis > 0
                 ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
                 : "")
@@ -617,7 +617,7 @@ export default function PainelRelatorios({
               "Clínica",
               "Leads",
               "Campanha",
-              "Desqual.",
+              "Não qualif.",
               "Qualif.",
               "Agendados",
               "Até a data",
@@ -671,11 +671,11 @@ export default function PainelRelatorios({
           {/* Tabela B */}
           <Tabela
             titulo="Follow — colheita de meses anteriores"
-            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. Vendas aqui são comparecimentos desses mesmos leads."
+            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. "Compareceram" são as consultas desses agendamentos em que o paciente esteve presente: não é venda, que só existe quando é registrada no lead."
             cabecalhos={[
               "Clínica",
               "Agendados de safra anterior",
-              "Vendas de safra anterior",
+              "Compareceram (safra anterior)",
             ]}
             vazio={followVisivel.length === 0}
           >
