@@ -671,7 +671,7 @@ export default function PainelRelatorios({
           {/* Tabela B */}
           <Tabela
             titulo="Follow — colheita de meses anteriores"
-            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. "Compareceram" são as consultas desses agendamentos em que o paciente esteve presente: não é venda, que só existe quando é registrada no lead."
+            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. “Compareceram” são as consultas desses agendamentos em que o paciente esteve presente: não é venda, que só existe quando é registrada no lead."
             cabecalhos={[
               "Clínica",
               "Agendados de safra anterior",
