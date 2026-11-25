@@ -75,7 +75,7 @@ export default function PainelVisaoGeral({
           rotulo="Comparecimentos"
           valor={formatarNumero(atual.comparecimentos)}
           variacao={variacao(atual.comparecimentos, anterior.comparecimentos)}
-          detalhe={`de ${formatarNumero(atual.consultasAteAData)} consultas desses agendamentos que já aconteceram`}
+          detalhe={`de ${formatarNumero(atual.consultasAteAData)} consultas que já aconteceram ${quando}, pela data da consulta, igual à Agenda`}
         />
         <Kpi
           rotulo="Vendas"

@@ -175,6 +175,10 @@ export type LinhaFunil = {
   ateAData: number;
   consultaFutura: number;
   compareceram: number;
+  /** Consultas do período que já passaram e foram marcadas como falta. */
+  faltaram: number;
+  /** Consultas do período que foram canceladas. */
+  cancelados: number;
   /**
    * Consultas com desfecho registrado: compareceu, faltou ou foi cancelada. É o
    * denominador de "% compar.", e consulta sem baixa não entra — ela não tem
@@ -320,6 +324,8 @@ export function montarFunil({
       ateAData: jaAconteceram.length,
       consultaFutura: futuras.length,
       compareceram: compareceram.length,
+      faltaram: jaAconteceram.filter((a) => a.status === "Faltou").length,
+      cancelados: canceladas,
       comDesfecho,
       // Sem as canceladas: cancelamento não espera baixa nenhuma.
       aguardandoBaixa:
@@ -431,19 +437,26 @@ export type ResumoGeral = {
   /** Qualificados do período perdidos por distância. Contexto da taxa acima. */
   inalcancaveis: number;
   producao: number;
-  producaoCompareceu: number;
-  producaoAteAData: number;
+  /*
+    Comparecimento, falta, cancelamento e no-show contam pelo DIA DA CONSULTA,
+    a mesma base do Funil de leads e da Agenda. Até 24/11/2026 vinham da
+    produção (pelo dia em que a consulta foi marcada), e o número não batia com
+    a Agenda: consulta marcada dia 11 e atendida hoje contava no dia 11.
+  */
+  compareceram: number;
+  /** Consultas do período que já passaram. */
+  consultasAteAData: number;
   /** Das consultas acima, quantas têm desfecho. É a base do show-rate e do no-show. */
-  producaoComDesfecho: number;
+  comDesfecho: number;
   /** Já aconteceram e continuam sem baixa: não são falta nem presença. */
   aguardandoBaixa: number;
-  showRateProducao: number | null;
+  showRate: number | null;
   /** Agendamentos do período que são remarcação, e o percentual deles. */
   remarcacoes: number;
   taxaReagendamento: number | null;
-  /** Consultas dessa produção que já passaram e o paciente não apareceu. */
+  /** Consultas do período que já passaram e o paciente não apareceu. */
   faltas: number;
-  /** Consultas dessa produção que foram canceladas. */
+  /** Consultas do período que foram canceladas. */
   cancelados: number;
   /** Falta + cancelamento, que é o numerador do no-show. */
   naoCompareceram: number;
@@ -470,8 +483,10 @@ export function montarResumo(
   const qualificados = soma(funil, (l) => l.qualificados);
   const agendadosFunil = soma(funil, (l) => l.agendados);
   const agendadosDaSafra = soma(funil, (l) => l.agendadosDaSafra);
-  const producaoAteAData = soma(producao, (l) => l.consultaAteAData);
-  const producaoCompareceu = soma(producao, (l) => l.compareceram);
+  // Presença pelo dia da consulta: sai do funil, não da produção. Ver o
+  // comentário em `ResumoGeral.compareceram`.
+  const compareceram = soma(funil, (l) => l.compareceram);
+  const comDesfecho = soma(funil, (l) => l.comDesfecho);
 
   const doPeriodo = agendamentos.filter((a) =>
     dentroDaFaixa(a.criadoHaDias, faixa),
@@ -488,15 +503,14 @@ export function montarResumo(
 
   const totalProducao = soma(producao, (l) => l.agendamentos);
   const remarcacoes = soma(producao, (l) => l.remarcacoes);
-  const producaoComDesfecho = soma(producao, (l) => l.comDesfecho);
   // Falta é só o que foi registrado como falta. Antes isto era "já aconteceu
   // menos quem compareceu", e aí toda consulta que ninguém deu baixa virava
   // falta: o no-show subia sozinho por trabalho pendente, não por ausência.
-  const faltas = soma(producao, (l) => l.faltaram);
-  const cancelados = soma(producao, (l) => l.cancelados);
-  const naoCompareceram = soma(producao, (l) => l.naoCompareceram);
+  const faltas = soma(funil, (l) => l.faltaram);
+  const cancelados = soma(funil, (l) => l.cancelados);
+  const naoCompareceram = faltas + cancelados;
   // O no-show sai daqui por complemento, nunca de um arredondamento próprio.
-  const showRateProducao = taxa(producaoCompareceu, producaoComDesfecho);
+  const showRate = taxa(compareceram, comDesfecho);
 
   return {
     leads: soma(funil, (l) => l.leads),
@@ -509,17 +523,17 @@ export function montarResumo(
     agendadosDaSafra,
     inalcancaveis: soma(funil, (l) => l.inalcancaveis),
     producao: totalProducao,
-    producaoCompareceu,
-    producaoAteAData,
-    producaoComDesfecho,
-    aguardandoBaixa: soma(producao, (l) => l.aguardandoBaixa),
-    showRateProducao,
+    compareceram,
+    consultasAteAData: soma(funil, (l) => l.ateAData),
+    comDesfecho,
+    aguardandoBaixa: soma(funil, (l) => l.aguardandoBaixa),
+    showRate,
     remarcacoes,
     taxaReagendamento: taxa(remarcacoes, totalProducao),
     faltas,
     cancelados,
     naoCompareceram,
-    taxaNoShow: complementoDa(showRateProducao),
+    taxaNoShow: complementoDa(showRate),
     fechadosPelaIa: pelaIa,
     fechadosPeloCrc: doPeriodo.length - pelaIa,
     percentualIa: taxa(pelaIa, doPeriodo.length),
@@ -558,7 +572,10 @@ export function montarAlertas(
   base: { leads: Lead[]; agendamentos: Agendamento[] },
 ): Alerta[] {
   const alertas: Alerta[] = [];
-  const porClinicaId = new Map(producao.map((l) => [l.clinica.id, l]));
+  // `producao` segue na assinatura para não mexer em quem chama, mas nenhum
+  // alerta usa mais: o de comparecimento passou para o dia da consulta, que é
+  // o `funil`. Ver `ResumoGeral.compareceram`.
+  void producao;
 
   // Leads que já têm a baixa registrada em alguma consulta. Quem está em
   // "Reagendamento" e não está aqui é a contradição que o alerta aponta.
@@ -569,7 +586,6 @@ export function montarAlertas(
   );
 
   for (const linha of funil) {
-    const prod = porClinicaId.get(linha.clinica.id);
     const nome = linha.clinica.nome;
 
     // Não existe mais alerta só de cancelamento: desde 17/11/2026 o
@@ -601,21 +617,22 @@ export function montarAlertas(
       });
     }
 
+    // Pelo dia da consulta: a mesma base do card do topo, da Visão Geral e da
+    // Agenda.
     if (
-      prod &&
-      prod.showRate !== null &&
+      linha.taxaComparecimento !== null &&
       // A amostra do show-rate é o que tem desfecho, não tudo que já passou:
       // alerta em cima de uma consulta com baixa seria alarme falso.
-      prod.comDesfecho >= metas.amostraMinima &&
-      prod.showRate < metas.pisoShowRate
+      linha.comDesfecho >= metas.amostraMinima &&
+      linha.taxaComparecimento < metas.pisoShowRate
     ) {
-      const critico = prod.showRate < metas.showRateCritico;
+      const critico = linha.taxaComparecimento < metas.showRateCritico;
       alertas.push({
         id: `showrate-${linha.clinica.id}`,
         clinica: nome,
         severidade: critico ? "critico" : "atencao",
-        problema: `Show-rate de ${prod.showRate}% na produção do período (piso: ${metas.pisoShowRate}%).`,
-        acao: `${prod.faltaram} faltas e ${prod.cancelados} cancelamentos em ${prod.comDesfecho} consultas com desfecho. Reforçar lembrete D-1 e D-0 e revisar o intervalo entre marcar e atender.`,
+        problema: `Comparecimento de ${linha.taxaComparecimento}% nas consultas do período (piso: ${metas.pisoShowRate}%).`,
+        acao: `${linha.faltaram} faltas e ${linha.cancelados} cancelamentos em ${linha.comDesfecho} consultas com desfecho. Reforçar lembrete D-1 e D-0 e revisar o intervalo entre marcar e atender.`,
       });
     }
 

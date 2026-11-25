@@ -503,17 +503,17 @@ export default function PainelRelatorios({
               detalhe="pelo ato de agendar · remarcação conta de novo"
             />
             <Kpi
-              rotulo="Show-rate da produção"
-              valor={comPercentual(resumo.showRateProducao)}
+              rotulo="Comparecimento"
+              valor={comPercentual(resumo.showRate)}
               detalhe={
-                `${formatarNumero(resumo.producaoCompareceu)} de ${formatarNumero(resumo.producaoComDesfecho)} consultas com desfecho (compareceu, faltou ou cancelou) · no-show de ${comPercentual(resumo.taxaNoShow)}, que é ${formatarNumero(resumo.faltas)} ${resumo.faltas === 1 ? "falta" : "faltas"} e ${formatarNumero(resumo.cancelados)} ${resumo.cancelados === 1 ? "cancelamento" : "cancelamentos"}` +
+                `${formatarNumero(resumo.compareceram)} de ${formatarNumero(resumo.comDesfecho)} consultas do período com desfecho (compareceu, faltou ou cancelou), pela data da consulta, igual à Agenda · no-show de ${comPercentual(resumo.taxaNoShow)}, que é ${formatarNumero(resumo.faltas)} ${resumo.faltas === 1 ? "falta" : "faltas"} e ${formatarNumero(resumo.cancelados)} ${resumo.cancelados === 1 ? "cancelamento" : "cancelamentos"}` +
                 (resumo.aguardandoBaixa > 0
                   ? ` · ${formatarNumero(resumo.aguardandoBaixa)} ${resumo.aguardandoBaixa === 1 ? "consulta já aconteceu e está sem baixa, fora da conta" : "consultas já aconteceram e estão sem baixa, fora da conta"}`
                   : "")
               }
               alerta={
-                resumo.showRateProducao !== null &&
-                resumo.showRateProducao < metasPadrao.pisoShowRate
+                resumo.showRate !== null &&
+                resumo.showRate < metasPadrao.pisoShowRate
               }
             />
             <Kpi
@@ -606,8 +606,9 @@ export default function PainelRelatorios({
           {/* Tabela A */}
           <Tabela
             titulo="Funil de leads (consultas do período)"
+            selo="Métrica oficial de comparecimento"
             legenda={
-              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem, menos quem está em "Outros Contatos": aquela etapa é onde a clínica guarda quem não é paciente, e ali não há lead para contar nem para desqualificar. A coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
+              'Conta todo lead pela safra — o mês em que chegaram —, de qualquer origem, menos quem está em "Outros Contatos": aquela etapa é onde a clínica guarda quem não é paciente, e ali não há lead para contar nem para desqualificar. A coluna "Campanha" separa quantos vieram de Meta Ads ou Google Ads. "Não qualif." é quem ainda não passou da triagem — está em "Em Contato" — ou foi perdido por clique errado, spam ou procedimento que a clínica não faz; não quer dizer que o lead foi descartado. As consultas contam pela data em que o paciente é atendido, venha o lead de qual safra vier. "Compareceu" é consulta que já aconteceu e o paciente esteve presente; consulta futura ainda não tem desfecho. A % de comparecimento é calculada só sobre as consultas com desfecho — compareceu, faltou ou cancelou: a que já passou e continua sem baixa aparece na coluna "Sem baixa" e fica fora da conta, porque ninguém sabe ainda se o paciente veio.' +
               (resumo.inalcancaveis > 0
                 ? ` Dos qualificados do período, ${formatarNumero(resumo.inalcancaveis)} se perderam por "Localização distante": eram leads reais, mas sem como chegar na clínica, e por isso puxam a % de agendamento para baixo.`
                 : "")
@@ -616,7 +617,7 @@ export default function PainelRelatorios({
               "Clínica",
               "Leads",
               "Campanha",
-              "Desqual.",
+              "Não qualif.",
               "Qualif.",
               "Agendados",
               "Até a data",
@@ -670,11 +671,11 @@ export default function PainelRelatorios({
           {/* Tabela B */}
           <Tabela
             titulo="Follow — colheita de meses anteriores"
-            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. Vendas aqui são comparecimentos desses mesmos leads."
+            legenda="Agendamentos feitos dentro do período para leads que chegaram antes dele. É o que a base antiga ainda rende: não precisa de campanha nova, precisa de follow-up. “Compareceram” são as consultas desses agendamentos em que o paciente esteve presente: não é venda, que só existe quando é registrada no lead."
             cabecalhos={[
               "Clínica",
               "Agendados de safra anterior",
-              "Vendas de safra anterior",
+              "Compareceram (safra anterior)",
             ]}
             vazio={followVisivel.length === 0}
           >
@@ -697,8 +698,8 @@ export default function PainelRelatorios({
           {/* Tabela C */}
           <Tabela
             titulo="Produção de agendamentos (pelo ato de agendar)"
-            selo="Métrica oficial de comparecimento"
-            legenda="Conta pela data em que a equipe marcou, não pela data da consulta. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas com desfecho: compareceu, faltou ou cancelou. No-show é o resto dessa mesma conta — falta e cancelamento juntos, porque nos dois a cadeira ficou vazia —, então as duas taxas são as duas faces do mesmo número (somadas podem dar 99% ou 101%, que é só o arredondamento de cada uma). As consultas futuras e as que já passaram sem baixa ficam fora do cálculo: consulta sem baixa não é falta, é consulta esperando alguém marcar se o paciente veio."
+            selo="Trabalho de marcar"
+            legenda="Conta pela data em que a equipe marcou, não pela data da consulta: por isso os comparecimentos daqui não batem com a Agenda, e a métrica oficial de comparecimento é o Funil de leads, acima. Se o paciente remarcou, conta de novo — é trabalho feito duas vezes. Show-rate é comparecimentos sobre as consultas com desfecho: compareceu, faltou ou cancelou. No-show é o resto dessa mesma conta — falta e cancelamento juntos, porque nos dois a cadeira ficou vazia —, então as duas taxas são as duas faces do mesmo número (somadas podem dar 99% ou 101%, que é só o arredondamento de cada uma). As consultas futuras e as que já passaram sem baixa ficam fora do cálculo: consulta sem baixa não é falta, é consulta esperando alguém marcar se o paciente veio."
             cabecalhos={[
               "Clínica",
               "Agendamentos",
@@ -758,13 +759,13 @@ export default function PainelRelatorios({
                   titulo: "Funil de leads",
                   quando: "Para fechar o mês e avaliar a entrada de leads.",
                   texto:
-                    "Responde se o lead que entrou virou consulta. Conta todo lead, de qualquer origem, e a coluna Campanha separa o que veio de anúncio pago. Como as consultas contam pela data em que o paciente é atendido, o número muda quando alguém antecipa ou adia.",
+                    "Responde se o lead que entrou virou consulta, e é a métrica oficial de comparecimento: as consultas contam pela data em que o paciente é atendido, a mesma da Agenda e da Visão Geral. Conta todo lead, de qualquer origem, e a coluna Campanha separa o que veio de anúncio pago. O número muda quando alguém antecipa ou adia.",
                 },
                 {
                   titulo: "Produção de agendamentos",
                   quando: "Para acompanhar a semana de trabalho.",
                   texto:
-                    "Responde quanto a equipe marcou nesses dias e quanto disso se sustentou. É onde cancelamento e no-show aparecem primeiro, por isso é a métrica oficial de comparecimento.",
+                    "Responde quanto a equipe marcou nesses dias e quanto disso se sustentou. Conta pela data em que a consulta foi marcada, então não bate com a Agenda: para comparecimento, use o Funil de leads.",
                 },
                 {
                   titulo: "Follow",

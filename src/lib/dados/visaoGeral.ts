@@ -114,12 +114,12 @@ export type ResumoDoPeriodo = {
   foraDaConta: number;
   /** Agendamentos pelo ato de agendar: `criado_em` dentro do período. */
   agendamentos: number;
-  /** Desses agendamentos, os que já aconteceram e tiveram presença. */
+  /** Consultas do período (pela data da consulta) que já aconteceram e tiveram presença. */
   comparecimentos: number;
   vendas: number;
   faltas: number;
   cancelamentos: number;
-  /** Agendamentos do período cuja consulta já passou. */
+  /** Consultas do período (pela data da consulta) que já passaram. */
   consultasAteAData: number;
   /** Falta + cancelamento: quem marcou e não foi atendido. */
   naoCompareceram: number;
@@ -357,15 +357,30 @@ function montarResumo(
     dentroDoIntervalo(diaDoInstante(consulta.criado_em), intervalo),
   );
 
-  // Consultas dessa produção que já aconteceram. Agendamento marcado para a
-  // semana que vem — ou para mais tarde hoje — não pode entrar na conta de
-  // falta nem de presença.
+  /*
+    Comparecimento, falta, cancelamento e no-show contam pelo DIA DA CONSULTA,
+    não pelo dia em que ela foi marcada — o mesmo dia que a Agenda mostra.
+
+    Correção de 24/11/2026: até aqui esses números vinham de `producao`, pelo
+    `criado_em`. Hoje a clínica teve 4 comparecimentos na Agenda e o card
+    mostrava 1, porque só uma das quatro consultas tinha sido marcada hoje; as
+    outras três tinham sido marcadas nos dias 11, 13 e 17 e iam para lá. Quem
+    abre a tela compara com a Agenda, e as duas precisam dizer a mesma coisa.
+    "Agendamentos", remarcação, origem (IA/CRC) e canal continuam pelo ato de
+    agendar: eles medem o trabalho de marcar, e esse acontece no `criado_em`.
+  */
+  const consultasDoPeriodo = contexto.agendamentos.filter((consulta) =>
+    dentroDoIntervalo(consulta.data_consulta, intervalo),
+  );
+
+  // Consultas do período que já aconteceram. A marcada para mais tarde hoje
+  // não pode entrar na conta de falta nem de presença.
   //
-  // Sem as canceladas, igual a `montarProducao` em `lib/relatorios.ts`: o
-  // cancelamento tem desfecho próprio e não "acontece" na data. Antes ela
-  // entrava aqui quando a data passava e virava "consulta sem baixa" em
-  // `aguardandoBaixa`, que nunca seria resolvida porque a baixa já existia.
-  const jaAconteceram = producao.filter(
+  // Sem as canceladas, igual a `montarFunil` em `lib/relatorios.ts`: o
+  // cancelamento tem desfecho próprio e não espera baixa. Se entrasse aqui,
+  // viraria "consulta sem baixa" em `aguardandoBaixa`, que nunca seria
+  // resolvida porque a baixa já existe.
+  const jaAconteceram = consultasDoPeriodo.filter(
     (consulta) =>
       consulta.status !== STATUS_CANCELADA && jaAconteceu(consulta, contexto),
   );
@@ -376,7 +391,7 @@ function montarResumo(
   const comparecimentos = jaAconteceram.filter(
     (consulta) => consulta.status === STATUS_COMPARECEU,
   ).length;
-  const cancelamentos = producao.filter(
+  const cancelamentos = consultasDoPeriodo.filter(
     (consulta) => consulta.status === STATUS_CANCELADA,
   ).length;
 
@@ -389,8 +404,8 @@ function montarResumo(
     pergunta, e a de no-show vivia zerada porque ninguém marca "Faltou".
 
     Cancelamento não precisa esperar a data chegar: ele já tem desfecho no dia
-    em que foi cancelado, por isso conta sobre toda a produção e não só sobre o
-    que já passou.
+    em que foi cancelado, por isso conta sobre todas as consultas do período e
+    não só sobre as que já passaram.
   */
   const naoCompareceram = faltas + cancelamentos;
 
