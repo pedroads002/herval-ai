@@ -391,8 +391,13 @@ function montarResumo(
   const comparecimentos = jaAconteceram.filter(
     (consulta) => consulta.status === STATUS_COMPARECEU,
   ).length;
+  // Só as canceladas cuja data já passou. O sistema não grava o dia do
+  // cancelamento, e contar a consulta de daqui a uma semana já cancelada fazia
+  // "Este mês" e "30 dias" darem no-show diferente no mesmo dia (decisão dele,
+  // em 24/11/2026).
   const cancelamentos = consultasDoPeriodo.filter(
-    (consulta) => consulta.status === STATUS_CANCELADA,
+    (consulta) =>
+      consulta.status === STATUS_CANCELADA && jaAconteceu(consulta, contexto),
   ).length;
 
   /*
@@ -403,9 +408,9 @@ function montarResumo(
     só "Faltou" e o cancelamento era uma taxa separada — duas taxas para a mesma
     pergunta, e a de no-show vivia zerada porque ninguém marca "Faltou".
 
-    Cancelamento não precisa esperar a data chegar: ele já tem desfecho no dia
-    em que foi cancelado, por isso conta sobre todas as consultas do período e
-    não só sobre as que já passaram.
+    O cancelamento conta quando a data da consulta chega, igual à falta: sem
+    o dia do cancelamento gravado, é a única data que todo período enxerga do
+    mesmo jeito.
   */
   const naoCompareceram = faltas + cancelamentos;
 

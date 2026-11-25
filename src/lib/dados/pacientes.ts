@@ -15,7 +15,7 @@
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
 import { ehHervalAdmin, PAPEIS, type Autorizacao } from "@/lib/autorizacao";
-import type { EtapaFunil } from "@/data/leads";
+import { ETAPA_SEM_LEAD, type EtapaFunil } from "@/data/leads";
 import {
   etapaDaLista,
   limparBusca,
@@ -136,12 +136,20 @@ export async function carregarPacientes(
       count: "exact",
     });
   if (clienteId !== null) lista = lista.eq("clinica_id", clienteId);
-  if (etapa !== null) lista = lista.eq("etapa", etapa);
   const filtroDeBusca = montarFiltroDeBusca(busca);
+  // "Outros Contatos" guarda quem não é paciente (o número da clínica,
+  // fornecedor, a agência). Fica fora da lista e do total, para o número do
+  // topo bater com os leads da Visão Geral. Continua aparecendo quando alguém
+  // escolhe essa etapa no filtro ou procura pelo nome.
+  if (etapa !== null) lista = lista.eq("etapa", etapa);
+  else if (!filtroDeBusca) lista = lista.neq("etapa", ETAPA_SEM_LEAD);
   if (filtroDeBusca) lista = lista.or(filtroDeBusca);
 
   // O total da base, sem etapa nem busca: é o número do topo da tela.
-  let contagem = supabase.from("leads").select("id", { count: "exact", head: true });
+  let contagem = supabase
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .neq("etapa", ETAPA_SEM_LEAD);
   if (clienteId !== null) contagem = contagem.eq("clinica_id", clienteId);
 
   const vendas = lerEmPaginas<{ valor: number | string }>((de, ate) => {
