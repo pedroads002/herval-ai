@@ -78,6 +78,7 @@ type Aviso = { texto: string; ok: boolean } | null;
 export default function PainelPacientes({
   pacientes,
   totalNaBase,
+  outrosContatos,
   totalFiltrado,
   totalVendido,
   vendasLidas,
@@ -90,6 +91,7 @@ export default function PainelPacientes({
 }: {
   pacientes: PacienteDaLista[];
   totalNaBase: number;
+  outrosContatos: number;
   totalFiltrado: number;
   totalVendido: number;
   vendasLidas: boolean;
@@ -267,12 +269,14 @@ export default function PainelPacientes({
               Pacientes
             </p>
             <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight text-herval-preto">
-              {totalNaBase.toLocaleString("pt-BR")}
+              {(totalNaBase - outrosContatos).toLocaleString("pt-BR")}
             </p>
             <p className="mt-1 text-xs font-medium text-black/45">
               {mostrarCliente && filtros.clienteId === null
                 ? "Na base de todos os clientes"
                 : "Na base da clínica"}
+              {outrosContatos > 0 &&
+                ` · mais ${outrosContatos.toLocaleString("pt-BR")} em Outros Contatos`}
             </p>
           </div>
           <div className="rounded-card border border-black/10 bg-herval-branco p-5 shadow-card">

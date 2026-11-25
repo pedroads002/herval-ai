@@ -17,7 +17,7 @@
  */
 import { criarClienteServidor } from "@/lib/supabase/servidor";
 import { supabaseConfigurado } from "@/lib/supabase/config";
-import { ETAPA_SEM_LEAD, etapasFunil, type EtapaFunil } from "@/data/leads";
+import { etapasFunil, type EtapaFunil } from "@/data/leads";
 import { lerEmPaginas } from "@/lib/dados/pacientes";
 import {
   QUEM_PAUSOU_SEM_NOME,
@@ -306,10 +306,6 @@ export async function carregarAtendimento(): Promise<DadosDoAtendimento> {
         .select(
           "id, nome, telefone, clinica_id, etapa, origem, criado_em, atendimento_ia, ia_pausada_em, ia_pausada_por",
         )
-        // "Outros Contatos" é quem não é paciente (o número da clínica,
-        // fornecedor, a agência): não é conversa da fila. Continua aberta pelo
-        // card do Funil, em `/atendimento/[id]`.
-        .neq("etapa", ETAPA_SEM_LEAD)
         .order("criado_em", { ascending: false }),
       // Em páginas: o PostgREST devolve no máximo mil linhas por pedido, e a
       // base já passou disso. Lida de uma vez só, a tela recebia só as mil

@@ -36,6 +36,8 @@ export type DadosDePacientes = {
   pacientes: PacienteDaLista[];
   /** Pacientes da base no recorte de cliente, sem etapa nem busca. */
   totalNaBase: number;
+  /** Quantos de `totalNaBase` estão em "Outros Contatos" e não são pacientes. */
+  outrosContatos: number;
   /** Pacientes que o filtro e a busca deixaram, em todas as páginas. */
   totalFiltrado: number;
   /** Soma de tudo o que foi registrado em `vendas`, no recorte de cliente. */
@@ -112,6 +114,7 @@ export async function carregarPacientes(
   const base: DadosDePacientes = {
     pacientes: [],
     totalNaBase: 0,
+    outrosContatos: 0,
     totalFiltrado: 0,
     totalVendido: 0,
     vendasLidas: false,
@@ -136,21 +139,23 @@ export async function carregarPacientes(
       count: "exact",
     });
   if (clienteId !== null) lista = lista.eq("clinica_id", clienteId);
-  const filtroDeBusca = montarFiltroDeBusca(busca);
-  // "Outros Contatos" guarda quem não é paciente (o número da clínica,
-  // fornecedor, a agência). Fica fora da lista e do total, para o número do
-  // topo bater com os leads da Visão Geral. Continua aparecendo quando alguém
-  // escolhe essa etapa no filtro ou procura pelo nome.
   if (etapa !== null) lista = lista.eq("etapa", etapa);
-  else if (!filtroDeBusca) lista = lista.neq("etapa", ETAPA_SEM_LEAD);
+  const filtroDeBusca = montarFiltroDeBusca(busca);
   if (filtroDeBusca) lista = lista.or(filtroDeBusca);
 
-  // O total da base, sem etapa nem busca: é o número do topo da tela.
-  let contagem = supabase
+  // O total da base, sem etapa nem busca.
+  let contagem = supabase.from("leads").select("id", { count: "exact", head: true });
+  if (clienteId !== null) contagem = contagem.eq("clinica_id", clienteId);
+
+  // "Outros Contatos" é quem não é paciente (o número da clínica, fornecedor,
+  // a agência). A lista e o resto da tela tratam esses contatos normalmente,
+  // porque a equipe fala com eles; só o número de pacientes do topo os separa,
+  // para bater com os leads da Visão Geral.
+  let contagemDeOutros = supabase
     .from("leads")
     .select("id", { count: "exact", head: true })
-    .neq("etapa", ETAPA_SEM_LEAD);
-  if (clienteId !== null) contagem = contagem.eq("clinica_id", clienteId);
+    .eq("etapa", ETAPA_SEM_LEAD);
+  if (clienteId !== null) contagemDeOutros = contagemDeOutros.eq("clinica_id", clienteId);
 
   const vendas = lerEmPaginas<{ valor: number | string }>((de, ate) => {
     let consulta = supabase.from("vendas").select("valor");
@@ -160,7 +165,7 @@ export async function carregarPacientes(
 
   const inicio = (filtros.pagina - 1) * PACIENTES_POR_PAGINA;
 
-  const [respostaDaLista, respostaDaContagem, respostaDasVendas, respostaDosClientes, respostaDosProcedimentos] =
+  const [respostaDaLista, respostaDaContagem, respostaDasVendas, respostaDosClientes, respostaDosProcedimentos, respostaDeOutros] =
     await Promise.all([
       lista
         .order("nome", { ascending: true })
@@ -175,6 +180,7 @@ export async function carregarPacientes(
         .eq("ativa", true)
         .order("nome", { ascending: true })
         .limit(1000),
+      contagemDeOutros,
     ]);
 
   // Página além da última (alguém excluiu pacientes, ou digitou o número na
@@ -238,6 +244,7 @@ export async function carregarPacientes(
     ...base,
     pacientes,
     totalNaBase: respostaDaContagem.count ?? 0,
+    outrosContatos: respostaDeOutros.count ?? 0,
     totalFiltrado: foraDaFaixa ? 0 : (respostaDaLista.count ?? 0),
     totalVendido,
     vendasLidas: !respostaDasVendas.erro,
