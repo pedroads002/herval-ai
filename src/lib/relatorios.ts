@@ -293,12 +293,13 @@ export function montarFunil({
     // As canceladas ficam fora de `consultas` (elas não ocupam mais a agenda),
     // mas entram na base de comparecimento: desde 17/11/2026 cancelamento é
     // no-show, e precisa ser a mesma base nas duas telas. Ver `naoCompareceram`
-    // em `lib/dados/visaoGeral.ts`.
+    // em `lib/dados/visaoGeral.ts`. Só as que a data já passou, igual à falta.
     const canceladas = agendamentos.filter(
       (a) =>
         a.clinicaId === clinica.id &&
         a.status === "Cancelada" &&
-        dentroDaFaixa(a.consultaEmDias, faixa),
+        dentroDaFaixa(a.consultaEmDias, faixa) &&
+        jaAconteceu(a, agora),
     ).length;
 
     const jaAconteceram = consultas.filter((a) => jaAconteceu(a, agora));

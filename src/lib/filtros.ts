@@ -40,7 +40,7 @@ export const filtrosDeSituacao = [
   "Aguardando Resposta",
   "Agendados",
   "Ganhos",
-  "Desqualificados",
+  "Venda Perdida",
 ] as const;
 
 export type FiltroDeSituacao = (typeof filtrosDeSituacao)[number];
@@ -76,7 +76,7 @@ export function combinaComFiltro(
       return situacao === "Agendado";
     case "Ganhos":
       return situacao === "Ganho";
-    case "Desqualificados":
+    case "Venda Perdida":
       return situacao === "Desqualificado";
     default:
       // "Em Atendimento" e "Aguardando Resposta" têm o mesmo nome da situação.
