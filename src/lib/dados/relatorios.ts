@@ -40,12 +40,18 @@ import {
   type LinhaDeLeadDoBanco,
 } from "@/lib/relatorios/doBanco";
 import type { LinhaDeEventoDeEtapaDoBanco } from "@/lib/relatorios/historicoDoBanco";
+import { lerQuemRespondeu } from "@/lib/dados/respostas";
 
 export type DadosDosRelatorios = {
   leads: LinhaDeLeadDoBanco[];
   agendamentos: LinhaDeAgendamentoDoBanco[];
   /** As mudanças de etapa, de onde sai a espera pelo primeiro contato. */
   eventos: LinhaDeEventoDeEtapaDoBanco[];
+  /**
+   * Ids dos leads que responderam à clínica. Lista, e não `Set`, porque atravessa
+   * do servidor para a tela. Ver `lib/dados/respostas.ts`.
+   */
+  responderam: number[];
   /** Qual cliente é dono de cada unidade, como pares para cruzar o mar de ids. */
   clinicaPorUnidade: [number, number | null][];
   clinicas: Clinica[];
@@ -103,6 +109,7 @@ const SEM_DADOS: DadosDosRelatorios = {
   leads: [],
   agendamentos: [],
   eventos: [],
+  responderam: [],
   clinicaPorUnidade: [],
   clinicas: [],
   falha: null,
@@ -144,6 +151,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     respostaDasUnidades,
     respostaDasClinicas,
     respostaDosOrfaos,
+    quemRespondeu,
   ] = await Promise.all([
     supabase
       .from("leads")
@@ -188,6 +196,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
       .from("leads")
       .select("id", { count: "exact", head: true })
       .is("clinica_id", null),
+    lerQuemRespondeu(supabase),
   ]);
 
   const erro =
@@ -202,6 +211,13 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     return {
       ...SEM_DADOS,
       falha: `Não deu para ler os relatórios: ${erro.message}`,
+    };
+  }
+
+  if (quemRespondeu.erro) {
+    return {
+      ...SEM_DADOS,
+      falha: `Não deu para ler os relatórios: ${quemRespondeu.erro}`,
     };
   }
 
@@ -236,6 +252,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
     leads,
     agendamentos,
     eventos,
+    responderam: [...quemRespondeu.ids],
     clinicaPorUnidade: unidades.map((u) => [u.id, u.clinica_id]),
     clinicas,
     falha: null,
@@ -244,6 +261,7 @@ export async function carregarRelatorios(): Promise<DadosDosRelatorios> {
       agendamentos.length,
       eventos.length,
       respostaDosOrfaos.count ?? 0,
+      quemRespondeu.cortado,
     ),
   };
 }
@@ -253,8 +271,15 @@ function montarAviso(
   agendamentos: number,
   eventos: number,
   semCliente: number,
+  mensagensCortadas: boolean,
 ) {
   const avisos: string[] = [];
+
+  if (mensagensCortadas) {
+    avisos.push(
+      "A leitura das conversas parou no teto de linhas: o número de quem respondeu pode estar menor do que é.",
+    );
+  }
 
   if (leads >= TETO_DE_LINHAS) {
     avisos.push(

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { variacao } from "@/lib/relatorios";
 import { formatarNumero, percentual } from "@/lib/formato";
+import { metasPadrao } from "@/data/metas";
 import {
   descricaoDoIntervalo,
   type PeriodoEscolhido,
@@ -88,7 +89,16 @@ export default function PainelVisaoGeral({
 
       {/* Indicadores secundários */}
       <section className="rounded-card border border-black/10 bg-herval-branco p-6 shadow-card">
-        <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <Indicador
+            rotulo="Agendamento de quem respondeu"
+            valor={comPercentual(atual.taxaAgendamentoResponderam)}
+            variacao={pontos(
+              atual.taxaAgendamentoResponderam,
+              anterior.taxaAgendamentoResponderam,
+            )}
+            detalhe={`${formatarNumero(atual.responderamComAgendamento)} de ${formatarNumero(atual.responderam)} leads que responderam à clínica · sobre qualificados: ${comPercentual(atual.taxaAgendamento)} (${formatarNumero(atual.leadsComAgendamento)} de ${formatarNumero(atual.qualificados)}), meta ${metasPadrao.taxaAgendamento}%`}
+          />
           <Indicador
             rotulo="Taxa de no-show"
             valor={comPercentual(atual.taxaNoShow)}

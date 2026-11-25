@@ -125,6 +125,8 @@ export type LeadsDoBanco = {
 export function montarLeadsDoBanco(
   linhas: LinhaDeLeadDoBanco[],
   hoje: Date,
+  /** Ids de quem respondeu à clínica. Sem a lista, ninguém conta como respondido. */
+  responderam: ReadonlySet<number> = new Set(),
 ): LeadsDoBanco {
   const leads: Lead[] = [];
   const etapas = new Set<string>();
@@ -153,6 +155,7 @@ export function montarLeadsDoBanco(
       origem,
       diasAtras: diasAtrasDe(new Date(linha.criado_em), hoje),
       ...(motivo === undefined ? {} : { motivoPerda: motivo as MotivoPerda }),
+      respondeu: responderam.has(linha.id),
     });
   }
 
